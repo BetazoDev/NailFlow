@@ -1,0 +1,16 @@
+{
+    "name": "nailflow-monorepo",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "apps/*"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm run dev -w @nailflow/api\" \"npm run dev -w @nailflow/web\"",
+        "build": "npm run build --workspaces",
+        "install:all": "npm install"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1"
+    }
+}
