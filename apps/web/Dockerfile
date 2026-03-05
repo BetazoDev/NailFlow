@@ -24,14 +24,12 @@ WORKDIR /app
 ENV NODE_ENV production
 ENV PORT 3000
 
-# Copy necessary files from builder
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/web/.next/standalone ./apps/web/
+# Next.js standalone folder includes a bundled node_modules, so we just copy it
+COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
 
-WORKDIR /app/apps/web
-CMD ["node", "server.js"]
+# The server.js is generated inside apps/web folder
+CMD ["node", "apps/web/server.js"]
