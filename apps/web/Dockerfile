@@ -15,6 +15,8 @@ COPY . .
 
 # Build web app
 WORKDIR /app/apps/web
+# Next.js may need environment variables from root (if dokploy generated it at root)
+RUN cp ../../.env .env || true
 RUN npm run build
 
 # Production stage
