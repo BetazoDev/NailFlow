@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy root files for workspaces
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
+COPY apps/api/package*.json ./apps/api/
 
 # Install root dependencies (including workspaces)
 RUN npm install
