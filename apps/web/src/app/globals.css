@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Noto+Serif:wght@300;400;500;600&family=Noto+Sans:wght@300;400;500&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0');
 
 /* ============================================
    NailFlow Design System — Tailwind v4 Tokens
@@ -22,6 +23,15 @@
   --gray-light: #C8BEB8;
   --nf-white: #FFFFFF;
 
+  /* Aesthetic Palette (from Stitch designs) */
+  --aesthetic-pink: #d4b4b4;
+  --aesthetic-beige: #e8d8d0;
+  --aesthetic-cream: #fdfaf7;
+  --aesthetic-taupe: #8a7a7a;
+  --aesthetic-soft-pink: #f3e6e6;
+  --aesthetic-muted: #968686;
+  --aesthetic-accent: #e9d5d5;
+
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(44, 36, 32, 0.06);
   --shadow-md: 0 4px 16px rgba(44, 36, 32, 0.08);
@@ -39,6 +49,9 @@
   /* Fonts */
   --font-serif: 'Playfair Display', Georgia, serif;
   --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-noto-serif: 'Noto Serif', serif;
+  --font-noto-sans: 'Noto Sans', sans-serif;
+  --font-newsreader: 'Newsreader', serif;
 }
 
 @theme inline {
@@ -56,8 +69,20 @@
   --color-nf-gray: var(--nf-gray);
   --color-gray-light: var(--gray-light);
   --color-nf-white: var(--nf-white);
+
+  --color-aesthetic-pink: var(--aesthetic-pink);
+  --color-aesthetic-beige: var(--aesthetic-beige);
+  --color-aesthetic-cream: var(--aesthetic-cream);
+  --color-aesthetic-taupe: var(--aesthetic-taupe);
+  --color-aesthetic-soft-pink: var(--aesthetic-soft-pink);
+  --color-aesthetic-muted: var(--aesthetic-muted);
+  --color-aesthetic-accent: var(--aesthetic-accent);
+
   --font-serif: var(--font-serif);
   --font-body: var(--font-sans);
+  --font-display: var(--font-newsreader);
+  --font-noto-serif: var(--font-noto-serif);
+  --font-noto-sans: var(--font-noto-sans);
 }
 
 /* ===== BASE RESET ===== */
@@ -345,4 +370,126 @@ body {
 /* Safe area padding for mobile nav */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+/* ===== LOADING BAR (Splash) ===== */
+@keyframes loadingBar {
+  0% {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  40% {
+    transform: scaleX(0.6);
+    transform-origin: left;
+  }
+
+  100% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+.loading-bar-track {
+  width: 120px;
+  height: 1px;
+  background: var(--cream-dark);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: var(--pink);
+  border-radius: 99px;
+  animation: loadingBar 1.8s ease-in-out forwards;
+}
+
+/* ===== PILL TAB ===== */
+.pill-tab {
+  padding: 7px 20px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  transition: var(--transition);
+  cursor: pointer;
+  border: 1.5px solid transparent;
+}
+
+.pill-tab-active {
+  background: linear-gradient(135deg, var(--pink), var(--coral));
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(232, 160, 180, 0.3);
+}
+
+.pill-tab-inactive {
+  background: var(--nf-white);
+  color: var(--charcoal-light);
+  border-color: var(--cream-dark);
+}
+
+.pill-tab-inactive:hover {
+  border-color: var(--pink-light);
+  color: var(--charcoal);
+}
+
+/* ===== APPOINTMENT CARD ===== */
+.card-appointment {
+  background: var(--nf-white);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(212, 200, 168, 0.2);
+  transition: var(--transition);
+}
+
+.card-appointment:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* ===== FAB ===== */
+.fab {
+  position: fixed;
+  bottom: 96px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink), var(--coral));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(232, 160, 180, 0.45);
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+  z-index: 40;
+}
+
+.fab:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 6px 28px rgba(232, 160, 180, 0.5);
+}
+
+.fab:active {
+  transform: scale(0.97);
+}
+
+/* ===== ICON SUPPORT ===== */
+.material-symbol {
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
 }

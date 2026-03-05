@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Selección de Fecha y Hora - Ana Nails</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&amp;family=Manrope:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#D4A373",
+                        "accent-pink": "#E9CFCF",
+                        "background-cream": "#FDFBF7",
+                        "dark-text": "#2D2926",
+                        "soft-beige": "#F5F0E8",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"],
+                        "serif": ["Cormorant Garamond", "serif"]
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Manrope', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .serif-title {
+            font-family: 'Cormorant Garamond', serif;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-cream min-h-screen text-dark-text antialiased">
+<nav class="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-background-cream/80 backdrop-blur-md">
+<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-accent-pink/20 transition-colors">
+<span class="material-symbols-outlined text-dark-text font-light">arrow_back_ios_new</span>
+</button>
+<span class="text-[10px] font-bold tracking-[0.2em] uppercase opacity-40 serif-title">Reserva</span>
+<div class="w-10"></div>
+</nav>
+<main class="max-w-md mx-auto px-6 pb-40">
+<header class="mt-4 mb-8">
+<h1 class="text-3xl font-medium serif-title text-dark-text">Selecciona fecha y hora</h1>
+<p class="text-dark-text/50 mt-1 text-sm font-light">Encuentra el momento perfecto para ti</p>
+</header>
+<section class="mb-10 bg-white/40 p-6 rounded-3xl border border-white/60">
+<div class="flex items-center justify-between mb-8 px-2">
+<h2 class="serif-title text-xl font-semibold tracking-wide text-dark-text">Octubre 2024</h2>
+<div class="flex gap-4">
+<button class="material-symbols-outlined text-dark-text/40 hover:text-dark-text transition-colors">chevron_left</button>
+<button class="material-symbols-outlined text-dark-text/40 hover:text-dark-text transition-colors">chevron_right</button>
+</div>
+</div>
+<div class="calendar-grid text-center mb-4">
+<span class="text-[10px] font-bold text-dark-text/30 uppercase tracking-widest">Lu</span>
+<span class="text-[10px] font-bold text-dark-text/30 uppercase tracking-widest">Ma</span>
+<span class="text-[10px] font-bold text-dark-text/30 uppercase tracking-widest">Mi</span>
+<span class="text-[10px] font-bold text-dark-text/30 uppercase tracking-widest">Ju</span>
+<span class="text-[10px] font-bold text-dark-text/30 uppercase tracking-widest">Vi</span>
+<span class="text-[10px] font-bold text-dark-text/30 uppercase tracking-widest">Sa</span>
+<span class="text-[10px] font-bold text-dark-text/30 uppercase tracking-widest">Do</span>
+</div>
+<div class="calendar-grid text-center">
+<span></span><span></span>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/20">1</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/20">2</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">3</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">4</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">5</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">6</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">7</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">8</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">9</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">10</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">11</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-semibold bg-accent-pink text-dark-text rounded-full shadow-sm">12</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">13</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">14</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">15</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">16</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">17</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">18</button>
+<button class="h-10 w-10 flex items-center justify-center text-sm font-light text-dark-text/80 hover:bg-soft-beige rounded-full">19</button>
+</div>
+</section>
+<section>
+<h3 class="serif-title text-xl mb-6 text-dark-text">Horarios para el 12 de Octubre</h3>
+<div class="grid grid-cols-3 gap-3">
+<button class="py-3 px-4 bg-white border border-soft-beige rounded-2xl text-sm font-medium text-dark-text/70 hover:border-accent-pink transition-all">09:00</button>
+<button class="py-3 px-4 bg-white border border-soft-beige rounded-2xl text-sm font-medium text-dark-text/70 hover:border-accent-pink transition-all">10:30</button>
+<button class="py-3 px-4 bg-accent-pink/20 border border-accent-pink rounded-2xl text-sm font-semibold text-dark-text">12:00</button>
+<button class="py-3 px-4 bg-white border border-soft-beige rounded-2xl text-sm font-medium text-dark-text/70 hover:border-accent-pink transition-all">14:00</button>
+<button class="py-3 px-4 bg-white border border-soft-beige rounded-2xl text-sm font-medium text-dark-text/70 hover:border-accent-pink transition-all">15:30</button>
+<button class="py-3 px-4 bg-white border border-soft-beige rounded-2xl text-sm font-medium text-dark-text/70 hover:border-accent-pink transition-all">17:00</button>
+<button class="py-3 px-4 bg-white border border-soft-beige rounded-2xl text-sm font-medium text-dark-text/70 hover:border-accent-pink transition-all">18:30</button>
+</div>
+</section>
+</main>
+<div class="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-background-cream via-background-cream to-transparent pt-16">
+<div class="max-w-md mx-auto">
+<button class="w-full bg-accent-pink hover:bg-[#E2C4C4] text-dark-text font-medium py-4 rounded-2xl shadow-sm active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+<span class="serif-title text-lg tracking-wide font-semibold">Confirmar Cita</span>
+<span class="material-symbols-outlined font-light text-xl">calendar_today</span>
+</button>
+</div>
+</div>
+
+</body></html>

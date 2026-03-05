@@ -1,25 +1,50 @@
 import { Tenant } from './types';
-import { DEMO_TENANT } from './mock-data';
 
-// Map of domains → tenant configs
-// In production, this will be a Firestore lookup
-const tenantsByDomain: Record<string, Tenant> = {
-    'localhost': DEMO_TENANT,
-    'localhost:3000': DEMO_TENANT,
-};
+export async function getTenantByDomain(domain: string): Promise<Tenant | null> {
+    // For localhost development, map localhost or localhost:3000 to "demo"
+    let searchDomain = domain;
+    if (domain.includes('localhost') || domain === 'demo.nailflow.com') {
+        searchDomain = 'demo.com'; // Adjust default dev domain
+    }
 
-const tenantsById: Record<string, Tenant> = {
-    [DEMO_TENANT.id]: DEMO_TENANT,
-};
-
-export function getTenantByDomain(domain: string): Tenant | null {
-    return tenantsByDomain[domain] || DEMO_TENANT; // fallback to demo in dev
+    // Mock response to avoid Firestore creds issue during MVP flow testing
+    return {
+        id: 'demo-tenant',
+        domain: searchDomain,
+        branding: {
+            logo_url: '',
+            primary_color: '#E8B4B8',
+            secondary_color: '#82C3A6'
+        },
+        settings: {
+            currency: 'MXN',
+            timezone: 'America/Mexico_City'
+        },
+        owner_id: 'mock-owner-id',
+        subscription: {
+            status: 'active',
+            plan: 'pro'
+        }
+    };
 }
 
-export function getTenantById(id: string): Tenant | null {
-    return tenantsById[id] || null;
-}
-
-export function getDefaultTenant(): Tenant {
-    return DEMO_TENANT;
+export async function getTenantById(id: string): Promise<Tenant | null> {
+    return {
+        id,
+        domain: 'demo.com',
+        branding: {
+            logo_url: '',
+            primary_color: '#E8B4B8',
+            secondary_color: '#82C3A6'
+        },
+        settings: {
+            currency: 'MXN',
+            timezone: 'America/Mexico_City'
+        },
+        owner_id: 'mock-owner-id',
+        subscription: {
+            status: 'active',
+            plan: 'pro'
+        }
+    };
 }

@@ -4,37 +4,66 @@
 
 export interface Tenant {
   id: string;
-  name: string;
   domain: string;
-  logo_url: string;
-  primary_color: string;
-  secondary_color: string;
-  accent_color: string;
-  owner_name: string;
-  phone: string;
-  currency: string;
+  name?: string;
+  branding: {
+    logo_url: string;
+    primary_color: string;
+    secondary_color: string;
+    photo_url?: string;
+    palette_id?: string;
+    typography?: string;
+    tagline?: string;
+  };
+  settings: {
+    currency: string;
+    timezone: string;
+  };
+  owner_id: string;
+  subscription: {
+    status: 'active' | 'trial';
+    plan: 'pro';
+  };
 }
 
-export interface Service {
+export interface Staff {
   id: string;
   tenant_id: string;
   name: string;
-  description: string;
-  category: string;
-  duration_minutes: number;
-  estimated_price: number;
-  required_advance: number;
-  image_url?: string;
+  email: string;
+  role: 'owner' | 'staff';
+  photo_url: string;
+  bio: string;
   active: boolean;
+  color_identifier: string;
+  services_offered: string[];
+  specialty?: string;
+  slug?: string;
+  weekly_schedule: {
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+  }[];
 }
 
 export interface Availability {
   id: string;
   tenant_id: string;
-  day_of_week: number; // 0 = Sunday, 6 = Saturday
-  start_time: string;  // "09:00"
-  end_time: string;    // "18:00"
-  is_active: boolean;
+  staff_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  duration_minutes: number;
+  estimated_price: number;
+  required_advance: number;
+  category?: string;
+  description?: string;
+  image_url?: string;
 }
 
 export interface Appointment {
@@ -44,20 +73,39 @@ export interface Appointment {
   client_phone: string;
   client_email?: string;
   service_id: string;
-  service_name: string;
-  datetime_start: string; // ISO string
+  staff_id: string;
+  date: string;        // "2025-03-15"
+  time: string;        // "10:00"
+  datetime_start: string;
   datetime_end: string;
   image_url?: string;
+  image_urls?: string[];
   notes?: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-  advance_paid: number;
-  total_price: number;
-  created_at: string;
+  status: 'pending_payment' | 'confirmed' | 'cancelled' | 'completed';
+  advance_paid: boolean;
+  payment_ref?: string;
+  expires_at?: string;
+  service?: Service;
 }
 
 export interface TimeSlot {
   time: string;       // "09:00"
   available: boolean;
+}
+
+export interface Client {
+  id?: string;
+  name: string;
+  phone: string;
+  email?: string;
+  preferences?: string;
+  allergies?: string;
+  visits: number;
+  lastVisit: string;
+  lastService?: string;
+  totalSpent: number;
+  services: string[];
+  favorite?: boolean;
 }
 
 export interface BookingData {
@@ -68,16 +116,15 @@ export interface BookingData {
   service_name: string;
   service_price: number;
   service_duration: number;
+  staff_id?: string;
+  staff_name?: string;
+  staff_photo?: string;
   client_name: string;
   client_phone: string;
   client_email?: string;
   image_url?: string;
+  image_urls?: string[];
   notes?: string;
 }
 
-export type BookingStep =
-  | 'datetime'
-  | 'service'
-  | 'details'
-  | 'payment'
-  | 'confirmation';
+export type BookingStep = 'personal' | 'service' | 'datetime' | 'inspiration' | 'summary' | 'payment' | 'confirmation';

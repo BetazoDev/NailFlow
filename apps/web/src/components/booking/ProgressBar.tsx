@@ -6,11 +6,13 @@ interface ProgressBarProps {
     currentStep: BookingStep;
 }
 
-const STEPS: BookingStep[] = ['datetime', 'service', 'details', 'payment', 'confirmation'];
+const STEPS: BookingStep[] = ['personal', 'service', 'datetime', 'inspiration', 'summary', 'payment', 'confirmation'];
 const STEP_LABELS: Record<BookingStep, string> = {
-    datetime: 'Fecha',
+    personal: 'Datos',
     service: 'Servicio',
-    details: 'Datos',
+    datetime: 'Fecha',
+    inspiration: 'Fotos',
+    summary: 'Resumen',
     payment: 'Pago',
     confirmation: '✓',
 };

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Confirmación de Cita - Aesthetic Success</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&amp;family=Noto+Serif:ital,wght@0,300;0,400;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#E2B6B1",
+                        "soft-pink": "#F4E4E1",
+                        "cream": "#F9F6F2",
+                        "taupe": "#8E8279"
+                    },
+                    fontFamily: {
+                        "display": ["Noto Serif", "serif"],
+                        "sans": ["Noto Sans", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-cream text-slate-800 antialiased;
+                font-family: 'Noto Sans', sans-serif;
+            }
+            .font-display {
+                font-family: 'Noto Serif', serif;
+            }
+        }
+        .illustration-ring {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .flower-accent {
+            position: absolute;
+            color: #E2B6B1;
+            opacity: 0.6;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen flex items-center justify-center p-4">
+<div class="max-w-md w-full bg-cream min-h-[90vh] flex flex-col items-center justify-between py-12 px-8">
+<div class="flex flex-col items-center mt-8">
+<div class="illustration-ring mb-6">
+<div class="absolute inset-0 bg-soft-pink/40 rounded-full scale-110"></div>
+<span class="material-symbols-outlined flower-accent -top-2 text-xl">spa</span>
+<span class="material-symbols-outlined flower-accent -right-2 top-1/2 -translate-y-1/2 text-xl">filter_vintage</span>
+<span class="material-symbols-outlined flower-accent -bottom-2 text-xl">local_florist</span>
+<span class="material-symbols-outlined flower-accent -left-2 top-1/2 -translate-y-1/2 text-xl">celebration</span>
+<div class="relative bg-white rounded-full p-4 shadow-sm">
+<span class="material-symbols-outlined text-primary text-4xl font-light">check_circle</span>
+</div>
+</div>
+<h1 class="font-display italic text-3xl text-slate-700 text-center leading-tight">
+                ¡Tu cita está confirmada!
+            </h1>
+</div>
+<div class="w-full mt-10">
+<div class="bg-white/60 backdrop-blur-sm rounded-[2rem] p-8 shadow-[0_8px_30px_rgb(226,182,177,0.12)] border border-white/40">
+<div class="text-center mb-6">
+<p class="text-[10px] uppercase tracking-[0.25em] text-taupe/60 mb-1">Tu cita en</p>
+<h2 class="font-display text-xl text-slate-800">Ana Nails Studio</h2>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-4 border-b border-primary/10 pb-3">
+<span class="material-symbols-outlined text-primary/70 font-light">calendar_today</span>
+<div>
+<p class="text-[9px] uppercase tracking-wider text-slate-400">Fecha</p>
+<p class="text-sm font-display text-slate-700">Jueves, 24 de Octubre</p>
+</div>
+</div>
+<div class="flex items-center gap-4 border-b border-primary/10 pb-3">
+<span class="material-symbols-outlined text-primary/70 font-light">schedule</span>
+<div>
+<p class="text-[9px] uppercase tracking-wider text-slate-400">Hora</p>
+<p class="text-sm font-display text-slate-700">16:30 PM</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary/70 font-light">auto_awesome</span>
+<div>
+<p class="text-[9px] uppercase tracking-wider text-slate-400">Servicio</p>
+<p class="text-sm font-display text-slate-700">Manicura Premium + Nail Art</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8 px-4">
+<p class="text-center text-slate-400 text-xs font-light leading-relaxed italic">
+                Te hemos enviado los detalles y el recordatorio a tu WhatsApp
+            </p>
+</div>
+<div class="w-full mt-10 space-y-6">
+<button class="w-full bg-soft-pink/60 hover:bg-soft-pink text-slate-600 py-4 rounded-full flex items-center justify-center gap-3 transition-all active:scale-[0.98] border border-primary/10">
+<span class="material-symbols-outlined text-xl">event_available</span>
+<span class="font-display tracking-wide text-sm">Añadir a mi Calendario</span>
+</button>
+<div class="text-center">
+<a class="text-[11px] uppercase tracking-[0.2em] text-taupe/50 hover:text-taupe transition-colors border-b border-transparent hover:border-taupe/30 pb-1" href="#">
+                    Volver al inicio
+                </a>
+</div>
+</div>
+<div class="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+<span class="material-symbols-outlined text-9xl">spa</span>
+</div>
+<div class="absolute bottom-0 left-0 p-12 opacity-5 pointer-events-none">
+<span class="material-symbols-outlined text-8xl">self_improvement</span>
+</div>
+</div>
+
+</body></html>

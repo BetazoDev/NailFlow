@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Editor de Servicios Aesthetic Refinado</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@300;400;500;600&amp;family=Noto+Sans:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-soft": "#e9d5d5", // Mauve/dusty pink soft tone
+                        "primary-muted": "#d4b8b8",
+                        "background-cream": "#fdfbf9",
+                        "border-soft": "#e5e1da",
+                        "aesthetic-gray": "#94a3b8",
+                        "text-elegant": "#4a4444",
+                    },
+                    fontFamily: {
+                        "display": ["Noto Serif", "serif"],
+                        "sans": ["Noto Sans", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Noto Sans', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            background-color: theme('colors.background-cream');
+        }
+        .serif-font {
+            font-family: 'Noto Serif', serif;
+        }
+        .soft-shadow {
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
+        }
+        .input-focus {
+            @apply focus:ring-1 focus:ring-primary-muted/30 focus:border-primary-muted/30;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-cream text-text-elegant min-h-screen flex flex-col">
+<header class="sticky top-0 z-10 bg-background-cream/90 backdrop-blur-md px-6 py-4 flex items-center justify-between border-b border-border-soft/50">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-black/5 transition-colors">
+<span class="material-symbols-outlined text-slate-500 font-light">arrow_back</span>
+</button>
+<h1 class="serif-font text-lg font-medium tracking-tight">Nuevo Servicio</h1>
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-black/5 transition-colors">
+<span class="material-symbols-outlined text-slate-500 font-light">more_horiz</span>
+</button>
+</header>
+<main class="flex-1 max-w-md mx-auto w-full px-6 py-8 space-y-10">
+<section class="flex flex-col items-center gap-4">
+<div class="relative group cursor-pointer w-full aspect-square max-w-[280px] bg-white border border-dashed border-border-soft rounded-2xl flex flex-col items-center justify-center transition-all hover:bg-stone-50 overflow-hidden">
+<div class="flex flex-col items-center gap-3 text-primary-muted">
+<span class="material-symbols-outlined text-3xl font-light">photo_camera</span>
+<p class="text-xs font-medium uppercase tracking-widest serif-font">Agregar Miniatura</p>
+</div>
+</div>
+<p class="text-[11px] text-slate-400 text-center px-8 leading-relaxed italic serif-font">Sube una foto de alta calidad para destacar tu trabajo</p>
+</section>
+<div class="space-y-8">
+<div class="space-y-2">
+<label class="serif-font text-xs font-medium tracking-wider text-slate-500 ml-1">Nombre del Servicio</label>
+<input class="w-full bg-white border-none ring-1 ring-border-soft input-focus rounded-xl p-4 text-base serif-font soft-shadow transition-all placeholder:text-slate-300" placeholder="ej. Kapping Gel + Nail Art" type="text"/>
+</div>
+<div class="space-y-2">
+<label class="serif-font text-xs font-medium tracking-wider text-slate-500 ml-1">Descripción</label>
+<textarea class="w-full bg-white border-none ring-1 ring-border-soft input-focus rounded-xl p-4 text-base serif-font soft-shadow transition-all resize-none placeholder:text-slate-300" placeholder="Describe el procedimiento..." rows="3"></textarea>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="serif-font text-xs font-medium tracking-wider text-slate-500 ml-1">Precio ($)</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 serif-font">$</span>
+<input class="w-full bg-white border-none ring-1 ring-border-soft input-focus rounded-xl p-4 pl-8 text-base serif-font soft-shadow transition-all" placeholder="0.00" type="number"/>
+</div>
+</div>
+<div class="space-y-2">
+<label class="serif-font text-xs font-medium tracking-wider text-slate-500 ml-1">Duración</label>
+<div class="relative">
+<select class="w-full appearance-none bg-white border-none ring-1 ring-border-soft input-focus rounded-xl p-4 text-base serif-font soft-shadow transition-all pr-10">
+<option>30 min</option>
+<option selected="">60 min</option>
+<option>90 min</option>
+<option>120 min</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xl">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<section class="pt-4 pb-12">
+<button class="w-full bg-primary-soft text-text-elegant hover:bg-primary-muted transition-all duration-500 py-5 rounded-2xl text-base serif-font font-medium tracking-widest soft-shadow active:scale-[0.98] border border-white/20">
+            GUARDAR SERVICIO
+        </button>
+<p class="text-center mt-8 text-slate-400 text-[10px] tracking-[0.2em] uppercase">Estética &amp; Elegancia Profesional</p>
+</section>
+</main>
+<nav class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-border-soft/40 px-6 py-3 flex justify-around items-end pb-8">
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined font-light text-2xl">home</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined font-light text-2xl">calendar_today</span>
+</a>
+<a class="flex flex-col items-center justify-center -translate-y-4" href="#">
+<div class="bg-primary-soft size-14 rounded-full flex items-center justify-center soft-shadow border-4 border-background-cream">
+<span class="material-symbols-outlined text-text-elegant text-3xl font-light">add</span>
+</div>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined font-light text-2xl">content_cut</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined font-light text-2xl">person</span>
+</a>
+</nav>
+<div class="h-24"></div>
+
+</body></html>

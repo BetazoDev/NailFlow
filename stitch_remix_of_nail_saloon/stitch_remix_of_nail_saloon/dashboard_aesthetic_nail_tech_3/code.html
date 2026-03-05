@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Agenda Aesthetic Semanal</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#E6A4B4", // Soft Rose
+              "background-light": "#FAF3F0", // Creamy Beige Base
+              "background-dark": "#1A1614", // Dark Cocoa
+              accent: "#F3D7CA", // Soft Peach
+              beige: {
+                50: '#FDFBF9',
+                100: '#FAF3F0',
+                200: '#F3D7CA',
+              }
+            },
+            fontFamily: {
+              display: ["Playfair Display", "serif"],
+              sans: ["Inter", "sans-serif"],
+            },
+            borderRadius: {
+              '2xl': '24px',
+              '3xl': '32px',
+              '4xl': '40px',
+            },
+          },
+        },
+      };
+    </script>
+<style type="text/tailwindcss">
+        .glass {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .dark .glass {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        body {
+            background-color: #FAF3F0;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .timeline-line {
+            position: absolute;
+            left: 58px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: linear-gradient(to bottom, transparent, #E5E7EB, #E5E7EB, transparent);
+        }
+        .dark .timeline-line {
+            background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.1), rgba(255,255,255,0.1), transparent);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-stone-800 dark:text-stone-200 font-sans antialiased min-h-screen flex flex-col">
+<main class="flex-1 w-full max-w-md mx-auto flex flex-col h-screen">
+<header class="px-6 pt-12 pb-6 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md sticky top-0 z-30">
+<div class="flex justify-between items-center mb-8">
+<h1 class="font-display text-3xl font-medium text-stone-900 dark:text-white">Mi Agenda</h1>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-stone-400">calendar_month</span>
+<span class="text-xs font-bold tracking-widest uppercase opacity-40">Octubre</span>
+</div>
+</div>
+<div class="flex justify-between items-center scrollbar-hide overflow-x-auto gap-2">
+<div class="flex flex-col items-center min-w-[48px] py-3 rounded-2xl transition-all">
+<span class="text-[10px] uppercase tracking-tighter font-bold opacity-40 mb-2">Lun</span>
+<span class="text-sm font-semibold">12</span>
+</div>
+<div class="flex flex-col items-center min-w-[48px] py-3 rounded-2xl transition-all">
+<span class="text-[10px] uppercase tracking-tighter font-bold opacity-40 mb-2">Mar</span>
+<span class="text-sm font-semibold">13</span>
+</div>
+<div class="flex flex-col items-center min-w-[48px] py-3 rounded-full bg-primary/20 text-primary border border-primary/10 transition-all shadow-sm">
+<span class="text-[10px] uppercase tracking-tighter font-bold mb-2">Mié</span>
+<span class="text-sm font-bold">14</span>
+</div>
+<div class="flex flex-col items-center min-w-[48px] py-3 rounded-2xl transition-all">
+<span class="text-[10px] uppercase tracking-tighter font-bold opacity-40 mb-2">Jue</span>
+<span class="text-sm font-semibold">15</span>
+</div>
+<div class="flex flex-col items-center min-w-[48px] py-3 rounded-2xl transition-all">
+<span class="text-[10px] uppercase tracking-tighter font-bold opacity-40 mb-2">Vie</span>
+<span class="text-sm font-semibold">16</span>
+</div>
+<div class="flex flex-col items-center min-w-[48px] py-3 rounded-2xl transition-all">
+<span class="text-[10px] uppercase tracking-tighter font-bold opacity-40 mb-2">Sáb</span>
+<span class="text-sm font-semibold">17</span>
+</div>
+</div>
+</header>
+<section class="flex-1 px-6 pb-32 overflow-y-auto scrollbar-hide relative">
+<div class="timeline-line"></div>
+<div class="space-y-10 relative">
+<div class="flex gap-6 items-start">
+<div class="w-10 text-right pt-2">
+<p class="text-[11px] font-bold text-stone-400 dark:text-stone-500">09:00</p>
+</div>
+<div class="flex-1">
+<div class="bg-accent/30 dark:bg-primary/10 p-5 rounded-3xl border border-white/50 dark:border-white/5 shadow-sm">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-display text-lg font-semibold text-stone-800 dark:text-stone-100">Ana García</h3>
+<span class="text-[10px] bg-white/60 dark:bg-black/20 px-2 py-0.5 rounded-full text-stone-500 font-bold uppercase tracking-wider">90 min</span>
+</div>
+<p class="text-xs text-stone-500 dark:text-stone-400 italic">Esmaltado Semi + Retiro</p>
+</div>
+</div>
+</div>
+<div class="flex gap-6 items-start">
+<div class="w-10 text-right pt-2">
+<p class="text-[11px] font-bold text-stone-400 dark:text-stone-500">10:30</p>
+</div>
+<div class="flex-1 pt-1">
+<div class="flex items-center h-12 px-5 rounded-2xl border border-dashed border-stone-300 dark:border-white/10 group">
+<span class="text-xs font-medium text-stone-400/60 font-display italic">Libre</span>
+</div>
+</div>
+</div>
+<div class="flex gap-6 items-start">
+<div class="w-10 text-right pt-2">
+<p class="text-[11px] font-bold text-stone-400 dark:text-stone-500">11:00</p>
+</div>
+<div class="flex-1">
+<div class="bg-primary/10 dark:bg-primary/20 p-5 rounded-3xl border border-primary/10 shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 w-16 h-16 bg-white/20 -rotate-45 translate-x-8 -translate-y-8"></div>
+<div class="flex justify-between items-start mb-1 relative z-10">
+<h3 class="font-display text-lg font-semibold text-stone-800 dark:text-stone-100">Carla Ruiz</h3>
+<span class="text-[10px] bg-primary/20 px-2 py-0.5 rounded-full text-primary font-bold uppercase tracking-wider">120 min</span>
+</div>
+<p class="text-xs text-stone-500 dark:text-stone-400 italic relative z-10">Soft Gel + Nail Art Mano Alzada</p>
+</div>
+</div>
+</div>
+<div class="flex gap-6 items-start">
+<div class="w-10 text-right pt-2">
+<p class="text-[11px] font-bold text-stone-400 dark:text-stone-500">13:00</p>
+</div>
+<div class="flex-1 pt-1">
+<div class="flex items-center h-12 px-5 rounded-2xl border border-dashed border-stone-300 dark:border-white/10">
+<span class="text-xs font-medium text-stone-400/60 font-display italic">Libre</span>
+</div>
+</div>
+</div>
+<div class="flex gap-6 items-start">
+<div class="w-10 text-right pt-2">
+<p class="text-[11px] font-bold text-stone-400 dark:text-stone-500">14:00</p>
+</div>
+<div class="flex-1">
+<div class="bg-stone-200/40 dark:bg-stone-800/40 p-4 rounded-3xl border border-stone-200 dark:border-white/5 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px] opacity-40">coffee</span>
+<span class="text-xs font-bold uppercase tracking-[0.2em] opacity-30">Almuerzo</span>
+</div>
+</div>
+</div>
+<div class="flex gap-6 items-start">
+<div class="w-10 text-right pt-2">
+<p class="text-[11px] font-bold text-stone-400 dark:text-stone-500">15:30</p>
+</div>
+<div class="flex-1">
+<div class="bg-blue-50/50 dark:bg-blue-900/10 p-5 rounded-3xl border border-blue-100/50 dark:border-blue-900/20 shadow-sm">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-display text-lg font-semibold text-stone-800 dark:text-stone-100">Marta Soler</h3>
+<span class="text-[10px] bg-blue-100/50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full text-blue-400 font-bold uppercase tracking-wider">60 min</span>
+</div>
+<p class="text-xs text-stone-500 dark:text-stone-400 italic">Mantenimiento Acrílico</p>
+</div>
+</div>
+</div>
+<div class="flex gap-6 items-start">
+<div class="w-10 text-right pt-2">
+<p class="text-[11px] font-bold text-stone-400 dark:text-stone-500">16:30</p>
+</div>
+<div class="flex-1 pt-1">
+<div class="flex items-center h-12 px-5 rounded-2xl border border-dashed border-stone-300 dark:border-white/10">
+<span class="text-xs font-medium text-stone-400/60 font-display italic">Libre</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<div class="fixed bottom-28 right-6 z-50">
+<button class="w-16 h-16 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[32px]">add</span>
+</button>
+</div>
+<nav class="fixed bottom-0 w-full z-40 bg-white/80 dark:bg-stone-900/90 backdrop-blur-xl border-t border-stone-200/50 dark:border-white/5">
+<div class="max-w-md mx-auto px-10 pt-4 pb-8 flex justify-between items-center">
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[26px]">grid_view</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Inicio</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-primary cursor-pointer">
+<span class="material-symbols-outlined text-[26px]" style="font-variation-settings: 'FILL' 1;">calendar_today</span>
+<span class="text-[10px] font-bold uppercase tracking-wider">Agenda</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[26px]">group</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Clientes</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[26px]">person</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Perfil</span>
+</div>
+</div>
+</nav>
+</main>
+<script>
+    // System dark mode detection
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+    }
+</script>
+
+</body></html>

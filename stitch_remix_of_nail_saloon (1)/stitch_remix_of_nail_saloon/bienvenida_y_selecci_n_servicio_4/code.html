@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Selecciona tu servicio - Aesthetic Booking</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&amp;family=Manrope:wght@200;300;400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-beige": "#F5F0E8",
+                        "accent-pink-dusty": "#F8E1E1",
+                        "button-pink": "#F4D7D7",
+                        "background-cream": "#FDFBF7",
+                        "dark-text": "#3A3530",
+                        "muted-gold": "#C5A880",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"],
+                        "serif": ["Cormorant Garamond", "serif"]
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                font-family: 'Manrope', sans-serif;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .serif-elegant {
+                font-family: 'Cormorant Garamond', serif;
+            }
+        }
+    </style>
+<style>
+        body {
+            min-height: 100dvh;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-cream text-dark-text antialiased">
+<nav class="sticky top-0 z-50 flex items-center justify-between px-6 py-6 bg-background-cream/90 backdrop-blur-md">
+<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-accent-pink-dusty/30 transition-colors">
+<span class="material-symbols-outlined text-dark-text/70 font-light text-xl">arrow_back_ios_new</span>
+</button>
+<span class="text-[11px] font-medium tracking-[0.4em] uppercase opacity-40 serif-elegant">Reserva</span>
+<div class="w-10"></div>
+</nav>
+<main class="max-w-md mx-auto px-6 pb-44">
+<header class="mt-4 mb-10">
+<h1 class="text-[40px] leading-[1.1] font-light serif-elegant text-dark-text">Selecciona tu servicio</h1>
+<p class="text-dark-text/40 mt-3 text-[12px] tracking-[0.1em] font-light uppercase">Elige el tratamiento ideal para ti</p>
+<div class="w-12 h-[1px] bg-accent-pink-dusty mt-6"></div>
+</header>
+<div class="space-y-4">
+<button class="w-full flex items-center p-4 bg-white rounded-[24px] border border-accent-pink-dusty shadow-[0_8px_20px_-6px_rgba(233,207,207,0.4)] transition-all">
+<div class="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border border-background-cream">
+<img alt="Esmaltado" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-VhO-unVoTW2WDtOViSy4RmIgle92HUKUtNL2nSUNBsXRmfetf8bPRTgJ9YPEOold1UAnILSH1mEVIMEHnOejx8CnUZxwylk_UFBEyDCIMSuedAHxYL-HFpBm31ADPftL6dfRihJaJpTkWvRSMEWsu_iilazEVED39CnItjWnHEcztpNkT38z0IdiTtwFaJwkF_ooOODXQfNohQnsr6bKlNSmC3IbX8ht-iPhZQReIBz8frsdl2XMpZ5cv9WjFJdEtYYDMZ_2sc5g"/>
+</div>
+<div class="ml-4 flex flex-col items-start text-left flex-1">
+<span class="text-xl serif-elegant font-semibold text-dark-text">Esmaltado Semipermanente</span>
+<span class="text-[10px] text-dark-text/50 flex items-center gap-1.5 mt-1.5 font-medium tracking-widest">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 60 MIN
+                    </span>
+</div>
+<div class="flex flex-col items-end gap-3 pl-2">
+<span class="text-[15px] font-semibold text-dark-text/80 serif-elegant">$25</span>
+<div class="w-6 h-6 rounded-full flex items-center justify-center bg-button-pink shadow-sm">
+<span class="material-symbols-outlined text-white text-[16px] font-bold">check</span>
+</div>
+</div>
+</button>
+<button class="w-full flex items-center p-4 bg-white/40 rounded-[24px] border border-transparent hover:border-accent-pink-dusty/60 transition-all group">
+<div class="w-16 h-16 rounded-2xl overflow-hidden shrink-0">
+<img alt="Kapping" class="w-full h-full object-cover opacity-90" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1h8cRAaiY3EJTXTNWIuvUen7Oh0VdgYtCtDBeC-0l5VkErkQpm4NtIvAWiNxQ7xgthFmLOBK7T6bE27lEGepVFrcGXH9ZrBKEo9q8mzqvy9MzaSJuLgT2kPeghihYiJBxdKq5cnyAT6W-E1VRaMDDuvBb3W7DpjYSrnYQTypKI09VsqFzeLYR23mbpQAnSd7MOAbrx3WkZ_tIGcEq8hpj1-1MV8rQkwF1s2saXIu7pSFYqxY0jOvInkn_I6dFrvujogudX8X1_yz-"/>
+</div>
+<div class="ml-4 flex flex-col items-start text-left flex-1">
+<span class="text-xl serif-elegant font-medium text-dark-text/90">Kapping Gel</span>
+<span class="text-[10px] text-dark-text/50 flex items-center gap-1.5 mt-1.5 font-medium tracking-widest">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 90 MIN
+                    </span>
+</div>
+<div class="flex flex-col items-end gap-3 pl-2">
+<span class="text-[15px] font-medium text-dark-text/60 serif-elegant">$35</span>
+<div class="w-6 h-6 rounded-full border border-dark-text/10 flex items-center justify-center bg-white/50 group-hover:border-accent-pink-dusty/40"></div>
+</div>
+</button>
+<button class="w-full flex items-center p-4 bg-white/40 rounded-[24px] border border-transparent hover:border-accent-pink-dusty/60 transition-all group">
+<div class="w-16 h-16 rounded-2xl overflow-hidden shrink-0">
+<img alt="Esculpidas" class="w-full h-full object-cover opacity-90" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrvtM_HhmsCB1cflJivZYGYY6oL4EUzSC5FtKJQdpQX_cma_UwcSynekGVEPUjdJuRln3MOvaLyJ2s6ooTmhrxF5c2EqDsJpFlH9iLV2GhhF5aNST7Wn0XKH_g9gbdLypXpcHTtHrZX5t7Ntzgy50i3R7_qqmFm-VKw8-olXu7hwJ2c4nJ0UIuKQkwpC1qSECFRToCDSQpnoVoMJXXh9SzgHg6y-tK41yqkzMt3FIZunmM3ECTKuRh8-79lfUSgDgVBgTnScgxEKBU"/>
+</div>
+<div class="ml-4 flex flex-col items-start text-left flex-1">
+<span class="text-xl serif-elegant font-medium text-dark-text/90">Esculpidas Premium</span>
+<span class="text-[10px] text-dark-text/50 flex items-center gap-1.5 mt-1.5 font-medium tracking-widest">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 120 MIN
+                    </span>
+</div>
+<div class="flex flex-col items-end gap-3 pl-2">
+<span class="text-[15px] font-medium text-dark-text/60 serif-elegant">$45</span>
+<div class="w-6 h-6 rounded-full border border-dark-text/10 flex items-center justify-center bg-white/50 group-hover:border-accent-pink-dusty/40"></div>
+</div>
+</button>
+<button class="w-full flex items-center p-4 bg-white/40 rounded-[24px] border border-transparent hover:border-accent-pink-dusty/60 transition-all group">
+<div class="w-16 h-16 rounded-2xl overflow-hidden shrink-0">
+<img alt="Nail Art" class="w-full h-full object-cover opacity-90" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBAeORFCGiVXTgCOUeQ0fyo1-xHJh2cR3tNXfZrBIl9tGeEwdmP02iS9mgzD-xz8r5so6d7pm3KlncfWqYwZd8lwSryDQPndNoK4GGrPytm7BNfxQip9gibEVieKk_-sJO0_zOU1q_pQDxwk2vSBzsteS4AOY8cdWZ6vuAyjVJG2hDbzkD_Hs6mLIWjkMGptsKxBd2iyW2Psb0gNTpZOebcMGa9I6W2q-p1dBUHrZ5VbV6E-eLSHi7yQX04UT44LpT0AgLiTqygfOwh"/>
+</div>
+<div class="ml-4 flex flex-col items-start text-left flex-1">
+<span class="text-xl serif-elegant font-medium text-dark-text/90">Diseño Especial</span>
+<span class="text-[10px] text-dark-text/50 flex items-center gap-1.5 mt-1.5 font-medium tracking-widest">
+<span class="material-symbols-outlined text-[14px]">add_circle</span> VARÍA
+                    </span>
+</div>
+<div class="flex flex-col items-end gap-3 pl-2">
+<span class="text-[15px] font-medium text-dark-text/60 serif-elegant">+$10</span>
+<div class="w-6 h-6 rounded-full border border-dark-text/10 flex items-center justify-center bg-white/50 group-hover:border-accent-pink-dusty/40"></div>
+</div>
+</button>
+</div>
+</main>
+<div class="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-background-cream via-background-cream to-transparent pt-20">
+<div class="max-w-md mx-auto">
+<button class="w-full bg-button-pink hover:bg-[#F2CACA] text-dark-text/80 font-semibold py-5 rounded-[22px] shadow-sm active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+<span class="serif-elegant text-xl tracking-wider">Continuar</span>
+<span class="material-symbols-outlined font-light text-xl">arrow_forward</span>
+</button>
+<div class="flex items-center justify-center gap-6 mt-6">
+<div class="h-[2px] w-8 bg-accent-pink-dusty rounded-full"></div>
+<p class="text-center text-[10px] text-dark-text/30 uppercase tracking-[0.3em] font-medium">Paso 1 de 3</p>
+<div class="h-[2px] w-8 bg-dark-text/5 rounded-full"></div>
+</div>
+</div>
+</div>
+
+</body></html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Nail Tech Aesthetic Dashboard</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#E6A4B4", // Soft Rose
+              "background-light": "#FAF3F0", // Creamy Beige Base
+              "background-dark": "#1A1614", // Dark Cocoa
+              accent: "#F3D7CA", // Soft Peach
+            },
+            fontFamily: {
+              display: ["Playfair Display", "serif"],
+              sans: ["Inter", "sans-serif"],
+            },
+            borderRadius: {
+              '2xl': '24px',
+              '3xl': '32px',
+            },
+          },
+        },
+      };
+    </script>
+<style type="text/tailwindcss">
+        .glass {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .dark .glass {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        body {
+            background-color: #FAF3F0;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-stone-800 dark:text-stone-200 font-sans antialiased min-h-screen flex flex-col">
+<main class="flex-1 overflow-y-auto px-6 pt-12 pb-32 scrollbar-hide w-full max-w-md mx-auto">
+<header class="mb-10">
+<p class="text-[10px] opacity-50 uppercase tracking-[0.2em] font-semibold mb-2">Hola, Ana</p>
+<h1 class="font-display text-4xl font-medium text-stone-900 dark:text-white leading-tight">Buenos días ✨</h1>
+</header>
+<div class="bg-white/60 dark:bg-stone-800/40 p-5 rounded-3xl shadow-sm mb-10 flex items-center justify-between border border-white dark:border-white/5">
+<div class="flex items-center gap-4 overflow-hidden">
+<div class="w-11 h-11 rounded-full bg-accent/40 dark:bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[22px]">link</span>
+</div>
+<div class="overflow-hidden">
+<p class="text-[9px] uppercase tracking-wider opacity-50 font-bold mb-0.5">Link de reserva</p>
+<p class="text-sm font-medium truncate text-stone-700 dark:text-stone-300">agendapro.nails/ana</p>
+</div>
+</div>
+<button class="bg-primary/10 hover:bg-primary/20 text-primary p-2.5 rounded-2xl transition-all">
+<span class="material-symbols-outlined text-[20px]">content_copy</span>
+</button>
+</div>
+<div class="glass p-7 rounded-3xl mb-10 relative overflow-hidden group">
+<div class="absolute -right-6 -top-6 w-28 h-28 bg-primary/15 rounded-full blur-2xl transition-all"></div>
+<div class="relative z-10">
+<p class="text-[10px] uppercase tracking-[0.2em] font-semibold opacity-60 mb-2">Ingresos de hoy</p>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-display font-bold text-stone-900 dark:text-white">$1,250</span>
+<span class="text-xs text-green-600 dark:text-green-400 font-semibold px-2 py-0.5 bg-green-500/10 rounded-full">+12%</span>
+</div>
+</div>
+</div>
+<div class="mb-5 flex justify-between items-end px-1">
+<h2 class="font-display text-2xl font-semibold text-stone-800 dark:text-stone-100">Citas de hoy</h2>
+<span class="text-[10px] bg-primary/15 px-3 py-1 rounded-full text-primary font-bold uppercase tracking-wider">4 Pendientes</span>
+</div>
+<div class="space-y-4">
+<div class="bg-white dark:bg-stone-800 p-5 rounded-3xl shadow-[0_12px_24px_rgba(0,0,0,0.02)] border border-stone-100 dark:border-white/5 flex items-center gap-5">
+<div class="flex flex-col items-center justify-center min-w-[55px] border-r border-stone-100 dark:border-white/5 pr-4">
+<p class="text-lg font-bold font-display leading-tight text-stone-900 dark:text-white">10:00</p>
+<p class="text-[10px] opacity-40 font-bold uppercase tracking-tighter">AM</p>
+</div>
+<div class="flex-1">
+<p class="text-[15px] font-semibold mb-0.5 text-stone-800 dark:text-stone-200">Valentina Rossi</p>
+<p class="text-[11px] opacity-50 font-medium">Esmaltado Semi + Deco Art</p>
+</div>
+<div class="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_10px_rgba(230,164,180,0.6)]"></div>
+</div>
+<div class="bg-white dark:bg-stone-800 p-5 rounded-3xl shadow-[0_12px_24px_rgba(0,0,0,0.02)] border border-stone-100 dark:border-white/5 flex items-center gap-5">
+<div class="flex flex-col items-center justify-center min-w-[55px] border-r border-stone-100 dark:border-white/5 pr-4">
+<p class="text-lg font-bold font-display leading-tight text-stone-900 dark:text-white">12:30</p>
+<p class="text-[10px] opacity-40 font-bold uppercase tracking-tighter">PM</p>
+</div>
+<div class="flex-1">
+<p class="text-[15px] font-semibold mb-0.5 text-stone-800 dark:text-stone-200">Lucía Méndez</p>
+<p class="text-[11px] opacity-50 font-medium">Retoque Soft Gel</p>
+</div>
+<div class="w-9 h-9 rounded-full border border-stone-100 dark:border-white/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-stone-400 text-[18px]">more_horiz</span>
+</div>
+</div>
+<div class="bg-white/40 dark:bg-stone-800/20 p-5 rounded-3xl border border-dashed border-stone-300 dark:border-white/10 flex items-center gap-5">
+<div class="flex flex-col items-center justify-center min-w-[55px] border-r border-stone-200 dark:border-white/10 pr-4 opacity-40">
+<p class="text-lg font-bold font-display leading-tight">15:00</p>
+<p class="text-[10px] font-bold uppercase tracking-tighter">PM</p>
+</div>
+<div class="flex-1 opacity-40 italic">
+<p class="text-[14px] font-medium">Hueco disponible</p>
+</div>
+<button class="text-primary text-[10px] font-bold uppercase tracking-[0.15em] py-2 px-3 bg-primary/5 rounded-xl border border-primary/10">
+                    Bloquear
+                </button>
+</div>
+</div>
+</main>
+<div class="fixed bottom-28 right-6 z-50">
+<button class="w-16 h-16 bg-primary text-white rounded-full shadow-xl shadow-primary/30 flex items-center justify-center active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[32px]">add</span>
+</button>
+</div>
+<nav class="fixed bottom-0 w-full z-40 bg-white/80 dark:bg-stone-900/90 backdrop-blur-xl border-t border-stone-200/50 dark:border-white/5">
+<div class="max-w-md mx-auto px-10 pt-4 pb-8 flex justify-between items-center">
+<div class="flex flex-col items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[26px]">grid_view</span>
+<span class="text-[10px] font-bold uppercase tracking-wider">Inicio</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[26px]">calendar_today</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Agenda</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[26px]">group</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Clientes</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[26px]">person</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Perfil</span>
+</div>
+</div>
+</nav>
+<script>
+        // Detection for light/dark mode preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+
+</body></html>

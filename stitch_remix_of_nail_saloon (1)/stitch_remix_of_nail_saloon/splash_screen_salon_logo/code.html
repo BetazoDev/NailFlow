@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,300;0,400;0,500;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-dusty": "#d4b8b1",
+                        "cream-bg": "#fdfaf6",
+                        "cream-dark": "#e5dfd3",
+                        "neutral-text": "#6b5e59",
+                    },
+                    fontFamily: {
+                        "serif": ["Newsreader", "serif"]
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #fdfaf6;
+        }
+        .serif-display {
+            font-family: 'Newsreader', serif;
+        }
+        .loading-bar-animate {
+            animation: loading-progress 2s ease-in-out infinite;
+        }
+        @keyframes loading-progress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-cream-bg serif-display">
+<div class="relative flex min-h-screen w-full flex-col items-center justify-center p-6">
+<div class="flex flex-col items-center justify-center w-full max-w-xs">
+<div class="mb-6 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-dusty text-5xl font-light">
+                    brush
+                </span>
+</div>
+<div class="text-center">
+<h1 class="text-neutral-text text-3xl font-light tracking-wide serif-display mb-1">
+                    L'Atelier Nails
+                </h1>
+<p class="text-primary-dusty/80 text-sm font-light italic tracking-widest serif-display">
+                    Art at your fingertips
+                </p>
+</div>
+<div class="mt-32 w-32 flex flex-col items-center">
+<div class="w-full h-[1px] bg-cream-dark/40 overflow-hidden relative">
+<div class="absolute inset-0 bg-primary-dusty/30 loading-bar-animate"></div>
+</div>
+<span class="mt-4 text-[9px] uppercase tracking-[0.3em] text-primary-dusty/60 font-medium">
+                    Loading
+                </span>
+</div>
+</div>
+</div>
+
+</body></html>

@@ -3,125 +3,139 @@
 import { useState, useRef } from 'react';
 
 interface ImageUploadStepProps {
-    imagePreview: string | null;
-    notes: string;
-    onImageChange: (preview: string | null) => void;
-    onNotesChange: (notes: string) => void;
+    imageUrls: string[];
+    onImagesChange: (urls: string[]) => void;
     onNext: () => void;
     onBack: () => void;
+    staffName?: string;
+    tenantId?: string;
 }
 
-export default function ImageUploadStep({
-    imagePreview, notes, onImageChange, onNotesChange, onNext, onBack
-}: ImageUploadStepProps) {
+export default function ImageUploadStep({ imageUrls, onImagesChange, onNext, onBack, staffName = 'Ana', tenantId = 'demo' }: ImageUploadStepProps) {
     const fileRef = useRef<HTMLInputElement>(null);
-    const [isDragging, setIsDragging] = useState(false);
+    const [dragging, setDragging] = useState(false);
 
-    const handleFile = (file: File) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            onImageChange(e.target?.result as string);
-        };
-        reader.readAsDataURL(file);
+    const addFiles = (files: FileList | null) => {
+        if (!files) return;
+        const newUrls: string[] = [];
+        Array.from(files).forEach(file => {
+            if (!file.type.startsWith('image/')) return;
+            const url = URL.createObjectURL(file);
+            newUrls.push(url);
+        });
+        onImagesChange([...imageUrls, ...newUrls].slice(0, 6));
     };
 
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) handleFile(file);
-    };
-
-    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) handleFile(file);
+    const removeImage = (idx: number) => {
+        onImagesChange(imageUrls.filter((_, i) => i !== idx));
     };
 
     return (
-        <div className="flex flex-col h-full animate-fade-in-up">
-            <div className="px-6 pt-4 pb-2">
-                <button onClick={onBack} className="flex items-center gap-1 text-nf-gray text-sm mb-3 hover:text-charcoal transition-colors">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-                    Atrás
+        <div className="flex flex-col min-h-full animate-fade-in-up" style={{ background: 'var(--cream)' }}>
+            {/* Header */}
+            <div className="px-6 pt-6 pb-2">
+                <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest mb-4 hover:text-pink transition-colors group">
+                    <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                    </div>
                 </button>
-                <h2 className="font-serif text-2xl font-semibold text-charcoal mb-1">Diseño de referencia</h2>
-                <p className="text-sm text-nf-gray">Sube una imagen del diseño que te gustaría (opcional)</p>
+
+                <div className="flex gap-1 mb-6">
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cream-dark opacity-30" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cream-dark opacity-30" />
+                </div>
+
+                <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 4: Inspiración</p>
+                <h1 className="font-serif text-3xl text-charcoal leading-tight">
+                    Tu <span className="text-pink">visión</span> creativa
+                </h1>
+                <div className="w-8 h-px bg-pink mt-3" />
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                {/* Upload area */}
+            {/* Upload zone */}
+            <div className="px-6 pt-8 stagger-children">
                 <div
-                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={handleDrop}
-                    onClick={() => fileRef.current?.click()}
                     className={`
-            relative rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-300
-            ${isDragging ? 'border-pink bg-pink-pale scale-[1.02]' : 'border-cream-dark hover:border-pink-light hover:bg-pink-pale/30'}
-            ${imagePreview ? 'p-2' : 'p-8'}
-          `}
+                        border-[3px] border-dashed rounded-[2.5rem] flex flex-col items-center justify-center py-16 cursor-pointer transition-all duration-500 transform
+                        ${dragging
+                            ? 'border-pink bg-pink-pale shadow-2xl scale-[1.02]'
+                            : 'border-pink-light/30 hover:border-pink/40 bg-white/80 hover:bg-white shadow-xl hover:shadow-2xl'}
+                    `}
+                    onClick={() => fileRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
                 >
+                    <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-inner animate-pulse-subtle" style={{ background: 'var(--pink-pale)' }}>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--pink)" strokeWidth="1.5">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                    </div>
+                    <p className="text-charcoal font-serif text-xl font-bold">Añadir referencias</p>
+                    <p className="text-nf-gray text-[10px] font-bold uppercase tracking-widest mt-2 opacity-60">JPG, PNG • Máximo 6 fotos</p>
                     <input
                         ref={fileRef}
                         type="file"
                         accept="image/*"
+                        multiple
                         className="hidden"
-                        onChange={handleFileInput}
+                        onChange={e => addFiles(e.target.files)}
                     />
-
-                    {imagePreview ? (
-                        <div className="relative">
-                            <img
-                                src={imagePreview}
-                                alt="Diseño de referencia"
-                                className="w-full h-48 object-cover rounded-xl"
-                            />
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onImageChange(null); }}
-                                className="absolute top-2 right-2 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors"
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--charcoal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M18 6L6 18M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-3 text-center">
-                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--pink-pale), var(--coral-light))' }}>
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--pink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                    <path d="M21 15l-5-5L5 21" />
-                                </svg>
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-charcoal">Toca para subir una imagen</p>
-                                <p className="text-xs text-nf-gray mt-1">o arrastra y suelta aquí</p>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
-                {/* Notes */}
-                <div>
-                    <label className="block text-sm font-medium text-charcoal mb-2">Notas adicionales</label>
-                    <textarea
-                        value={notes}
-                        onChange={(e) => onNotesChange(e.target.value)}
-                        placeholder="Describe detalles del diseño, colores preferidos, etc."
-                        rows={3}
-                        className="input-field resize-none"
-                    />
+                {/* Info Box */}
+                <div className="mt-8 p-6 rounded-[2rem] bg-charcoal/5 border border-charcoal/5 flex gap-4 items-start">
+                    <span className="text-2xl">💡</span>
+                    <p className="text-[11px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider">
+                        Sube fotos de diseños que te gusten para que {staffName} pueda prepararse mejor para tu cita.
+                    </p>
                 </div>
             </div>
 
-            <div className="p-6">
-                <button onClick={onNext} className="btn-gradient w-full py-4 rounded-2xl text-base">
-                    Continuar
+            {/* Selected photos */}
+            {imageUrls.length > 0 && (
+                <div className="px-6 pt-10 pb-10 animate-fade-in">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="font-serif text-lg text-charcoal">Seleccionadas</h3>
+                        <span className="text-[10px] font-bold text-pink uppercase tracking-[0.2em] bg-pink-pale px-3 py-1 rounded-full border border-pink-light/20">
+                            {imageUrls.length} de 6
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        {imageUrls.map((url, idx) => (
+                            <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden shadow-lg group hover:scale-105 transition-transform">
+                                <img src={url} alt={`ref ${idx + 1}`} className="w-full h-full object-cover" />
+                                <button
+                                    onClick={() => removeImage(idx)}
+                                    className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-white text-charcoal flex items-center justify-center shadow-lg transform scale-75 group-hover:scale-100 transition-transform">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                    </div>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* CTA */}
+            <div className="px-6 pb-12 mt-auto pt-6">
+                <button
+                    onClick={onNext}
+                    className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                    {imageUrls.length > 0 ? 'Confirmar Selección' : 'Continuar sin fotos'}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                 </button>
-                <button onClick={onNext} className="w-full text-center text-sm text-nf-gray mt-3 hover:text-charcoal transition-colors">
-                    Omitir este paso
-                </button>
+                <p className="text-center text-[10px] tracking-[0.2em] text-gray-light uppercase font-bold mt-6">
+                    PASO 5 DE 5
+                </p>
             </div>
         </div>
     );

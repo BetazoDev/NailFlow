@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Perfil &amp; Ajustes - Nail Tech Aesthetic</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#E6A4B4", // Soft Rose
+              "background-light": "#FAF3F0", // Creamy Beige Base
+              "background-dark": "#1A1614", // Dark Cocoa
+              accent: "#F3D7CA", // Soft Peach
+            },
+            fontFamily: {
+              display: ["Playfair Display", "serif"],
+              sans: ["Inter", "sans-serif"],
+            },
+            borderRadius: {
+              '2xl': '24px',
+              '3xl': '32px',
+            },
+          },
+        },
+      };
+    </script>
+<style type="text/tailwindcss">
+        .glass {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .dark .glass {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        body {
+            background-color: #FAF3F0;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        input:focus {
+            outline: none;
+            box-shadow: none;
+            border-color: #E6A4B4;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-stone-800 dark:text-stone-200 font-sans antialiased min-h-screen">
+<main class="w-full max-w-md mx-auto px-6 pt-16 pb-32 scrollbar-hide">
+<header class="flex flex-col items-center mb-12">
+<div class="relative mb-4 group">
+<div class="w-28 h-28 rounded-full overflow-hidden border-4 border-white dark:border-stone-800 shadow-sm">
+<img alt="Ana Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASzwlDQfNyniVGHwLkxHzxDBizVULnPkYIR3oszlQdgi-8yyjfok19a_2G5oNla38T2bIPkd2G9kNM6Nsdlg0ZBa-hqvOe5KeapWl0BDShTyc6tVR5q3uhcAOsoa8hqikSn1wUf_J1YFgP-Vc19p6Gw1RL9ivttJWf4z34hMpCnm5I3h2blotB8b3MQmNsSNNadIEy-KAOvzZuQBFjdfH6BH49GUmHSxnVkSL1w-ecSvEZ5Q3bDXPBis-EbA_YiXFs1soWMlbbJueZ"/>
+</div>
+<button class="absolute bottom-1 right-1 bg-primary text-white p-2 rounded-full shadow-lg border-2 border-white dark:border-stone-800">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+</div>
+<h1 class="font-display text-3xl font-medium text-stone-900 dark:text-white mb-1">Ana Martínez</h1>
+<p class="text-[11px] uppercase tracking-[0.2em] opacity-50 font-semibold">Especialista en Nail Art</p>
+</header>
+<section class="mb-10">
+<h2 class="font-display text-xl font-semibold mb-4 px-1">Link de Reserva</h2>
+<div class="bg-white/60 dark:bg-stone-800/40 p-5 rounded-3xl border border-white dark:border-white/5 flex items-center gap-4">
+<div class="flex-1">
+<p class="text-[9px] uppercase tracking-wider opacity-50 font-bold mb-1">Tu URL personalizada</p>
+<div class="flex items-center text-stone-700 dark:text-stone-300">
+<span class="text-sm opacity-40">agendapro.nails/</span>
+<input class="bg-transparent border-none p-0 text-sm font-medium w-full focus:ring-0" type="text" value="ana"/>
+</div>
+</div>
+<button class="bg-primary/10 hover:bg-primary/20 text-primary p-2.5 rounded-2xl transition-all">
+<span class="material-symbols-outlined text-[20px]">content_copy</span>
+</button>
+</div>
+</section>
+<section class="mb-10">
+<div class="flex justify-between items-center mb-4 px-1">
+<h2 class="font-display text-xl font-semibold">Política de Anticipo</h2>
+<div class="w-10 h-5 bg-primary/20 rounded-full relative">
+<div class="absolute right-0.5 top-0.5 w-4 h-4 bg-primary rounded-full"></div>
+</div>
+</div>
+<p class="text-xs opacity-60 mb-5 px-1 leading-relaxed">Solicita un pago previo para asegurar tu tiempo y reducir inasistencias.</p>
+<div class="flex justify-between gap-3">
+<button class="flex-1 py-4 rounded-2xl border border-primary bg-primary/5 text-primary font-semibold text-sm transition-all">
+                30%
+            </button>
+<button class="flex-1 py-4 rounded-2xl border border-stone-100 dark:border-white/5 bg-white/40 dark:bg-stone-800/40 text-stone-600 dark:text-stone-400 font-semibold text-sm hover:border-primary/30">
+                50%
+            </button>
+<button class="flex-1 py-4 rounded-2xl border border-stone-100 dark:border-white/5 bg-white/40 dark:bg-stone-800/40 text-stone-600 dark:text-stone-400 font-semibold text-sm hover:border-primary/30">
+                100%
+            </button>
+</div>
+</section>
+<section class="mb-10">
+<h2 class="font-display text-xl font-semibold mb-4 px-1">Conectar Pagos</h2>
+<div class="space-y-3">
+<button class="w-full bg-stone-900 dark:bg-white text-white dark:text-stone-900 py-4 px-6 rounded-3xl flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">payments</span>
+<span class="text-sm font-semibold">Configurar Stripe</span>
+</div>
+<span class="material-symbols-outlined opacity-30 group-hover:opacity-100 transition-opacity">chevron_right</span>
+</button>
+<button class="w-full bg-[#009EE3] text-white py-4 px-6 rounded-3xl flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined">wallet</span>
+<span class="text-sm font-semibold text-white">Mercado Pago</span>
+</div>
+<span class="text-[10px] font-bold uppercase bg-white/20 px-2 py-0.5 rounded-lg">Vincular</span>
+</button>
+</div>
+</section>
+<button class="w-full py-4 text-stone-400 dark:text-stone-600 text-[10px] font-bold uppercase tracking-[0.2em] hover:text-red-400 transition-colors">
+        Cerrar Sesión
+    </button>
+</main>
+<nav class="fixed bottom-0 w-full z-40 bg-white/80 dark:bg-stone-900/90 backdrop-blur-xl border-t border-stone-200/50 dark:border-white/5">
+<div class="max-w-md mx-auto px-10 pt-4 pb-8 flex justify-between items-center">
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[26px]">grid_view</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Inicio</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[26px]">calendar_today</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Agenda</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-stone-400 dark:text-stone-500 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[26px]">group</span>
+<span class="text-[10px] font-semibold uppercase tracking-wider">Clientes</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[26px] fill-current">person</span>
+<span class="text-[10px] font-bold uppercase tracking-wider">Perfil</span>
+</div>
+</div>
+</nav>
+<script>
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+    }
+</script>
+
+</body></html>

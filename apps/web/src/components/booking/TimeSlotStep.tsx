@@ -1,7 +1,8 @@
 'use client';
 
 import { TimeSlot } from '@/lib/types';
-import { useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { api } from '@/lib/api';
 
 interface TimeSlotStepProps {
     selectedDate: string;
@@ -9,76 +10,137 @@ interface TimeSlotStepProps {
     onSelect: (time: string) => void;
     onNext: () => void;
     onBack: () => void;
+    tenantId?: string;
 }
 
-export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onNext, onBack }: TimeSlotStepProps) {
-    // Generate time slots (mock — in production, filtered by availability + existing bookings)
-    const timeSlots: TimeSlot[] = useMemo(() => {
-        const dayOfWeek = new Date(selectedDate + 'T12:00:00').getDay();
-        const isSaturday = dayOfWeek === 6;
-        const startHour = isSaturday ? 10 : 9;
-        const endHour = isSaturday ? 15 : 18;
-        const slots: TimeSlot[] = [];
-
-        for (let h = startHour; h < endHour; h++) {
-            slots.push({ time: `${String(h).padStart(2, '0')}:00`, available: Math.random() > 0.3 });
-            if (h < endHour - 1 || !isSaturday) {
-                slots.push({ time: `${String(h).padStart(2, '0')}:30`, available: Math.random() > 0.25 });
-            }
-        }
-        return slots;
-    }, [selectedDate]);
+export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onNext, onBack, tenantId = 'demo' }: TimeSlotStepProps) {
+    const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+    const [loading, setLoading] = useState(false);
+    const holdIdRef = useRef(`hold_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    const prevSlotRef = useRef<string | null>(null);
 
     const formatDate = (dateStr: string) => {
         const d = new Date(dateStr + 'T12:00:00');
-        return d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+        return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
     };
 
-    return (
-        <div className="flex flex-col h-full animate-fade-in-up">
-            <div className="px-6 pt-4 pb-2">
-                <button onClick={onBack} className="lg:hidden flex items-center gap-1 text-nf-gray text-sm mb-3 hover:text-charcoal transition-colors">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-                    Atrás
-                </button>
-                <h2 className="font-serif text-2xl font-semibold text-charcoal mb-1">Elige la hora</h2>
-                <p className="text-sm text-nf-gray capitalize">{formatDate(selectedDate)}</p>
-            </div>
+    useEffect(() => {
+        if (!selectedDate) return;
+        async function loadAvailability() {
+            setLoading(true);
+            try {
+                const slots = await api.getAvailability(tenantId, selectedDate);
+                setTimeSlots(slots);
+            } catch (err) {
+                console.error('Failed to load availability:', err);
+                setTimeSlots([]);
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadAvailability();
+    }, [selectedDate, tenantId]);
 
-            {/* Time slots grid */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-                <div className="grid grid-cols-3 gap-3 stagger-children">
-                    {timeSlots.map((slot) => (
+    const handleSlotSelect = useCallback(async (time: string) => {
+        // Release previous hold if any
+        if (prevSlotRef.current && prevSlotRef.current !== time) {
+            api.releaseSlot(tenantId, selectedDate, prevSlotRef.current).catch(() => { });
+        }
+        // Hold the new slot
+        try {
+            await api.holdSlot(tenantId, selectedDate, time, holdIdRef.current);
+        } catch (e) {
+            console.error('Failed to hold slot:', e);
+        }
+        prevSlotRef.current = time;
+        onSelect(time);
+    }, [tenantId, selectedDate, onSelect]);
+
+    const morningSlots = timeSlots.filter(s => parseInt(s.time.split(':')[0]) < 13);
+    const afternoonSlots = timeSlots.filter(s => parseInt(s.time.split(':')[0]) >= 13);
+
+    const SlotGrid = ({ slots, title, icon }: { slots: TimeSlot[], title: string, icon: string }) => (
+        <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+                <span className="text-xl">{icon}</span>
+                <h4 className="text-[10px] font-bold text-nf-gray uppercase tracking-widest">{title}</h4>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+                {slots.map((slot) => {
+                    const isSelected = selectedTime === slot.time;
+                    return (
                         <button
                             key={slot.time}
-                            onClick={() => slot.available && onSelect(slot.time)}
-                            disabled={!slot.available}
+                            onClick={() => handleSlotSelect(slot.time)}
                             className={`
-                py-3.5 px-3 rounded-xl text-sm font-medium transition-all duration-200
-                ${!slot.available
-                                    ? 'bg-cream-dark text-gray-light cursor-not-allowed line-through opacity-50'
-                                    : selectedTime === slot.time
-                                        ? 'text-white shadow-md'
-                                        : 'bg-white border-1.5 border-cream-dark text-charcoal hover:border-pink hover:bg-pink-pale'
-                                }
-              `}
-                            style={selectedTime === slot.time ? { background: 'linear-gradient(135deg, var(--pink), var(--coral))' } : {}}
+                                py-4 rounded-2xl text-[13px] font-bold transition-all duration-300 border
+                                ${isSelected
+                                    ? 'bg-charcoal text-white border-charcoal shadow-lg scale-105'
+                                    : 'bg-white border-cream-dark text-charcoal hover:border-pink hover:bg-pink-pale'}
+                            `}
                         >
                             {slot.time}
                         </button>
-                    ))}
+                    );
+                })}
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="px-6 py-8 animate-fade-in">
+            {/* Context bar */}
+            <div className="flex items-center justify-between mb-8 p-4 rounded-2xl bg-white shadow-sm border border-cream-dark/30">
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-nf-gray uppercase tracking-widest">Fecha elegida</span>
+                    <span className="font-serif text-charcoal font-bold">{formatDate(selectedDate)}</span>
                 </div>
+                <button
+                    onClick={onBack}
+                    className="w-10 h-10 rounded-full bg-cream-dark/20 flex items-center justify-center text-nf-gray hover:bg-pink-pale hover:text-pink transition-all"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 12H4M4 12l8-8M4 12l8 8" /></svg>
+                </button>
             </div>
 
-            {/* Continue */}
-            <div className="p-6">
-                <button
-                    onClick={onNext}
-                    disabled={!selectedTime}
-                    className="btn-gradient w-full py-4 rounded-2xl text-base"
-                >
-                    Continuar
-                </button>
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="w-10 h-10 border-3 border-pink-pale border-t-pink rounded-full animate-spin" />
+                    <p className="font-serif italic text-nf-gray">Consultando agenda...</p>
+                </div>
+            ) : timeSlots.length === 0 ? (
+                <div className="text-center py-20 px-8">
+                    <div className="text-4xl mb-4 opacity-20">📅</div>
+                    <p className="font-serif text-charcoal text-lg mb-2">¡Lo sentimos!</p>
+                    <p className="text-sm text-nf-gray">No hay horarios disponibles para el {formatDate(selectedDate)}. Por favor elige otra fecha.</p>
+                </div>
+            ) : (
+                <div className="stagger-children">
+                    {morningSlots.length > 0 && <SlotGrid slots={morningSlots} title="Mañana" icon="☀️" />}
+                    {afternoonSlots.length > 0 && <SlotGrid slots={afternoonSlots} title="Tarde" icon="☕" />}
+                </div>
+            )}
+
+            {/* Bottom Panel */}
+            <div className={`
+                fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 transition-all duration-500 transform z-20
+                ${selectedTime ? 'translate-y-0 opacity-100 shadow-up' : 'translate-y-full opacity-0'}
+            `}>
+                <div className="max-w-lg mx-auto flex items-center justify-between gap-4">
+                    <div className="hidden sm:block">
+                        <p className="text-[10px] font-bold text-pink uppercase tracking-widest mb-0.5">Confirmar para las</p>
+                        <p className="font-serif text-charcoal text-lg font-bold">
+                            {selectedTime}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onNext}
+                        className="flex-1 py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white"
+                    >
+                        Confirmar Cita
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                    </button>
+                </div>
             </div>
         </div>
     );
