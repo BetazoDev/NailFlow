@@ -12,7 +12,8 @@ import PaymentStep from './PaymentStep';
 import ConfirmationStep from './ConfirmationStep';
 
 const STEPS: BookingStep[] = ['personal', 'service', 'datetime', 'inspiration', 'summary', 'payment', 'confirmation'];
-const TENANT_DOMAIN = 'demo.nailflow.com';
+// Fallback domain for local development
+const DEFAULT_DOMAIN = 'demo.diabolicalservices.tech';
 
 export default function BookingWizardPage() {
     const [currentStep, setCurrentStep] = useState<BookingStep>('personal');
@@ -31,7 +32,11 @@ export default function BookingWizardPage() {
     useEffect(() => {
         async function loadTenant() {
             try {
-                const t = await api.getTenant(TENANT_DOMAIN);
+                const domain = typeof window !== 'undefined' ? window.location.hostname : DEFAULT_DOMAIN;
+                // If localhost, use the demo domain for testing
+                const searchDomain = (domain.includes('localhost') || domain.includes('127.0.0.1')) ? DEFAULT_DOMAIN : domain;
+
+                const t = await api.getTenant(searchDomain);
                 if (t) {
                     setTenant(t);
                     const s = await api.getStaff(t.id);
@@ -181,6 +186,7 @@ export default function BookingWizardPage() {
                             onNext={goNext}
                             onBack={goBack}
                             tenantId={tenant?.id}
+                            staffId={primaryStaff?.id}
                         />
                     )}
                     {currentStep === 'inspiration' && (

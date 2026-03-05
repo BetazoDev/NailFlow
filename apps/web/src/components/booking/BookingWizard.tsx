@@ -116,6 +116,7 @@ export default function BookingWizard({
                     onNext={goNext}
                     onBack={goBack}
                     tenantId={tenantId}
+                    staffId={staffId}
                 />
             )}
             {currentStep === 'inspiration' && (

@@ -11,9 +11,10 @@ interface TimeSlotStepProps {
     onNext: () => void;
     onBack: () => void;
     tenantId?: string;
+    staffId?: string;
 }
 
-export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onNext, onBack, tenantId = 'demo' }: TimeSlotStepProps) {
+export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onNext, onBack, tenantId = 'demo', staffId = 'staff-1' }: TimeSlotStepProps) {
     const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
     const [loading, setLoading] = useState(false);
     const holdIdRef = useRef(`hold_${Date.now()}_${Math.random().toString(36).slice(2)}`);
@@ -29,7 +30,7 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
         async function loadAvailability() {
             setLoading(true);
             try {
-                const slots = await api.getAvailability(tenantId, selectedDate);
+                const slots = await api.getAvailability(tenantId, staffId, selectedDate);
                 setTimeSlots(slots);
             } catch (err) {
                 console.error('Failed to load availability:', err);

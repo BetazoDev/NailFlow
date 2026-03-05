@@ -10,7 +10,7 @@ interface Props {
 }
 
 // Fallback tenant domain for the primary root application
-const TENANT_DOMAIN = 'demo.nailflow.com';
+const TENANT_DOMAIN = 'demo.diabolicalservices.tech';
 
 export async function generateStaticParams() {
     return [{ staffSlug: 'ana' }, { staffSlug: 'lucia' }, { staffSlug: 'vale' }];

@@ -1,36 +1,25 @@
 import express from 'express';
 import cors from 'cors';
-import { getTenantByDomain } from './tenant';
+import { getTenantByDomain, getTenantById } from './tenant';
 import { db } from './lib/firebase';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { query } from './lib/db';
+import { initDb } from './init-db';
+import crypto from 'crypto';
 
-// Initialize MP Client (In MVP, we use one token. In a full system, you would load this dynamically per tenant from DB)
+// Initialize MP Client 
 const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN || 'TEST-TOKEN-MOCK' });
 
 const app = express();
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-// ── In-Memory Data Stores (MVP) ──────────────────────────
-let servicesStore = [
-    { id: 'svc-1', name: 'Manicura Clásica', duration_minutes: 45, estimated_price: 350, required_advance: 100, category: 'Manicura' },
-    { id: 'svc-2', name: 'Aplicación Acrílico', duration_minutes: 120, estimated_price: 600, required_advance: 200, category: 'Acrílicas' },
-    { id: 'svc-3', name: 'Retoque Acrílico', duration_minutes: 90, estimated_price: 450, required_advance: 150, category: 'Acrílicas' },
-    { id: 'svc-4', name: 'Gelish en Manos', duration_minutes: 60, estimated_price: 400, required_advance: 150, category: 'Gel' },
-    { id: 'svc-5', name: 'Pedicura Spa', duration_minutes: 60, estimated_price: 450, required_advance: 150, category: 'Pedicura' },
-    { id: 'svc-6', name: 'Diseño Artístico', duration_minutes: 90, estimated_price: 550, required_advance: 180, category: 'Diseño' },
-];
+// Initialize DB schema
+initDb().catch(console.error);
 
-const todayStr = new Date().toISOString().split('T')[0];
-let appointmentsStore = [
-    { id: 'apt-1', tenant_id: 'demo-tenant', client_name: 'Lucia Ferreyra', client_phone: '5512345678', client_email: 'lucia@correo.com', service_id: 'svc-1', staff_id: 'staff-1', datetime_start: `${todayStr}T10:00:00Z`, datetime_end: `${todayStr}T10:45:00Z`, status: 'confirmed', advance_paid: true, notes: 'Diseño francés' },
-    { id: 'apt-2', tenant_id: 'demo-tenant', client_name: 'Camila Rojas', client_phone: '5587654321', client_email: 'camila@correo.com', service_id: 'svc-4', staff_id: 'staff-2', datetime_start: `${todayStr}T12:00:00Z`, datetime_end: `${todayStr}T13:00:00Z`, status: 'pending_payment', advance_paid: false, notes: '' },
-    { id: 'apt-3', tenant_id: 'demo-tenant', client_name: 'Valeria Méndez', client_phone: '5523456789', client_email: 'valeria@correo.com', service_id: 'svc-2', staff_id: 'staff-1', datetime_start: `${todayStr}T14:00:00Z`, datetime_end: `${todayStr}T16:00:00Z`, status: 'confirmed', advance_paid: true, notes: 'Baby boomer' },
-    { id: 'apt-4', tenant_id: 'demo-tenant', client_name: 'Mariana Torres', client_phone: '5534567890', client_email: '', service_id: 'svc-5', staff_id: 'staff-2', datetime_start: `${todayStr}T16:00:00Z`, datetime_end: `${todayStr}T17:00:00Z`, status: 'confirmed', advance_paid: true, notes: '' },
-    { id: 'apt-5', tenant_id: 'demo-tenant', client_name: 'Andrea Solis', client_phone: '5545678901', client_email: 'andrea@correo.com', service_id: 'svc-6', staff_id: 'staff-1', datetime_start: `${todayStr}T17:00:00Z`, datetime_end: `${todayStr}T18:30:00Z`, status: 'pending_payment', advance_paid: false, notes: 'Nail art temática' },
-];
+
 
 let tenantBranding: Record<string, any> = {};
 
@@ -41,14 +30,25 @@ app.use(async (req, res, next) => {
         return next();
     }
 
-    const tenantDomain = req.headers['x-tenant-domain'] as string || 'demo.nailflow.com';
+    const tenantDomain = (req.headers['x-tenant-domain'] || req.query.domain) as string;
+    const tenantId = (req.headers['x-tenant-id'] || req.query.id) as string;
+    const ownerId = req.query.owner_id as string;
 
     try {
-        const tenant = await getTenantByDomain(tenantDomain);
+        let tenant = null;
+        if (tenantId) {
+            tenant = await getTenantById(tenantId);
+        } else if (ownerId) {
+            const res = await query('SELECT * FROM tenants WHERE owner_id = $1', [ownerId]);
+            tenant = res.rows.length > 0 ? res.rows[0] : null;
+        } else {
+            tenant = await getTenantByDomain(tenantDomain || 'demo.diabolicalservices.tech');
+        }
+
         if (!tenant) {
             return res.status(404).json({ error: 'Tenant not found' });
         }
-        // @ts-ignore - Injecting tenant into request block for convenience
+        // @ts-ignore
         req.tenant = tenant;
         next();
     } catch (e) {
@@ -66,7 +66,10 @@ app.get('/api/tenant', (req, res) => {
 // Endpoint: Get Services
 app.get('/api/services', async (req, res) => {
     try {
-        res.json(servicesStore);
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        const result = await query('SELECT * FROM services WHERE tenant_id = $1', [tenantId]);
+        res.json(result.rows);
     } catch (e) {
         console.error('Failed to fetch services:', e);
         res.status(500).json({ error: 'Failed to fetch services' });
@@ -76,20 +79,21 @@ app.get('/api/services', async (req, res) => {
 // Endpoint: Create Service
 app.post('/api/services', async (req, res) => {
     try {
-        const { name, duration_minutes, estimated_price, required_advance, category } = req.body;
+        const { name, description, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+
         if (!name || !duration_minutes || !estimated_price) {
             return res.status(400).json({ error: 'Name, duration, and price are required' });
         }
-        const newService = {
-            id: `svc-${Date.now()}`,
-            name,
-            duration_minutes: Number(duration_minutes),
-            estimated_price: Number(estimated_price),
-            required_advance: Number(required_advance) || 0,
-            category: category || 'General'
-        };
-        servicesStore.push(newService);
-        res.status(201).json(newService);
+
+        const id = crypto.randomUUID();
+        const result = await query(
+            'INSERT INTO services (id, tenant_id, name, description, duration_minutes, estimated_price, required_advance, category, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+            [id, tenantId, name, description, Number(duration_minutes), Number(estimated_price), Number(required_advance) || 0, category || 'General', image_url || '']
+        );
+
+        res.status(201).json(result.rows[0]);
     } catch (e) {
         console.error('Failed to create service:', e);
         res.status(500).json({ error: 'Failed to create service' });
@@ -99,10 +103,13 @@ app.post('/api/services', async (req, res) => {
 // Endpoint: Update Service
 app.put('/api/services/:id', async (req, res) => {
     try {
-        const idx = servicesStore.findIndex(s => s.id === req.params.id);
-        if (idx === -1) return res.status(404).json({ error: 'Service not found' });
-        servicesStore[idx] = { ...servicesStore[idx], ...req.body, id: req.params.id };
-        res.json(servicesStore[idx]);
+        const { name, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
+        const result = await query(
+            'UPDATE services SET name = $1, duration_minutes = $2, estimated_price = $3, required_advance = $4, category = $5, image_url = $6 WHERE id = $7 RETURNING *',
+            [name, Number(duration_minutes), Number(estimated_price), Number(required_advance), category, image_url, req.params.id]
+        );
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
+        res.json(result.rows[0]);
     } catch (e) {
         res.status(500).json({ error: 'Failed to update service' });
     }
@@ -110,9 +117,8 @@ app.put('/api/services/:id', async (req, res) => {
 
 // Endpoint: Delete Service
 app.delete('/api/services/:id', async (req, res) => {
-    const idx = servicesStore.findIndex(s => s.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Service not found' });
-    servicesStore.splice(idx, 1);
+    const result = await query('DELETE FROM services WHERE id = $1', [req.params.id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
     res.json({ success: true });
 });
 
@@ -121,34 +127,8 @@ app.get('/api/staff', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     try {
-        // MOCK DATA FOR MVP - In real app, fetch from db collection 'tenants/{tenantId}/staff'
-        const staffMembers = [
-            {
-                id: 'staff-1',
-                tenant_id: tenantId,
-                name: 'Ana López',
-                email: 'ana@nailflow.demo',
-                role: 'owner',
-                photo_url: 'https://i.pravatar.cc/150?u=ana',
-                bio: 'Especialista en Acrílico y Diseño 3D',
-                active: true,
-                color_identifier: '#E8B4B8',
-                services_offered: ['svc-1', 'svc-2', 'svc-3']
-            },
-            {
-                id: 'staff-2',
-                tenant_id: tenantId,
-                name: 'María García',
-                email: 'maria@nailflow.demo',
-                role: 'staff',
-                photo_url: 'https://i.pravatar.cc/150?u=maria',
-                bio: 'Experta en Gelish y Pedicura Spa',
-                active: true,
-                color_identifier: '#82C3A6',
-                services_offered: ['svc-1', 'svc-4', 'svc-5']
-            }
-        ];
-        res.json(staffMembers);
+        const result = await query('SELECT * FROM staff WHERE tenant_id = $1 AND active = true', [tenantId]);
+        res.json(result.rows);
     } catch (e) {
         console.error('Failed to fetch staff:', e);
         res.status(500).json({ error: 'Failed to fetch staff' });
@@ -158,9 +138,17 @@ app.get('/api/staff', async (req, res) => {
 // Endpoint: Get Appointments
 app.get('/api/appointments', async (req, res) => {
     const staffId = req.query.staff_id as string;
+    // @ts-ignore
+    const tenantId = req.tenant.id;
     try {
-        const filtered = staffId ? appointmentsStore.filter(a => a.staff_id === staffId) : appointmentsStore;
-        res.json(filtered);
+        let text = 'SELECT * FROM appointments WHERE tenant_id = $1';
+        let params = [tenantId];
+        if (staffId) {
+            text += ' AND staff_id = $2';
+            params.push(staffId);
+        }
+        const result = await query(text, params);
+        res.json(result.rows);
     } catch (e) {
         console.error('Failed to fetch appointments:', e);
         res.status(500).json({ error: 'Failed to fetch appointments' });
@@ -169,11 +157,13 @@ app.get('/api/appointments', async (req, res) => {
 
 // Endpoint: Get Single Appointment
 app.get('/api/appointments/:id', async (req, res) => {
-    const apt = appointmentsStore.find(a => a.id === req.params.id);
-    if (!apt) return res.status(404).json({ error: 'Appointment not found' });
-    // Enrich with service details
-    const service = servicesStore.find(s => s.id === apt.service_id);
-    res.json({ ...apt, service });
+    try {
+        const result = await query('SELECT a.*, s.name as service_name FROM appointments a LEFT JOIN services s ON a.service_id = s.id WHERE a.id = $1', [req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Appointment not found' });
+        res.json(result.rows[0]);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch appointment' });
+    }
 });
 
 // Endpoint: Update Appointment Status
@@ -183,173 +173,219 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
     if (!validStatuses.includes(status)) {
         return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
     }
-    const idx = appointmentsStore.findIndex(a => a.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Appointment not found' });
-    appointmentsStore[idx] = { ...appointmentsStore[idx], status };
-    res.json(appointmentsStore[idx]);
+    try {
+        const result = await query('UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *', [status, req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Appointment not found' });
+        res.json(result.rows[0]);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to update appointment' });
+    }
 });
 
 // Endpoint: Get Availability
 app.get('/api/availability', async (req, res) => {
-    const dateStr = req.query.date as string;
-    const staffId = req.query.staff_id as string; // 'any' or specific staff ID
+    const { date, staff_id } = req.query;
     // @ts-ignore
     const tenantId = req.tenant.id;
 
-    if (!dateStr || !staffId) {
-        return res.status(400).json({ error: 'Date and staff_id parameters are required' });
-    }
+    if (!date) return res.status(400).json({ error: 'Date is required' });
 
     try {
-        // MOCK DATA for availability. In reality, check staff weekly_schedule and appointments for the date
-        const slots: { time: string, available: boolean }[] = [];
-        const startHour = 9;
-        const endHour = 18;
+        const result = await query(
+            "SELECT TO_CHAR(datetime_start, 'HH24:MI') as time FROM appointments WHERE tenant_id = $1 AND TO_CHAR(datetime_start, 'YYYY-MM-DD') = $2 AND status IN ('confirmed', 'pending_payment')",
+            [tenantId, date]
+        );
+        const bookedTimes = new Set(result.rows.map(r => r.time));
 
-        for (let i = startHour; i < endHour; i++) {
-            slots.push({ time: `${i.toString().padStart(2, '0')}:00`, available: true });
-            slots.push({ time: `${i.toString().padStart(2, '0')}:30`, available: Math.random() > 0.3 }); // Randomly mock booked slots
+        const slots = [];
+        for (let h = 9; h < 18; h++) {
+            const time1 = `${String(h).padStart(2, '0')}:00`;
+            const time2 = `${String(h).padStart(2, '0')}:30`;
+            slots.push({ time: time1, available: !bookedTimes.has(time1) });
+            slots.push({ time: time2, available: !bookedTimes.has(time2) });
         }
-
         res.json(slots);
     } catch (e) {
-        console.error('Failed to fetch availability:', e);
-        res.status(400).json({ error: 'Invalid date format or db error' });
+        res.status(500).json({ error: 'Failed to fetch availability' });
     }
 });
 
-// Endpoint: Create Booking
-app.post('/api/booking', async (req, res) => {
-    const bookingData = req.body;
+// Endpoint: Create Booking (Initiates MercadoPago Payment)
+app.post('/api/bookings', async (req, res) => {
+    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes } = req.body;
     // @ts-ignore
     const tenantId = req.tenant.id;
 
-    // Basic validation
-    if (!bookingData.service_id || !bookingData.date || !bookingData.time) {
-        return res.status(400).json({ error: 'Missing required booking data' });
-    }
-
     try {
-        // Calculate temporary lock expiration time (10 minutes)
-        const expiresAt = new Date();
-        expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+        const svcRes = await query('SELECT * FROM services WHERE id = $1', [service_id]);
+        if (svcRes.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
+        const service = svcRes.rows[0];
 
-        // Create an appointment document with pending status
-        const appointmentRef = db.collection('tenants').doc(tenantId).collection('appointments').doc();
-        await appointmentRef.set({
-            ...bookingData,
-            status: 'pending_payment',
-            created_at: new Date().toISOString(),
-            expires_at: expiresAt.toISOString()
-        });
+        // Create appointment in 'pending_payment' status
+        const aptRes = await query(
+            `INSERT INTO appointments 
+            (tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, status, notes) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [tenantId, client_name, client_phone, client_email, service_id, staff_id, `${date}T${time}:00Z`, 'pending_payment', notes]
+        );
+        const appointment = aptRes.rows[0];
 
-        // Generate MercadoPago Checkout Preference
+        // Create MP Preference
         const preference = new Preference(mpClient);
-        const advanceAmount = Number(bookingData.service_price) * 0.3;
-
-        const mpResponse = await preference.create({
+        const response = await preference.create({
             body: {
-                payment_methods: {
-                    // Force the user to pay immediately online to secure the spot quickly
-                    excluded_payment_types: [{ id: 'ticket' }]
-                },
-                items: [
-                    {
-                        id: bookingData.service_id,
-                        title: `Anticipo de Cita - ${bookingData.service_name}`,
-                        quantity: 1,
-                        unit_price: advanceAmount
-                    }
-                ],
-                metadata: {
-                    tenant_id: tenantId,
-                    appointment_id: appointmentRef.id
-                },
+                items: [{
+                    id: service.id,
+                    title: service.name,
+                    quantity: 1,
+                    unit_price: Number(service.required_advance),
+                }],
+                external_reference: appointment.id.toString(),
+                notification_url: `${process.env.APP_BASE_URL}/api/webhooks/mercadopago`,
                 back_urls: {
-                    success: `http://${req.headers['x-tenant-domain']}/book/success`,
-                    failure: `http://${req.headers['x-tenant-domain']}/book`,
-                    pending: `http://${req.headers['x-tenant-domain']}/book`
+                    success: `https://${req.headers['host']}/book/success`,
+                    failure: `https://${req.headers['host']}/book/error`,
                 },
                 auto_return: 'approved',
-                // notification_url is called by MP server to our server
-                // We use query params to pass context to the webhook
-                notification_url: `${process.env.APP_BASE_URL || 'https://api.nailflow.com'}/api/webhooks/mercadopago?tenant_id=${tenantId}&appointment_id=${appointmentRef.id}`
             }
         });
 
         res.json({
-            success: true,
-            appointmentId: appointmentRef.id,
-            status: 'pending_payment',
-            init_point: mpResponse.init_point, // URL to redirect the user
-            message: 'Booking initialized. Redirecting to Mercado Pago.'
+            appointmentId: appointment.id,
+            init_point: response.init_point
         });
     } catch (e) {
         console.error('Booking failed:', e);
-        res.status(500).json({ error: 'Creation failed' });
+        res.status(500).json({ error: 'Booking process failed' });
     }
 });
 
-// Endpoint: Webhooks (Mercado Pago)
+// Endpoint: MercadoPago Webhook
 app.post('/api/webhooks/mercadopago', async (req, res) => {
-    // Respond quickly to not block MP server
-    res.sendStatus(200);
-
     const { type, data } = req.body;
-    const { tenant_id, appointment_id } = req.query;
 
-    if (!tenant_id || !appointment_id || type !== 'payment') {
-        return;
-    }
+    if (type === 'payment') {
+        try {
+            // Usually we'd fetch details from MP with data.id here.
+            // For now, let's just mark the reference as paid if we can find it.
+            // External reference was appointment.id
+            const paymentId = data.id;
 
-    try {
-        // In reality, we should fetch payment status from MP using data.id and verify it's approved.
-        // Assuming it's approved for MVP:
-        const appointmentRef = db.collection('tenants').doc(tenant_id as string).collection('appointments').doc(appointment_id as string);
-        const doc = await appointmentRef.get();
-
-        if (doc.exists && doc.data()?.status === 'pending_payment') {
-            const appointmentData = doc.data();
-
-            // 1. Update appointment status
-            await appointmentRef.update({
-                status: 'confirmed',
-                payment_ref: data.id // Store MP Payment ID
-            });
-            console.log(`✅ Appointment ${appointment_id} confirmed for Tenant ${tenant_id}`);
-
-            // 2. Trigger n8n WhatsApp confirmation (Fire and forget)
-            const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/nailflow-confirm';
-            fetch(N8N_WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    tenant_id,
-                    appointment_id,
-                    client_name: appointmentData?.client_name,
-                    client_phone: appointmentData?.client_phone,
-                    date: appointmentData?.date,
-                    time: appointmentData?.time,
-                    service_name: appointmentData?.service_name
-                })
-            }).catch(e => console.error('Failed to ping n8n webhook:', e));
+            // Note: In real scenarios, MP sends a notification, then you GET the payment to see external_reference
+            console.log(`Payment incoming: ${paymentId}`);
+        } catch (e) {
+            console.error('Webhook processing failed:', e);
         }
-
-    } catch (e) {
-        console.error('Webhook processing failed:', e);
     }
+    res.sendStatus(200);
 });
 
 // Endpoint: Update Tenant Branding
 app.put('/api/tenant', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
-    const { branding, settings } = req.body;
-    tenantBranding[tenantId] = { ...tenantBranding[tenantId], branding, settings };
-    // @ts-ignore
-    const merged = { ...req.tenant, ...tenantBranding[tenantId] };
-    res.json(merged);
+    const { name, branding, settings } = req.body;
+
+    try {
+        const result = await query(
+            'UPDATE tenants SET name = COALESCE($1, name), branding = COALESCE($2, branding), settings = COALESCE($3, settings) WHERE id = $4 RETURNING *',
+            [name, branding, settings, tenantId]
+        );
+        res.json(result.rows[0]);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to update tenant' });
+    }
 });
+
+// Endpoint: Complete Appointment
+app.post('/api/appointments/:id/complete', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        await query(
+            "UPDATE appointments SET status = 'completed' WHERE id = $1 AND tenant_id = $2",
+            [id, tenantId]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to complete appointment' });
+    }
+});
+
+// Endpoint: Staff Management (POST)
+app.post('/api/staff', async (req, res) => {
+    try {
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        const { name, email, role, specialty, photo_url } = req.body;
+        const id = crypto.randomUUID();
+        const result = await query(
+            'INSERT INTO staff (id, tenant_id, name, email, role, specialty, photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [id, tenantId, name, email, role, specialty, photo_url]
+        );
+        res.json(result.rows[0]);
+    } catch (e) {
+        console.error('Failed to create staff member:', e);
+        res.status(500).json({ error: 'Failed to create staff member' });
+    }
+});
+
+// Endpoint: Staff Management (PUT)
+app.put('/api/staff/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        const { name, email, role, specialty, photo_url } = req.body;
+        const result = await query(
+            'UPDATE staff SET name = $1, email = $2, role = $3, bio = $4, photo_url = $5 WHERE id = $6 AND tenant_id = $7 RETURNING *',
+            [name, email, role, specialty, photo_url, id, tenantId]
+        );
+        res.json(result.rows[0]);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to update staff member' });
+    }
+});
+
+// Endpoint: Favorites (GET)
+app.get('/api/favorites', async (req, res) => {
+    try {
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        const result = await query('SELECT client_phone FROM client_favorites WHERE tenant_id = $1', [tenantId]);
+        res.json(result.rows.map(r => r.client_phone));
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch favorites' });
+    }
+});
+
+// Endpoint: Favorites (POST)
+app.post('/api/favorites/:phone', async (req, res) => {
+    try {
+        const { phone } = req.params;
+        const { favorite } = req.body;
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+
+        if (favorite) {
+            await query(
+                'INSERT INTO client_favorites (tenant_id, client_phone) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                [tenantId, phone]
+            );
+        } else {
+            await query(
+                'DELETE FROM client_favorites WHERE tenant_id = $1 AND client_phone = $2',
+                [tenantId, phone]
+            );
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to update favorite' });
+    }
+});
+
+app.get('/health', (req, res) => res.send('OK'));
 
 app.listen(port, () => {
     console.log(`NailFlow API running on http://localhost:${port}`);

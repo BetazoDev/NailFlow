@@ -21,11 +21,11 @@ export default function middleware(req: NextRequest) {
     let hostname = req.headers.get("host") || "";
 
     // Clean hostname for local development
-    hostname = hostname.replace('localhost:3000', 'demo.com');
+    hostname = hostname.replace('localhost:3000', 'demo.diabolicalservices.tech');
 
     // Define main domains that shouldn't be rewritten
     const mainDomains = [
-        'demo.com',
+        'demo.diabolicalservices.tech',
         'nailflow.com',
         'www.nailflow.com',
         'admin.nailflow.com',

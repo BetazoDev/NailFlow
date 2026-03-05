@@ -12,9 +12,10 @@ interface DateTimeStepProps {
     onNext: () => void;
     onBack?: () => void;
     tenantId?: string;
+    staffId?: string;
 }
 
-export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect, onTimeSelect, onNext, onBack, tenantId = 'demo' }: DateTimeStepProps) {
+export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect, onTimeSelect, onNext, onBack, tenantId = 'demo', staffId }: DateTimeStepProps) {
     return (
         <div className="flex flex-col min-h-full animate-fade-in-up" style={{ background: 'var(--cream)' }}>
             {/* Header */}
@@ -68,6 +69,7 @@ export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect,
                             onNext={onNext}
                             onBack={() => onDateSelect('')}
                             tenantId={tenantId}
+                            staffId={staffId}
                         />
                     </div>
                 )}
