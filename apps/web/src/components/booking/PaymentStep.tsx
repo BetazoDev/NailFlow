@@ -32,11 +32,11 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
     const handlePayment = async () => {
         setLoading(true);
         try {
-            // Create the booking in Firestore
-            await api.createBooking(booking.tenant_id || 'demo', booking);
-            // Release the slot hold
+            // Create the booking in the backend
+            await api.createBooking(booking);
+            // Release the slot hold (if implemented in backend)
             if (booking.date && booking.time) {
-                await api.releaseSlot(booking.tenant_id || 'demo', booking.date, booking.time);
+                await api.releaseSlot(booking.tenant_id, booking.date, booking.time);
             }
         } catch (e) {
             console.error('Error creating booking:', e);

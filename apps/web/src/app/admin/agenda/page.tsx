@@ -64,7 +64,7 @@ export default function AgendaPage() {
         if (!svc || !tenantId) return;
         setCompleting(apt.id);
         try {
-            await api.completeAppointment(tenantId, apt.id, svc.estimated_price, apt.staff_id, apt.date);
+            await api.completeAppointment(tenantId, apt.id);
             setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'completed' as const } : a));
         } catch (e) {
             console.error('Error completing appointment:', e);

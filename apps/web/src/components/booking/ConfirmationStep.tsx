@@ -27,7 +27,7 @@ export default function ConfirmationStep({ booking, salonName = 'Ana Nails Studi
             setSaving(true);
             try {
                 // Use the API helper for consistency
-                await api.createBooking(booking.tenant_id, booking);
+                await api.createBooking(booking);
                 setSaved(true);
             } catch (e) {
                 console.error('Failed to save appointment:', e);

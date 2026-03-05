@@ -237,7 +237,7 @@ export default function AdminDashboard() {
         if (!tenantId) return;
         try {
             const amount = getService(apt.service_id)?.estimated_price || 0;
-            await api.completeAppointment(tenantId, apt.id, amount, apt.staff_id, apt.date);
+            await api.completeAppointment(tenantId, apt.id);
             setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'completed' } : a));
             setSelectedApt(null);
         } catch (e) {

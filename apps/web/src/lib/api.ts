@@ -58,6 +58,13 @@ export const api = {
             return null;
         }
     },
+    updateTenant: async (id: string, data: Partial<Tenant>): Promise<Tenant> => {
+        return fetchApi(`/api/tenant?id=${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+    },
 
     // Staff
     getStaff: async (tenantId: string): Promise<Staff[]> => {
