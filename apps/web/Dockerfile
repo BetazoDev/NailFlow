@@ -3,12 +3,12 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy root files for workspaces
-COPY package*.json ./
-COPY apps/web/package*.json ./apps/web/
-COPY apps/api/package*.json ./apps/api/
+COPY package.json ./
+COPY apps/web/package.json ./apps/web/
+COPY apps/api/package.json ./apps/api/
 
-# Install root dependencies (including workspaces)
-RUN npm install
+# Install root dependencies without lockfile to resolve linux bindings
+RUN npm install --no-package-lock
 
 # Copy source
 COPY . .
