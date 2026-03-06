@@ -146,12 +146,49 @@ export const api = {
         });
     },
 
-    // Images (Kept Firebase for now as it's separate storage)
+    // Images (CDN Integration replacing Firebase Storage)
     uploadImage: async (tenantId: string, path: string, file: File): Promise<string> => {
-        const { storage } = await import('./firebase');
-        const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-        const storageRef = ref(storage, `${tenantId}/${path}/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        return getDownloadURL(snapshot.ref);
+        const formData = new FormData();
+        formData.append('images', file);
+
+        // Utilizamos los IDs configurados en las variables de entorno o los valores por defecto de NailsSalon
+        const clientId = process.env.NEXT_PUBLIC_CDN_CLIENT_ID || 'c6d224a2-1ebc-480a-8ccc-dcaf06258f01';
+        formData.append('client_id', clientId);
+
+        const projectId = process.env.NEXT_PUBLIC_CDN_PROJECT_ID || 'a4ebae0c-6ce2-482a-8774-e1a9aee72c79';
+        formData.append('project_id', projectId);
+
+        const uploadUrl = 'https://api.diabolicalservices.tech/api/images/upload';
+        const token = process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || '';
+
+        try {
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `CDN Upload Error: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.uploaded && data.uploaded.length > 0) {
+                // El CDN público usa el formato https://cdn.diabolicalservices.tech/{client-slug}/{filename}
+                const clientSlug = process.env.NEXT_PUBLIC_CDN_CLIENT_SLUG || 'nailssalon';
+                const filename = data.uploaded[0].filename;
+
+                return `https://cdn.diabolicalservices.tech/${clientSlug}/${filename}`;
+            } else {
+                throw new Error('Error CDN: No se retornó información de la imagen subida.');
+            }
+        } catch (error) {
+            console.error('Upload Error:', error);
+            throw error;
+        }
     }
 };
