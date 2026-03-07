@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
@@ -150,7 +151,10 @@ export default function LoginPage() {
                         Google
                     </button>
                 </div>
-                <div className="flex justify-center text-sm">
+                <div className="flex flex-col items-center gap-4 text-sm mt-6">
+                    <p className="text-nf-gray font-medium">
+                        ¿No tienes cuenta? <Link href="/signup" className="text-pink font-bold hover:text-coral transition-colors">Regístrate aquí</Link>
+                    </p>
                     <p className="text-nf-gray font-medium">
                         ¿Olvidaste tu contraseña? <a href="#" className="text-pink hover:text-coral transition-colors">Recupérala aquí</a>
                     </p>
