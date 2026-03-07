@@ -30,7 +30,7 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
         async function loadAvailability() {
             setLoading(true);
             try {
-                const slots = await api.getAvailability(tenantId, staffId, selectedDate);
+                const slots = await api.getAvailability(staffId, selectedDate);
                 setTimeSlots(slots);
             } catch (err) {
                 console.error('Failed to load availability:', err);
@@ -45,11 +45,11 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
     const handleSlotSelect = useCallback(async (time: string) => {
         // Release previous hold if any
         if (prevSlotRef.current && prevSlotRef.current !== time) {
-            api.releaseSlot(tenantId, selectedDate, prevSlotRef.current).catch(() => { });
+            api.releaseSlot(selectedDate, prevSlotRef.current).catch(() => { });
         }
         // Hold the new slot
         try {
-            await api.holdSlot(tenantId, selectedDate, time, holdIdRef.current);
+            await api.holdSlot(selectedDate, time, holdIdRef.current);
         } catch (e) {
             console.error('Failed to hold slot:', e);
         }

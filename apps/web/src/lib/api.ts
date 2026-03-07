@@ -67,17 +67,17 @@ export const api = {
     },
 
     // Staff
-    getStaff: async (tenantId: string): Promise<Staff[]> => {
+    getStaff: async (): Promise<Staff[]> => {
         return fetchApi('/api/staff');
     },
-    createStaffMember: async (tenantId: string, data: Partial<Staff>): Promise<Staff> => {
+    createStaffMember: async (data: Partial<Staff>): Promise<Staff> => {
         return fetchApi('/api/staff', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
     },
-    updateStaffMember: async (tenantId: string, id: string, data: Partial<Staff>): Promise<Staff> => {
+    updateStaffMember: async (id: string, data: Partial<Staff>): Promise<Staff> => {
         return fetchApi(`/api/staff/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -86,32 +86,33 @@ export const api = {
     },
 
     // Services
-    getServices: async (tenantId: string): Promise<Service[]> => {
+    getServices: async (): Promise<Service[]> => {
         return fetchApi('/api/services');
     },
-    createService: async (tenantId: string, data: Partial<Service>): Promise<Service> => {
+    createService: async (data: Partial<Service>): Promise<Service> => {
         return fetchApi('/api/services', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
     },
-    updateService: async (tenantId: string, id: string, data: Partial<Service>): Promise<Service> => {
+    updateService: async (id: string, data: Partial<Service>): Promise<Service> => {
         return fetchApi(`/api/services/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
     },
-    deleteService: async (tenantId: string, id: string): Promise<void> => {
+    deleteService: async (id: string): Promise<void> => {
         return fetchApi(`/api/services/${id}`, { method: 'DELETE' });
     },
 
     // Appointments & Booking
-    getAppointments: async (tenantId: string): Promise<Appointment[]> => {
+    // Appointments & Booking
+    getAppointments: async (): Promise<Appointment[]> => {
         return fetchApi('/api/appointments');
     },
-    getAvailability: async (tenantId: string, staffId: string, date: string): Promise<TimeSlot[]> => {
+    getAvailability: async (staffId: string, date: string): Promise<TimeSlot[]> => {
         return fetchApi(`/api/availability?date=${date}&staff_id=${staffId}`);
     },
     createBooking: async (data: BookingData): Promise<{ appointmentId: string; init_point: string }> => {
@@ -128,24 +129,24 @@ export const api = {
             body: JSON.stringify(data),
         });
     },
-    completeAppointment: async (tenantId: string, id: string): Promise<void> => {
+    completeAppointment: async (id: string): Promise<void> => {
         return fetchApi(`/api/appointments/${id}/complete`, { method: 'POST' });
     },
-    holdSlot: async (tenantId: string, date: string, time: string, holdId: string): Promise<void> => {
+    holdSlot: async (date: string, time: string, holdId: string): Promise<void> => {
         // Placeholder for demo
         return Promise.resolve();
     },
-    releaseSlot: async (tenantId: string, date: string, time: string): Promise<void> => {
+    releaseSlot: async (date: string, time: string): Promise<void> => {
         // Placeholder for demo
         return Promise.resolve();
     },
 
     // CRM / Favorites
-    getFavorites: async (tenantId: string): Promise<Set<string>> => {
+    getFavorites: async (): Promise<Set<string>> => {
         const data = await fetchApi('/api/favorites');
         return new Set(data);
     },
-    setFavorite: async (tenantId: string, phone: string, favorite: boolean): Promise<void> => {
+    setFavorite: async (phone: string, favorite: boolean): Promise<void> => {
         return fetchApi(`/api/favorites/${phone}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -153,8 +154,8 @@ export const api = {
         });
     },
 
-    // Images (CDN Integration replacing Firebase Storage)
-    uploadImage: async (tenantId: string, path: string, file: File): Promise<string> => {
+    // Images (CDN Integration)
+    uploadImage: async (file: File): Promise<string> => {
         const formData = new FormData();
         formData.append('images', file);
 

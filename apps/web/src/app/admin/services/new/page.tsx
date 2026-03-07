@@ -30,7 +30,7 @@ function NewServiceContent() {
     useEffect(() => {
         if (id && tenantId) {
             setLoading(true);
-            api.getServices(tenantId)
+            api.getServices()
                 .then(services => {
                     const data = services.find(s => s.id === id);
                     if (data) {
@@ -67,7 +67,7 @@ function NewServiceContent() {
             if (selectedFile) {
                 console.log('Subiendo imagen...', selectedFile.name);
                 try {
-                    finalImageUrl = await api.uploadImage(tenantId, 'services', selectedFile);
+                    finalImageUrl = await api.uploadImage(selectedFile);
                     console.log('Imagen subida con éxito:', finalImageUrl);
                 } catch (imgError) {
                     console.error('Error subiendo imagen:', imgError);
@@ -90,10 +90,10 @@ function NewServiceContent() {
 
             console.log('Enviando datos a Firestore:', serviceData);
             if (id) {
-                await api.updateService(tenantId, id, serviceData);
+                await api.updateService(id, serviceData);
                 console.log('Servicio actualizado con éxito');
             } else {
-                await api.createService(tenantId, serviceData);
+                await api.createService(serviceData);
                 console.log('Servicio creado con éxito');
             }
             console.log('Redirigiendo a /admin/services');

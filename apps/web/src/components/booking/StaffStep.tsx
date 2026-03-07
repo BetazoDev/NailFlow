@@ -19,7 +19,7 @@ export default function StaffStep({ selectedStaffId, onSelect, onNext, onBack }:
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.getStaff(domain)
+        api.getStaff()
             .then(data => setStaffList(data || []))
             .catch(console.error)
             .finally(() => setLoading(false));

@@ -196,27 +196,39 @@ app.get('/api/availability', async (req, res) => {
     if (!date) return res.status(400).json({ error: 'Date is required' });
 
     try {
+        // Query booked times, converting to Mexico City timezone for comparison
         const result = await query(
-            "SELECT TO_CHAR(datetime_start, 'HH24:MI') as time FROM appointments WHERE tenant_id = $1 AND TO_CHAR(datetime_start, 'YYYY-MM-DD') = $2 AND status IN ('confirmed', 'pending_payment')",
+            `SELECT TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'HH24:MI') as time 
+             FROM appointments 
+             WHERE tenant_id = $1 
+             AND TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD') = $2 
+             AND status IN ('confirmed', 'pending_payment')`,
             [tenantId, date]
         );
         const bookedTimes = new Set(result.rows.map(r => r.time));
 
-        // Determine if date is today (Mexico City timezone)
-        const nowMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
-        const todayStr = `${nowMX.getFullYear()}-${String(nowMX.getMonth() + 1).padStart(2, '0')}-${String(nowMX.getDate()).padStart(2, '0')}`;
+        // Get "Now" in Mexico City
+        const mxNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+        const todayStr = `${mxNow.getFullYear()}-${String(mxNow.getMonth() + 1).padStart(2, '0')}-${String(mxNow.getDate()).padStart(2, '0')}`;
+
+        // We calculate if requested date is today
         const isToday = date === todayStr;
+
         // 3-hour advance: minimum time allowed
-        const minAllowedHour = nowMX.getHours() + 3 + (nowMX.getMinutes() > 0 ? 1 : 0);
+        // If it's 19:51, h=19. minAllowed = 19 + 3 + 1 = 23.
+        const minAllowedHour = mxNow.getHours() + 3 + (mxNow.getMinutes() > 0 ? 1 : 0);
 
         const slots = [];
-        for (let h = 9; h < 18; h++) {
+        for (let h = 9; h < 21; h++) { // Expanded to 9 PM just in case
             for (const min of [0, 30]) {
                 const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-                // Skip past times for today (with 3-hour advance)
-                if (isToday && (h < minAllowedHour || (h === minAllowedHour && min <= nowMX.getMinutes()))) {
-                    continue;
+
+                // Filter: must be in the future (with 3-hour buffer) if date is today
+                if (isToday) {
+                    if (h < minAllowedHour) continue;
+                    if (h === minAllowedHour && min <= mxNow.getMinutes()) continue;
                 }
+
                 if (!bookedTimes.has(time)) {
                     slots.push({ time, available: true });
                 }
@@ -224,6 +236,7 @@ app.get('/api/availability', async (req, res) => {
         }
         res.json(slots);
     } catch (e) {
+        console.error('Failed to fetch availability:', e);
         res.status(500).json({ error: 'Failed to fetch availability' });
     }
 });
@@ -234,18 +247,22 @@ app.post('/api/bookings/test', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
 
+    console.log('Received test booking request:', { tenantId, client_name, date, time });
+
     if (!client_name || !date || !time) {
         return res.status(400).json({ error: 'client_name, date, and time are required' });
     }
 
     try {
-        const datetimeStr = `${date}T${time}:00`;
+        // Construct ISO string with explicit -06:00 offset (Mexico City normal time)
+        const datetimeStr = `${date}T${time}:00-06:00`;
         const aptRes = await query(
             `INSERT INTO appointments 
             (tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, status, notes, advance_paid) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-            [tenantId, client_name, client_phone || '', client_email || '', service_id, staff_id, datetimeStr, 'confirmed', notes || '', false]
+            [tenantId, client_name, client_phone || '', client_email || '', service_id, staff_id || null, datetimeStr, 'confirmed', notes || '', false]
         );
+        console.log('Test booking created successfully:', aptRes.rows[0].id);
         res.json({ appointmentId: aptRes.rows[0].id, success: true });
     } catch (e) {
         console.error('Test booking failed:', e);

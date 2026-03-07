@@ -18,7 +18,7 @@ export default function ServicesPage() {
 
     useEffect(() => {
         if (!tenantId) return;
-        api.getServices(tenantId)
+        api.getServices()
             .then(setServices)
             .finally(() => setLoading(false));
     }, [tenantId]);
@@ -38,7 +38,7 @@ export default function ServicesPage() {
         if (!deleteTarget || !tenantId) return;
         setDeleting(true);
         try {
-            await api.deleteService(tenantId, deleteTarget.id);
+            await api.deleteService(deleteTarget.id);
             setServices(prev => prev.filter(s => s.id !== deleteTarget.id));
             setDeleteTarget(null);
         } catch (e) {

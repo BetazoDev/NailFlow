@@ -32,7 +32,7 @@ export default async function StaffBookingPage({ params }: Props) {
         .join(' ');
 
     // Resolve the staff member by slug
-    const allStaff = await api.getStaff(tenant.id);
+    const allStaff = await api.getStaff();
     const staffMember = allStaff.find(s => {
         const memberSlug = s.slug || s.name.toLowerCase().replace(/\s+/g, '-');
         return memberSlug === params.staffSlug;

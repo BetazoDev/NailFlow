@@ -28,7 +28,7 @@ export default function TeamPage() {
 
     useEffect(() => {
         if (!tenantId) return;
-        api.getStaff(tenantId)
+        api.getStaff()
             .then(data => {
                 if (data.length > 0) setTeam(data);
             })
@@ -83,7 +83,7 @@ export default function TeamPage() {
         try {
             let photoUrl = editingMember?.photo_url || '';
             if (newPhotoFile) {
-                photoUrl = await api.uploadImage(tenantId, 'staff', newPhotoFile);
+                photoUrl = await api.uploadImage(newPhotoFile);
             }
 
             if (editingMember) {
@@ -97,11 +97,11 @@ export default function TeamPage() {
                     photo_url: photoUrl,
                     slug: newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
                 };
-                await api.updateStaffMember(tenantId, editingMember.id, updatedData);
+                await api.updateStaffMember(editingMember.id, updatedData);
                 setTeam(prev => prev.map(m => m.id === editingMember.id ? { ...m, ...updatedData } : m));
             } else {
                 // Add new member
-                const staffData = await api.createStaffMember(tenantId, {
+                const staffData = await api.createStaffMember({
                     tenant_id: tenantId,
                     name: newName.trim(),
                     email: newEmail.trim(),
