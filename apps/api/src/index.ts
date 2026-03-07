@@ -103,21 +103,26 @@ app.post('/api/services', async (req, res) => {
 // Endpoint: Update Service
 app.put('/api/services/:id', async (req, res) => {
     try {
-        const { name, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
+        const { name, description, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
+        // @ts-ignore
+        const tenantId = req.tenant.id;
         const result = await query(
-            'UPDATE services SET name = $1, duration_minutes = $2, estimated_price = $3, required_advance = $4, category = $5, image_url = $6 WHERE id = $7 RETURNING *',
-            [name, Number(duration_minutes), Number(estimated_price), Number(required_advance), category, image_url, req.params.id]
+            'UPDATE services SET name = $1, description = $2, duration_minutes = $3, estimated_price = $4, required_advance = $5, category = $6, image_url = $7 WHERE id = $8 AND tenant_id = $9 RETURNING *',
+            [name, description, Number(duration_minutes), Number(estimated_price), Number(required_advance), category, image_url, req.params.id, tenantId]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
         res.json(result.rows[0]);
     } catch (e) {
+        console.error('Failed to update service:', e);
         res.status(500).json({ error: 'Failed to update service' });
     }
 });
 
 // Endpoint: Delete Service
 app.delete('/api/services/:id', async (req, res) => {
-    const result = await query('DELETE FROM services WHERE id = $1', [req.params.id]);
+    // @ts-ignore
+    const tenantId = req.tenant.id;
+    const result = await query('DELETE FROM services WHERE id = $1 AND tenant_id = $2', [req.params.id, tenantId]);
     if (result.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
     res.json({ success: true });
 });
@@ -318,11 +323,11 @@ app.post('/api/staff', async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
-        const { name, email, role, specialty, photo_url } = req.body;
+        const { name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule } = req.body;
         const id = crypto.randomUUID();
         const result = await query(
-            'INSERT INTO staff (id, tenant_id, name, email, role, specialty, photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-            [id, tenantId, name, email, role, specialty, photo_url]
+            'INSERT INTO staff (id, tenant_id, name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+            [id, tenantId, name, email, role, specialty, photo_url, slug || name.toLowerCase().replace(/\s+/g, '-'), active !== false, bio, color_identifier, services_offered || [], weekly_schedule || {}]
         );
         res.json(result.rows[0]);
     } catch (e) {
@@ -337,13 +342,15 @@ app.put('/api/staff/:id', async (req, res) => {
         const { id } = req.params;
         // @ts-ignore
         const tenantId = req.tenant.id;
-        const { name, email, role, specialty, photo_url } = req.body;
+        const { name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule } = req.body;
         const result = await query(
-            'UPDATE staff SET name = $1, email = $2, role = $3, bio = $4, photo_url = $5 WHERE id = $6 AND tenant_id = $7 RETURNING *',
-            [name, email, role, specialty, photo_url, id, tenantId]
+            'UPDATE staff SET name = $1, email = $2, role = $3, specialty = $4, photo_url = $5, slug = $6, active = $7, bio = $8, color_identifier = $9, services_offered = $10, weekly_schedule = $11 WHERE id = $12 AND tenant_id = $13 RETURNING *',
+            [name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule, id, tenantId]
         );
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Staff member not found' });
         res.json(result.rows[0]);
     } catch (e) {
+        console.error('Failed to update staff member:', e);
         res.status(500).json({ error: 'Failed to update staff member' });
     }
 });

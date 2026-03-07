@@ -69,6 +69,18 @@ export async function initDb() {
     );
   `);
 
+  // Migrations: Ensure all columns exist in case the tables were created in early versions
+  console.log('Running migrations...');
+  await query(`
+    ALTER TABLE services ADD COLUMN IF NOT EXISTS image_url TEXT;
+    ALTER TABLE services ADD COLUMN IF NOT EXISTS description TEXT;
+    ALTER TABLE staff ADD COLUMN IF NOT EXISTS slug TEXT;
+    ALTER TABLE staff ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+    ALTER TABLE staff ADD COLUMN IF NOT EXISTS color_identifier TEXT;
+    ALTER TABLE staff ADD COLUMN IF NOT EXISTS services_offered TEXT[];
+    ALTER TABLE staff ADD COLUMN IF NOT EXISTS weekly_schedule JSONB;
+  `);
+
   // Seed/Update initial demo tenant
   console.log('Seeding/Updating demo tenant...');
   await query(`
