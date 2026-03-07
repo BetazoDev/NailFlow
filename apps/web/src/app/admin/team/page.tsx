@@ -20,7 +20,7 @@ export default function TeamPage() {
     const [newRole, setNewRole] = useState<'staff' | 'owner'>('staff');
     const [newSpecialty, setNewSpecialty] = useState('');
     const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
-    const [newPhotoPreview, setNewPhotoPreview] = useState<string | null>(null);
+    const [newPhotoPreview, setNewPhotoPreview] = useState<string | undefined>(undefined);
     const [saving, setSaving] = useState(false);
     const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,16 +35,18 @@ export default function TeamPage() {
             .finally(() => setLoading(false));
     }, [tenantId]);
 
-    const handleCopyLink = (member: Staff) => {
+    const getStaffUrl = (member: Staff) => {
         const slug = member.slug || member.name.toLowerCase().replace(/\s+/g, '-');
-        const host = typeof window !== 'undefined' ? window.location.host : 'nailflow.app';
-        const urlToUse = domain ? `https://${host}/book/${slug}?domain=${domain}` : `https://${host}/book/${slug}`;
-
-        // Let's use standard domain format if possible
         const baseDomain = domain && domain.includes('.') ? domain : `${domain}.nailflow.app`;
-        const finalUrl = `https://${baseDomain}/book/${slug}`;
+        // Dirección/owner: root domain. Staff: /book/slug
+        return member.role === 'owner'
+            ? { href: `https://${baseDomain}`, text: baseDomain }
+            : { href: `https://${baseDomain}/book/${slug}`, text: `${baseDomain}/book/${slug}` };
+    };
 
-        navigator.clipboard.writeText(finalUrl).catch(() => { });
+    const handleCopyLink = (member: Staff) => {
+        const { href } = getStaffUrl(member);
+        navigator.clipboard.writeText(href).catch(() => { });
         setCopiedSlug(member.id);
         setTimeout(() => setCopiedSlug(null), 2000);
     };
@@ -55,7 +57,7 @@ export default function TeamPage() {
         setNewRole('staff');
         setNewSpecialty('');
         setNewPhotoFile(null);
-        setNewPhotoPreview(null);
+        setNewPhotoPreview(undefined);
         setEditingMember(null);
     };
 
@@ -70,7 +72,7 @@ export default function TeamPage() {
         setNewEmail(member.email || '');
         setNewRole(member.role as 'staff' | 'owner');
         setNewSpecialty(member.specialty || member.bio || '');
-        setNewPhotoPreview(member.photo_url || null);
+        setNewPhotoPreview(member.photo_url || undefined);
         setNewPhotoFile(null);
         setShowAddModal(true);
     };
@@ -90,6 +92,7 @@ export default function TeamPage() {
                     name: newName.trim(),
                     email: newEmail.trim(),
                     role: newRole,
+                    bio: newSpecialty.trim(),
                     specialty: newSpecialty.trim(),
                     photo_url: photoUrl,
                     slug: newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
@@ -99,13 +102,22 @@ export default function TeamPage() {
             } else {
                 // Add new member
                 const staffData = await api.createStaffMember(tenantId, {
+                    tenant_id: tenantId,
                     name: newName.trim(),
                     email: newEmail.trim(),
                     role: newRole,
+                    bio: newSpecialty.trim(),
                     specialty: newSpecialty.trim(),
                     photo_url: photoUrl,
+                    active: true,
+                    services_offered: [],
+                    weekly_schedule: [],
+                    color_identifier: '#C97794',
+                    slug: newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
                 });
-                setTeam(prev => [...prev, staffData as Staff]);
+                if (staffData) {
+                    setTeam(prev => [...prev, staffData as Staff]);
+                }
             }
 
             resetForm();
@@ -124,12 +136,13 @@ export default function TeamPage() {
         setNewPhotoPreview(URL.createObjectURL(file));
     };
 
-    const formatSchedule = (member: Staff) => {
-        if (!member.weekly_schedule || member.weekly_schedule.length === 0) return 'Sin horario definido';
-        return member.weekly_schedule
-            .map(s => `${DAY_NAMES[s.day_of_week]}: ${s.start_time} - ${s.end_time}`)
-            .join(' • ');
-    };
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="w-8 h-8 border-2 border-aesthetic-accent border-t-aesthetic-pink rounded-full animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="animate-fade-in min-h-full pb-20">
@@ -164,7 +177,7 @@ export default function TeamPage() {
                         <tbody className="divide-y divide-aesthetic-accent/30">
                             {team.map((member) => {
                                 const initials = member.name.split(' ').map(n => n[0]).join('').slice(0, 2);
-                                const slug = member.slug || member.name.toLowerCase().replace(/\s+/g, '-');
+                                const { href: linkHref, text: linkText } = getStaffUrl(member);
                                 return (
                                     <tr key={member.id} className="hover:bg-aesthetic-soft-pink/10 transition-colors group">
                                         <td className="py-6 px-8">
@@ -193,12 +206,12 @@ export default function TeamPage() {
                                         <td className="py-6 px-8">
                                             <div className="flex items-center gap-3 max-w-[240px]">
                                                 <a
-                                                    href={`https://${domain && domain.includes('.') ? domain : `${domain}.nailflow.app`}/book/${slug}`}
+                                                    href={linkHref}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="bg-white border border-aesthetic-accent text-aesthetic-muted text-[10px] px-4 py-2 rounded-full font-display italic flex-1 truncate shadow-minimal group-hover:border-aesthetic-pink/30 transition-all hover:text-aesthetic-pink"
                                                 >
-                                                    {domain && domain.includes('.') ? domain : `${domain}.nailflow.app`}/book/{slug}
+                                                    {linkText}
                                                 </a>
                                                 <button
                                                     onClick={() => handleCopyLink(member)}
@@ -217,7 +230,7 @@ export default function TeamPage() {
                                             </button>
                                         </td>
                                     </tr>
-                                )
+                                );
                             })}
                         </tbody>
                     </table>
@@ -228,7 +241,7 @@ export default function TeamPage() {
             <div className="px-6 space-y-6 lg:hidden pb-10">
                 {team.map((member) => {
                     const initials = member.name.split(' ').map(n => n[0]).join('').slice(0, 2);
-                    const slug = member.slug || member.name.toLowerCase().replace(/\s+/g, '-');
+                    const { href: linkHref, text: linkText } = getStaffUrl(member);
                     return (
                         <div key={member.id} className="bg-white rounded-[2.5rem] p-8 shadow-minimal border border-aesthetic-accent relative overflow-hidden group">
                             <div className="absolute top-0 right-0 p-4 flex items-center gap-2">
@@ -239,7 +252,7 @@ export default function TeamPage() {
                                     <span className="material-symbol text-base">edit</span>
                                 </button>
                                 <span className={`px-4 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-[0.15em] ${member.role === 'owner' ? 'bg-aesthetic-pink/20 text-aesthetic-taupe border border-aesthetic-pink/30' : 'bg-aesthetic-cream border border-aesthetic-accent text-aesthetic-muted'}`}>
-                                    {member.role === 'owner' ? 'Fundadora' : 'Staff'}
+                                    {member.role === 'owner' ? 'Dirección' : 'Staff'}
                                 </span>
                             </div>
 
@@ -282,12 +295,12 @@ export default function TeamPage() {
                                     <p className="text-[9px] uppercase tracking-[0.2em] font-medium text-aesthetic-muted mb-3 opacity-60">Perfil Público</p>
                                     <div className="flex items-center justify-between gap-3 bg-white border border-aesthetic-accent rounded-2xl py-3 px-5 shadow-minimal">
                                         <a
-                                            href={`https://${domain && domain.includes('.') ? domain : `${domain}.nailflow.app`}/book/${slug}`}
+                                            href={linkHref}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-[11px] font-display italic text-aesthetic-taupe truncate hover:text-aesthetic-pink transition-colors"
                                         >
-                                            {domain && domain.includes('.') ? domain : `${domain}.nailflow.app`}/book/{slug}
+                                            {linkText}
                                         </a>
                                         <button
                                             onClick={() => handleCopyLink(member)}
@@ -305,12 +318,18 @@ export default function TeamPage() {
 
             {/* Add/Edit Member Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-aesthetic-taupe/40 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-fade-in">
+                <div
+                    className="fixed inset-0 bg-aesthetic-taupe/40 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-fade-in"
+                    onClick={(e) => { if (e.target === e.currentTarget) { setShowAddModal(false); resetForm(); } }}
+                >
                     <div className="bg-aesthetic-cream rounded-[3rem] p-10 w-full max-w-lg shadow-2xl relative border border-white/50 overflow-hidden max-h-[90vh] overflow-y-auto">
                         {/* Decorative background */}
                         <div className="absolute top-0 right-0 size-40 bg-aesthetic-pink/10 blur-3xl rounded-full -mr-20 -mt-20" />
 
-                        <button onClick={() => { setShowAddModal(false); resetForm(); }} className="absolute top-10 right-10 size-10 rounded-full bg-white/50 flex items-center justify-center hover:bg-white transition-colors">
+                        <button
+                            onClick={() => { setShowAddModal(false); resetForm(); }}
+                            className="absolute top-10 right-10 size-10 rounded-full bg-white/50 flex items-center justify-center hover:bg-white transition-colors z-10"
+                        >
                             <span className="material-symbol text-aesthetic-muted">close</span>
                         </button>
 

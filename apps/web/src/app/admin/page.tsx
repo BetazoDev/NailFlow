@@ -13,6 +13,8 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
     completed: { label: 'COMPLETADA', color: '#88C999', bg: 'rgba(136, 201, 153, 0.1)' },
 };
 
+type IncomePeriod = 'day' | 'week' | 'month';
+
 interface AppointmentDetailProps {
     apt: Appointment;
     service?: Service;
@@ -178,6 +180,7 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
     const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+    const [incomePeriod, setIncomePeriod] = useState<IncomePeriod>('day');
     const { tenantId, domain } = useTenant();
 
     useEffect(() => {
@@ -198,6 +201,20 @@ export default function AdminDashboard() {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+    // Start of current week (Monday)
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // Start of current month
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const completedAppointments = useMemo(() =>
+        appointments.filter(a => a.status === 'completed'),
+        [appointments]
+    );
+
     const todaysAppointments = useMemo(() =>
         appointments
             .filter(apt => apt.date === todayStr && apt.status !== 'cancelled')
@@ -210,23 +227,49 @@ export default function AdminDashboard() {
         [todaysAppointments]
     );
 
-    const completedAppointments = useMemo(() =>
+    const completedToday = useMemo(() =>
         todaysAppointments.filter(a => a.status === 'completed'),
         [todaysAppointments]
     );
 
     const todayIncome = useMemo(() =>
-        completedAppointments.reduce((sum, a) => sum + (getService(a.service_id)?.estimated_price || 0), 0),
-        [completedAppointments, getService]
+        completedToday.reduce((sum, a) => sum + (getService(a.service_id)?.estimated_price || 0), 0),
+        [completedToday, getService]
     );
 
-    const host = typeof window !== 'undefined' ? window.location.host : 'nailflow.app';
+    const weeklyIncome = useMemo(() =>
+        completedAppointments
+            .filter(a => new Date(a.datetime_start) >= startOfWeek)
+            .reduce((sum, a) => sum + (getService(a.service_id)?.estimated_price || 0), 0),
+        [completedAppointments, startOfWeek, getService]
+    );
+
+    const monthlyIncome = useMemo(() =>
+        completedAppointments
+            .filter(a => new Date(a.datetime_start) >= startOfMonth)
+            .reduce((sum, a) => sum + (getService(a.service_id)?.estimated_price || 0), 0),
+        [completedAppointments, startOfMonth, getService]
+    );
+
+    const displayIncome = incomePeriod === 'day' ? todayIncome : incomePeriod === 'week' ? weeklyIncome : monthlyIncome;
+    const displayCompletedCount = incomePeriod === 'day'
+        ? completedToday.length
+        : incomePeriod === 'week'
+            ? completedAppointments.filter(a => new Date(a.datetime_start) >= startOfWeek).length
+            : completedAppointments.filter(a => new Date(a.datetime_start) >= startOfMonth).length;
+
+    const periodLabel = incomePeriod === 'day' ? 'Hoy' : incomePeriod === 'week' ? 'Esta semana' : 'Este mes';
+
+    // Owner info from staff (Dirección role)
+    const owner = useMemo(() => staff.find(s => s.role === 'owner'), [staff]);
 
     const handleCopyLink = (member: Staff) => {
         const slug = member.slug || member.name.toLowerCase().replace(/\s+/g, '-');
-
+        // For Dirección role: use root domain. For staff: use /book/slug
         const baseDomain = domain && domain.includes('.') ? domain : `${domain}.nailflow.app`;
-        const finalUrl = `https://${baseDomain}/book/${slug}`;
+        const finalUrl = member.role === 'owner'
+            ? `https://${baseDomain}`
+            : `https://${baseDomain}/book/${slug}`;
 
         navigator.clipboard.writeText(finalUrl).catch(() => { });
         setCopiedSlug(member.id);
@@ -236,7 +279,6 @@ export default function AdminDashboard() {
     const handleComplete = async (apt: Appointment) => {
         if (!tenantId) return;
         try {
-            const amount = getService(apt.service_id)?.estimated_price || 0;
             await api.completeAppointment(tenantId, apt.id);
             setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'completed' } : a));
             setSelectedApt(null);
@@ -257,15 +299,19 @@ export default function AdminDashboard() {
         <div className="relative min-h-full pb-24" style={{ background: 'var(--cream)' }}>
             {/* Header */}
             <div className="px-6 pt-8 pb-0">
-                <p className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase mb-2 font-display italic font-medium">Hola, Ana</p>
+                <p className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase mb-2 font-display italic font-medium">
+                    {owner ? `Hola, ${owner.name.split(' ')[0]}` : 'Bienvenida'}
+                </p>
                 <div className="flex items-center justify-between">
                     <h1 className="font-display text-4xl font-light italic tracking-tight text-aesthetic-taupe">Buenos días ✨</h1>
                     <div className="size-11 rounded-full overflow-hidden shadow-soft border-2 border-white ring-1 ring-aesthetic-accent/50">
-                        <img
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAakgqdo3xGyEb_gQdoOeHJEBW2d0GIY35V0eMiKIcybGogNYfthHnBSfCAO_vfuauKbcSuKeXI8OgII8RnH4z9X5KBqjcYOIMf-svswpLrk5HI4n4guqpVYfonm85qLfAhglsa_vNTCh3KJgXuRRr7oqKhCc6FeL70o5ECU5d_x9jp_OQ30AWn7M1PP6gY-o7a86FmpQaphJ0uEvrq274veIa0X5l0bPFmVezOkL3vEHuPg0QeuopSZmXPBBeuWDdPKh0jj0K_eQLU"
-                            alt="Ana"
-                            className="w-full h-full object-cover"
-                        />
+                        {owner?.photo_url ? (
+                            <img src={owner.photo_url} alt={owner.name} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-sm font-display italic bg-aesthetic-soft-pink text-aesthetic-taupe">
+                                {owner ? owner.name.split(' ').map(n => n[0]).join('').slice(0, 2) : '✦'}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -276,7 +322,9 @@ export default function AdminDashboard() {
                 {staff.map(member => {
                     const slug = member.slug || member.name.toLowerCase().replace(/\s+/g, '-');
                     const baseDomain = domain && domain.includes('.') ? domain : `${domain}.nailflow.app`;
-                    const url = `${baseDomain}/book/${slug}`;
+                    const url = member.role === 'owner'
+                        ? baseDomain
+                        : `${baseDomain}/book/${slug}`;
                     const isCopied = copiedSlug === member.id;
                     return (
                         <div key={member.id} className="bg-white rounded-2xl p-3.5 shadow-sm flex items-center gap-3 border border-aesthetic-accent/30">
@@ -286,7 +334,10 @@ export default function AdminDashboard() {
                                 ) : member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-aesthetic-taupe font-display truncate">{member.name}</p>
+                                <p className="text-xs font-medium text-aesthetic-taupe font-display truncate">
+                                    {member.name}
+                                    {member.role === 'owner' && <span className="ml-1 text-[9px] text-aesthetic-pink">(Dirección)</span>}
+                                </p>
                                 <p className="text-[10px] text-aesthetic-muted/60 truncate font-display italic">https://{url}</p>
                             </div>
                             <button
@@ -302,15 +353,47 @@ export default function AdminDashboard() {
                 })}
             </div>
 
-            {/* Income card */}
+            {/* Income card with period selector */}
             <div className="mx-6 mt-6 p-8 bg-white/60 backdrop-blur-sm rounded-[2.5rem] border border-aesthetic-accent shadow-minimal flex flex-col items-center text-center">
-                <p className="text-[10px] tracking-[0.3em] uppercase text-aesthetic-muted mb-4 font-display italic font-medium">Ingresos de hoy</p>
+                {/* Period selector */}
+                <div className="flex gap-1 bg-aesthetic-cream rounded-full p-1 mb-6 self-stretch">
+                    {([['day', 'Hoy'], ['week', 'Semana'], ['month', 'Mes']] as [IncomePeriod, string][]).map(([id, label]) => (
+                        <button
+                            key={id}
+                            onClick={() => setIncomePeriod(id)}
+                            className={`flex-1 py-1.5 rounded-full text-[10px] font-bold tracking-[0.1em] uppercase transition-all duration-200 ${incomePeriod === id ? 'bg-white shadow-sm text-aesthetic-taupe' : 'text-aesthetic-muted/60'}`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-aesthetic-muted mb-4 font-display italic font-medium">
+                    Ingresos — {periodLabel}
+                </p>
                 <div className="flex flex-col items-center">
-                    <p className="font-display text-5xl font-light italic tracking-tight text-aesthetic-taupe mb-2">${todayIncome.toLocaleString()}</p>
+                    <p className="font-display text-5xl font-light italic tracking-tight text-aesthetic-taupe mb-2">${displayIncome.toLocaleString()}</p>
                     <span className="text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-green-50 text-[#88C999] border border-green-100/50">
-                        {completedAppointments.length} cita{completedAppointments.length !== 1 ? 's' : ''} completada{completedAppointments.length !== 1 ? 's' : ''}
+                        {displayCompletedCount} cita{displayCompletedCount !== 1 ? 's' : ''} completada{displayCompletedCount !== 1 ? 's' : ''}
                     </span>
                 </div>
+
+                {/* Quick stats grid */}
+                {incomePeriod !== 'day' && (
+                    <div className="mt-6 grid grid-cols-3 gap-4 w-full border-t border-aesthetic-accent/30 pt-6">
+                        <div className="text-center">
+                            <p className="text-[9px] tracking-[0.15em] text-aesthetic-muted uppercase mb-1">Hoy</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe">${todayIncome.toLocaleString()}</p>
+                        </div>
+                        <div className="text-center border-x border-aesthetic-accent/30">
+                            <p className="text-[9px] tracking-[0.15em] text-aesthetic-muted uppercase mb-1">Semana</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe">${weeklyIncome.toLocaleString()}</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-[9px] tracking-[0.15em] text-aesthetic-muted uppercase mb-1">Mes</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe">${monthlyIncome.toLocaleString()}</p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Pending Appointments */}
@@ -370,22 +453,22 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="font-display text-xl italic text-aesthetic-taupe flex items-center gap-2">
                         <span className="material-symbol text-[#88C999] text-lg">check_circle</span>
-                        Completadas
+                        Completadas hoy
                     </h2>
-                    {completedAppointments.length > 0 && (
+                    {completedToday.length > 0 && (
                         <span className="text-[11px] tracking-[0.12em] font-semibold uppercase text-[#88C999]">
-                            {completedAppointments.length}
+                            {completedToday.length}
                         </span>
                     )}
                 </div>
 
-                {completedAppointments.length === 0 ? (
+                {completedToday.length === 0 ? (
                     <div className="text-center py-8 bg-white/30 rounded-3xl border border-dashed border-aesthetic-accent">
                         <p className="text-aesthetic-muted/40 text-sm italic font-display">Sin citas completadas aún hoy</p>
                     </div>
                 ) : (
                     <div className="space-y-3 stagger-children">
-                        {completedAppointments.map(apt => {
+                        {completedToday.map(apt => {
                             const svc = getService(apt.service_id);
                             const startDate = new Date(apt.datetime_start);
                             const timeStr = startDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });

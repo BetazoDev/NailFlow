@@ -7,6 +7,12 @@ import { useState } from 'react';
 
 interface Props {
     tenant: Tenant;
+    /** When provided, skips the splash and pre-selects a staff member */
+    staffId?: string;
+    staffName?: string;
+    staffPhoto?: string;
+    /** Skip splash screen for staff-specific booking pages */
+    skipSplash?: boolean;
 }
 
 const STEPS: { id: BookingStep; label: string; desc: string }[] = [
@@ -19,8 +25,8 @@ const STEPS: { id: BookingStep; label: string; desc: string }[] = [
     { id: 'confirmation', label: 'Confirmación', desc: '¡Todo listo!' },
 ];
 
-export default function BookingWidget({ tenant }: Props) {
-    const [splashDone, setSplashDone] = useState(false);
+export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, skipSplash = false }: Props) {
+    const [splashDone, setSplashDone] = useState(skipSplash);
     const [currentStep, setCurrentStep] = useState<BookingStep>('personal');
 
     const salonName =
@@ -49,11 +55,11 @@ export default function BookingWidget({ tenant }: Props) {
                 <div>
                     <div className="flex items-center gap-3 mb-10">
                         <div
-                            className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg"
+                            className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden"
                             style={{ background: 'var(--pink)' }}
                         >
                             {tenant.branding.logo_url ? (
-                                <img src={tenant.branding.logo_url} className="w-8 h-8 object-contain" alt="Logo" />
+                                <img src={tenant.branding.logo_url} className="w-full h-full object-cover" alt="Logo" />
                             ) : (
                                 <span className="font-serif text-xl text-white font-bold">{salonName.charAt(0)}</span>
                             )}
@@ -63,6 +69,25 @@ export default function BookingWidget({ tenant }: Props) {
                             <p className="text-white/40 text-[11px] tracking-[0.15em] uppercase mt-0.5">Nail Studio</p>
                         </div>
                     </div>
+
+                    {/* Staff preview if provided */}
+                    {staffName && (
+                        <div className="mb-8 flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/10">
+                            <div className="size-10 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
+                                {staffPhoto ? (
+                                    <img src={staffPhoto} alt={staffName} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-xs font-serif text-white/60 bg-white/10">
+                                        {staffName.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <p className="text-white/40 text-[9px] tracking-[0.2em] uppercase mb-0.5">Tu especialista</p>
+                                <p className="text-white text-sm font-medium capitalize">{staffName}</p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Step indicators */}
                     <p className="text-[10px] tracking-[0.2em] text-white/30 uppercase font-semibold mb-5">
@@ -151,7 +176,9 @@ export default function BookingWidget({ tenant }: Props) {
                 <div className="flex-1">
                     <BookingWizard
                         tenantId={tenant.id}
-                        staffName="Ana"
+                        staffId={staffId}
+                        staffName={staffName}
+                        staffPhoto={staffPhoto}
                         salonName={salonName}
                         onStepChange={setCurrentStep}
                     />
