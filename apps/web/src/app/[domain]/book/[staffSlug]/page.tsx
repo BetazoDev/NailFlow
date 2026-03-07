@@ -44,6 +44,7 @@ export default async function StaffBookingPage({ params }: Props) {
 
     return (
         <div
+            className="min-h-screen bg-cream selection:bg-pink-pale selection:text-charcoal relative"
             style={{
                 ...cssVars.split(';').reduce((acc, curr) => {
                     const [k, v] = curr.split(':');
@@ -54,7 +55,6 @@ export default async function StaffBookingPage({ params }: Props) {
                 '--font-sans': typo.fontSans,
             } as React.CSSProperties}
         >
-            {/* Reuse the same BookingWidget used in the main booking page for consistent design */}
             <BookingWidget
                 tenant={tenant}
                 staffId={staffId}

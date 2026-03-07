@@ -29,24 +29,38 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
         return n;
     };
 
+    const [error, setError] = useState<string | null>(null);
+
     const handlePayment = async () => {
         setLoading(true);
+        setError(null);
         try {
-            // Create the booking in the backend
-            await api.createBooking(booking);
-            // Release the slot hold (if implemented in backend)
-            if (booking.date && booking.time) {
-                await api.releaseSlot(booking.tenant_id, booking.date, booking.time);
+            if (method === 'prueba') {
+                // Test mode: create appointment directly without payment gateway
+                await api.createBookingTest(booking);
+                setTimeout(() => {
+                    setLoading(false);
+                    onNext();
+                }, 600);
+            } else if (method === 'card' || method === 'apple' || method === 'mercado') {
+                // For real payment methods, create booking and redirect to payment gateway
+                const result = await api.createBooking(booking);
+                if (result.init_point) {
+                    window.location.href = result.init_point;
+                } else {
+                    throw new Error('No se pudo iniciar el pago');
+                }
+            } else {
+                setTimeout(() => {
+                    setLoading(false);
+                    onNext();
+                }, 600);
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error('Error creating booking:', e);
-        }
-        // Small delay for UX
-        const delay = method === 'prueba' ? 500 : 1000;
-        setTimeout(() => {
+            setError(e.message || 'Error al procesar la reserva. Por favor intenta de nuevo.');
             setLoading(false);
-            onNext();
-        }, delay);
+        }
     };
 
     const methods: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
@@ -189,6 +203,12 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
                     </div>
                 )}
             </div>
+
+            {error && (
+                <div className="mx-6 mb-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">
+                    {error}
+                </div>
+            )}
 
             {/* CTA */}
             <div className="px-6 pb-10 pt-4">

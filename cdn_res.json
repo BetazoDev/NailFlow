@@ -1,0 +1,28 @@
+﻿RESULT: {
+  "uploaded": [],
+  "duplicates": [
+    {
+      "filename": "test-image.jpg",
+      "existing": {
+        "id": "d706a9f3-041a-41f8-900a-5dd30ba0baa1",
+        "client_id": "c6d224a2-1ebc-480a-8ccc-dcaf06258f01",
+        "project_id": "a4ebae0c-6ce2-482a-8774-e1a9aee72c79",
+        "domain_id": null,
+        "filename": "test-image.jpg",
+        "slug": "test-image",
+        "path": "clients/nailssalon/general/original/test-image.jpg",
+        "hash": "f9e163223631689bb1a3f558efe6b1ef1b40940a409dcc0ddddda2fa54846c1c",
+        "size": "285",
+        "width": null,
+        "height": null,
+        "format": "jpg",
+        "created_at": "2026-03-07T00:59:56.852Z"
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "uploaded": 0,
+    "duplicates": 1
+  }
+}

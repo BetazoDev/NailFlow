@@ -202,16 +202,54 @@ app.get('/api/availability', async (req, res) => {
         );
         const bookedTimes = new Set(result.rows.map(r => r.time));
 
+        // Determine if date is today (Mexico City timezone)
+        const nowMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+        const todayStr = `${nowMX.getFullYear()}-${String(nowMX.getMonth() + 1).padStart(2, '0')}-${String(nowMX.getDate()).padStart(2, '0')}`;
+        const isToday = date === todayStr;
+        // 3-hour advance: minimum time allowed
+        const minAllowedHour = nowMX.getHours() + 3 + (nowMX.getMinutes() > 0 ? 1 : 0);
+
         const slots = [];
         for (let h = 9; h < 18; h++) {
-            const time1 = `${String(h).padStart(2, '0')}:00`;
-            const time2 = `${String(h).padStart(2, '0')}:30`;
-            slots.push({ time: time1, available: !bookedTimes.has(time1) });
-            slots.push({ time: time2, available: !bookedTimes.has(time2) });
+            for (const min of [0, 30]) {
+                const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+                // Skip past times for today (with 3-hour advance)
+                if (isToday && (h < minAllowedHour || (h === minAllowedHour && min <= nowMX.getMinutes()))) {
+                    continue;
+                }
+                if (!bookedTimes.has(time)) {
+                    slots.push({ time, available: true });
+                }
+            }
         }
         res.json(slots);
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch availability' });
+    }
+});
+
+// Endpoint: Create Booking (Test/PRUEBA mode — no payment gateway)
+app.post('/api/bookings/test', async (req, res) => {
+    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes } = req.body;
+    // @ts-ignore
+    const tenantId = req.tenant.id;
+
+    if (!client_name || !date || !time) {
+        return res.status(400).json({ error: 'client_name, date, and time are required' });
+    }
+
+    try {
+        const datetimeStr = `${date}T${time}:00`;
+        const aptRes = await query(
+            `INSERT INTO appointments 
+            (tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, status, notes, advance_paid) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            [tenantId, client_name, client_phone || '', client_email || '', service_id, staff_id, datetimeStr, 'confirmed', notes || '', false]
+        );
+        res.json({ appointmentId: aptRes.rows[0].id, success: true });
+    } catch (e) {
+        console.error('Test booking failed:', e);
+        res.status(500).json({ error: 'Failed to create test booking' });
     }
 });
 

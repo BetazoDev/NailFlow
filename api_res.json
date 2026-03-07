@@ -1,0 +1,74 @@
+﻿SERVICES: [
+  {
+    "id": "svc-1",
+    "name": "Manicura Cl├ísica",
+    "duration_minutes": 45,
+    "estimated_price": 350,
+    "required_advance": 100,
+    "category": "Manicura"
+  },
+  {
+    "id": "svc-2",
+    "name": "Aplicaci├│n Acr├¡lico",
+    "duration_minutes": 120,
+    "estimated_price": 600,
+    "required_advance": 200,
+    "category": "Acr├¡licas"
+  },
+  {
+    "id": "svc-3",
+    "name": "Retoque Acr├¡lico",
+    "duration_minutes": 90,
+    "estimated_price": 450,
+    "required_advance": 150,
+    "category": "Acr├¡licas"
+  },
+  {
+    "id": "svc-4",
+    "name": "Gelish en Manos",
+    "duration_minutes": 60,
+    "estimated_price": 400,
+    "required_advance": 150,
+    "category": "Gel"
+  },
+  {
+    "id": "svc-5",
+    "name": "Pedicura Spa",
+    "duration_minutes": 60,
+    "estimated_price": 450,
+    "required_advance": 150,
+    "category": "Pedicura"
+  },
+  {
+    "id": "svc-6",
+    "name": "Dise├▒o Art├¡stico",
+    "duration_minutes": 90,
+    "estimated_price": 550,
+    "required_advance": 180,
+    "category": "Dise├▒o"
+  },
+  {
+    "id": "svc-1772834009796",
+    "name": "U├▒as cl├ísicas",
+    "duration_minutes": 60,
+    "estimated_price": 123,
+    "required_advance": 49,
+    "category": "Manicura"
+  },
+  {
+    "id": "svc-1772834071085",
+    "name": "u├▒as",
+    "duration_minutes": 60,
+    "estimated_price": 250,
+    "required_advance": 100,
+    "category": "123"
+  },
+  {
+    "id": "svc-1772842273270",
+    "name": "Acr├¡cilas",
+    "duration_minutes": 60,
+    "estimated_price": 678,
+    "required_advance": 271,
+    "category": "Manicura"
+  }
+]

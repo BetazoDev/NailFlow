@@ -376,24 +376,6 @@ export default function AdminDashboard() {
                         {displayCompletedCount} cita{displayCompletedCount !== 1 ? 's' : ''} completada{displayCompletedCount !== 1 ? 's' : ''}
                     </span>
                 </div>
-
-                {/* Quick stats grid */}
-                {incomePeriod !== 'day' && (
-                    <div className="mt-6 grid grid-cols-3 gap-4 w-full border-t border-aesthetic-accent/30 pt-6">
-                        <div className="text-center">
-                            <p className="text-[9px] tracking-[0.15em] text-aesthetic-muted uppercase mb-1">Hoy</p>
-                            <p className="font-display text-lg italic text-aesthetic-taupe">${todayIncome.toLocaleString()}</p>
-                        </div>
-                        <div className="text-center border-x border-aesthetic-accent/30">
-                            <p className="text-[9px] tracking-[0.15em] text-aesthetic-muted uppercase mb-1">Semana</p>
-                            <p className="font-display text-lg italic text-aesthetic-taupe">${weeklyIncome.toLocaleString()}</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-[9px] tracking-[0.15em] text-aesthetic-muted uppercase mb-1">Mes</p>
-                            <p className="font-display text-lg italic text-aesthetic-taupe">${monthlyIncome.toLocaleString()}</p>
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* Pending Appointments */}

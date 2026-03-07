@@ -121,6 +121,13 @@ export const api = {
             body: JSON.stringify(data),
         });
     },
+    createBookingTest: async (data: BookingData): Promise<{ appointmentId: string }> => {
+        return fetchApi('/api/bookings/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+    },
     completeAppointment: async (tenantId: string, id: string): Promise<void> => {
         return fetchApi(`/api/appointments/${id}/complete`, { method: 'POST' });
     },
