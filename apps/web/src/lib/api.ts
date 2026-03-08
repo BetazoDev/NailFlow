@@ -158,7 +158,13 @@ export const api = {
     uploadImage: async (tenantId: string, folder: string, file: File): Promise<string> => {
         const formData = new FormData();
         formData.append('images', file);
-        formData.append('image', file); // Sugerido por algunos ejemplos de la guía
+
+        // Los IDs son necesarios si la deducción automática por token falla
+        const clientId = process.env.NEXT_PUBLIC_CDN_CLIENT_ID || 'c6d224a2-1ebc-480a-8ccc-dcaf06258f01';
+        formData.append('client_id', clientId);
+
+        const projectId = process.env.NEXT_PUBLIC_CDN_PROJECT_ID || 'a4ebae0c-6ce2-482a-8774-e1a9aee72c79';
+        formData.append('project_id', projectId);
 
         const uploadUrl = 'https://api.diabolicalservices.tech/api/images/upload';
         const token = process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
