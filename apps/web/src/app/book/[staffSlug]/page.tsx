@@ -12,9 +12,7 @@ interface Props {
 // Fallback tenant domain for the primary root application
 const TENANT_DOMAIN = 'demo.diabolicalservices.tech';
 
-export async function generateStaticParams() {
-    return [{ staffSlug: 'ana' }, { staffSlug: 'lucia' }, { staffSlug: 'vale' }];
-}
+export const dynamic = 'force-dynamic';
 
 export default async function StaffBookingPage({ params }: Props) {
     const tenant = await api.getTenant(TENANT_DOMAIN);
@@ -34,7 +32,7 @@ export default async function StaffBookingPage({ params }: Props) {
     const typoVars = `--font-display: ${typo.fontDisplay}; --font-sans: ${typo.fontSans};`;
 
     // Resolve the staff member by slug
-    const allStaff = await api.getStaff(tenant.id);
+    const allStaff = await api.getStaff();
     const staffMember = allStaff.find(s => {
         const memberSlug = s.slug || s.name.toLowerCase().replace(/\s+/g, '-');
         return memberSlug === params.staffSlug;
@@ -70,7 +68,7 @@ export default async function StaffBookingPage({ params }: Props) {
                             style={{ background: `linear-gradient(135deg, ${tenant.branding.primary_color}, ${tenant.branding.secondary_color})` }}
                         >
                             {tenant.branding.logo_url ? (
-                                <img src={tenant.branding.logo_url} className="object-cover lg:w-20 lg:h-20 rounded-2xl" alt="Logo" />
+                                <img src={api.getPublicUrl(tenant.branding.logo_url)} className="object-cover lg:w-20 lg:h-20 rounded-2xl" alt="Logo" />
                             ) : (
                                 <span className="font-serif text-3xl text-white uppercase">{tenant.domain.charAt(0)}</span>
                             )}
@@ -82,7 +80,7 @@ export default async function StaffBookingPage({ params }: Props) {
                         {staffPhoto && (
                             <div className="mt-4 flex items-center gap-3">
                                 <div className="size-12 rounded-full overflow-hidden border-2 border-white shadow-soft">
-                                    <img src={staffPhoto} alt={staffName} className="w-full h-full object-cover" />
+                                    <img src={api.getPublicUrl(staffPhoto)} alt={staffName} className="w-full h-full object-cover" />
                                 </div>
                                 <div>
                                     <p className="text-sm font-semibold text-charcoal capitalize">{staffName}</p>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Tenant } from '@/lib/types';
+import { api } from '@/lib/api';
 
 interface WelcomeStepProps {
     tenant: Tenant | null;
@@ -17,7 +18,7 @@ export default function WelcomeStep({ tenant, onNext }: WelcomeStepProps) {
                 <div className="w-32 h-32 rounded-3xl overflow-hidden mb-8 shadow-xl rotate-3 flex items-center justify-center bg-gradient-to-br from-pink-light to-coral-light p-1">
                     <div className="w-full h-full rounded-[20px] bg-white flex items-center justify-center overflow-hidden">
                         {tenant?.branding?.logo_url ? (
-                            <img src={tenant.branding.logo_url} alt={salonName} className="w-full h-full object-cover" />
+                            <img src={api.getPublicUrl(tenant.branding.logo_url)} alt={salonName} className="w-full h-full object-cover" />
                         ) : (
                             <span className="text-4xl font-serif font-bold text-pink">NF</span>
                         )}

@@ -1,33 +1,52 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 
 interface ImageUploadStepProps {
-    imageUrls: string[];
-    onImagesChange: (urls: string[]) => void;
+    /** Local blob URLs for preview (created from File objects) */
+    localPreviews: string[];
+    /** The actual File objects to be uploaded later */
+    pendingFiles: File[];
+    onFilesChange: (files: File[], previews: string[]) => void;
     onNext: () => void;
     onBack: () => void;
     staffName?: string;
     tenantId?: string;
 }
 
-export default function ImageUploadStep({ imageUrls, onImagesChange, onNext, onBack, staffName = 'Ana', tenantId = 'demo' }: ImageUploadStepProps) {
+export default function ImageUploadStep({
+    localPreviews,
+    pendingFiles,
+    onFilesChange,
+    onNext,
+    onBack,
+    staffName = 'Ana',
+}: ImageUploadStepProps) {
     const fileRef = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
 
-    const addFiles = (files: FileList | null) => {
-        if (!files) return;
-        const newUrls: string[] = [];
-        Array.from(files).forEach(file => {
-            if (!file.type.startsWith('image/')) return;
-            const url = URL.createObjectURL(file);
-            newUrls.push(url);
-        });
-        onImagesChange([...imageUrls, ...newUrls].slice(0, 6));
+    const addFiles = (fileList: FileList | null) => {
+        if (!fileList) return;
+        const newFiles: File[] = [];
+        const newPreviews: string[] = [];
+
+        for (const file of Array.from(fileList)) {
+            if (!file.type.startsWith('image/')) continue;
+            newFiles.push(file);
+            newPreviews.push(URL.createObjectURL(file));
+        }
+
+        const combined = [...pendingFiles, ...newFiles].slice(0, 6);
+        const combinedPreviews = [...localPreviews, ...newPreviews].slice(0, 6);
+        onFilesChange(combined, combinedPreviews);
     };
 
     const removeImage = (idx: number) => {
-        onImagesChange(imageUrls.filter((_, i) => i !== idx));
+        // Revoke the blob URL to free memory
+        URL.revokeObjectURL(localPreviews[idx]);
+        const newFiles = pendingFiles.filter((_, i) => i !== idx);
+        const newPreviews = localPreviews.filter((_, i) => i !== idx);
+        onFilesChange(newFiles, newPreviews);
     };
 
     return (
@@ -98,16 +117,16 @@ export default function ImageUploadStep({ imageUrls, onImagesChange, onNext, onB
             </div>
 
             {/* Selected photos */}
-            {imageUrls.length > 0 && (
+            {localPreviews.length > 0 && (
                 <div className="px-6 pt-10 pb-10 animate-fade-in">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-serif text-lg text-charcoal">Seleccionadas</h3>
                         <span className="text-[10px] font-bold text-pink uppercase tracking-[0.2em] bg-pink-pale px-3 py-1 rounded-full border border-pink-light/20">
-                            {imageUrls.length} de 6
+                            {localPreviews.length} de 6
                         </span>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                        {imageUrls.map((url, idx) => (
+                        {localPreviews.map((url: string, idx: number) => (
                             <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden shadow-lg group hover:scale-105 transition-transform">
                                 <img src={url} alt={`ref ${idx + 1}`} className="w-full h-full object-cover" />
                                 <button
@@ -130,11 +149,11 @@ export default function ImageUploadStep({ imageUrls, onImagesChange, onNext, onB
                     onClick={onNext}
                     className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
-                    {imageUrls.length > 0 ? 'Confirmar Selección' : 'Continuar sin fotos'}
+                    {localPreviews.length > 0 ? 'Confirmar Selección' : 'Continuar sin fotos'}
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                 </button>
                 <p className="text-center text-[10px] tracking-[0.2em] text-gray-light uppercase font-bold mt-6">
-                    PASO 5 DE 5
+                    PASO 4 DE 5
                 </p>
             </div>
         </div>

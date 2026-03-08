@@ -25,29 +25,50 @@ let tenantBranding: Record<string, any> = {};
 
 // Middleware to extract tenant from request
 app.use(async (req, res, next) => {
-    // Skip tenant domain resolution for webhooks
-    if (req.path.startsWith('/api/webhooks')) {
+    // Basic request logging
+    console.log(`[API Request] ${req.method} ${req.url}`, {
+        host: req.headers.host,
+        tenantDomain: req.headers['x-tenant-domain'],
+        tenantId: req.headers['x-tenant-id']
+    });
+
+    // Skip tenant domain resolution for webhooks and health
+    const skipPaths = ['/health', '/api/webhooks', '/api/health'];
+    if (skipPaths.some(p => req.path.startsWith(p))) {
         return next();
     }
 
-    const tenantDomain = (req.headers['x-tenant-domain'] || req.query.domain) as string;
+    const tenantDomain = (req.headers['x-tenant-domain'] || req.query.domain || req.headers.host) as string;
     const tenantId = (req.headers['x-tenant-id'] || req.query.id) as string;
     const ownerId = req.query.owner_id as string;
 
     try {
         let tenant = null;
-        if (tenantId) {
+        if (tenantId && tenantId !== 'undefined') {
             tenant = await getTenantById(tenantId);
         } else if (ownerId) {
             const res = await query('SELECT * FROM tenants WHERE owner_id = $1', [ownerId]);
             tenant = res.rows.length > 0 ? res.rows[0] : null;
         } else {
-            tenant = await getTenantByDomain(tenantDomain || 'demo.diabolicalservices.tech');
+            // Clean domain (remove port if present)
+            const cleanDomain = tenantDomain?.split(':')[0] || 'demo.diabolicalservices.tech';
+            tenant = await getTenantByDomain(cleanDomain);
+
+            // Fallback for demo if still not found
+            if (!tenant && (cleanDomain.includes('diabolicalservices.tech') || cleanDomain.includes('localhost'))) {
+                tenant = await getTenantById('demo-tenant');
+            }
+        }
+
+        if (!tenant) {
+            console.warn(`Tenant not found for: ${tenantDomain || tenantId}. Falling back to demo.`);
+            tenant = await getTenantById('demo-tenant');
         }
 
         if (!tenant) {
             return res.status(404).json({ error: 'Tenant not found' });
         }
+
         // @ts-ignore
         req.tenant = tenant;
         next();
@@ -57,14 +78,47 @@ app.use(async (req, res, next) => {
     }
 });
 
+// Create API Router to handle both cases (/api or direct)
+const apiRouter = express.Router();
+
+// Health check inside router too
+apiRouter.get('/health', (req, res) => res.send('OK'));
+
+// Endpoint: Admin Cleanup (wipe services, staff, appointments for tenant)
+// Protected by secret key - only for demo reset
+apiRouter.post('/admin/cleanup', async (req, res) => {
+    const { secret } = req.body;
+    const CLEANUP_SECRET = process.env.CLEANUP_SECRET || 'nailflow-demo-reset-2026';
+    if (secret !== CLEANUP_SECRET) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    try {
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        await query('DELETE FROM appointments WHERE tenant_id = $1', [tenantId]);
+        await query('DELETE FROM staff WHERE tenant_id = $1', [tenantId]);
+        await query('DELETE FROM services WHERE tenant_id = $1', [tenantId]);
+        // Reset branding to clean state
+        await query(
+            `UPDATE tenants SET branding = $1 WHERE id = $2`,
+            [JSON.stringify({ primary_color: '#E8B4B8', secondary_color: '#82C3A6', palette_id: 'soft-rose', typography: 'Outfit' }), tenantId]
+        );
+        res.json({ success: true, message: 'All tenant data wiped successfully.' });
+    } catch (e) {
+        console.error('Cleanup failed:', e);
+        res.status(500).json({ error: 'Cleanup failed' });
+    }
+});
+
 // Endpoint: Get Tenant configuration
-app.get('/api/tenant', (req, res) => {
+apiRouter.get('/tenant', (req, res) => {
     // @ts-ignore
     res.json(req.tenant);
 });
 
+
 // Endpoint: Get Services
-app.get('/api/services', async (req, res) => {
+apiRouter.get('/services', async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
@@ -77,7 +131,7 @@ app.get('/api/services', async (req, res) => {
 });
 
 // Endpoint: Create Service
-app.post('/api/services', async (req, res) => {
+apiRouter.post('/services', async (req, res) => {
     try {
         const { name, description, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
         // @ts-ignore
@@ -101,7 +155,7 @@ app.post('/api/services', async (req, res) => {
 });
 
 // Endpoint: Update Service
-app.put('/api/services/:id', async (req, res) => {
+apiRouter.put('/services/:id', async (req, res) => {
     try {
         const { name, description, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
         // @ts-ignore
@@ -119,7 +173,7 @@ app.put('/api/services/:id', async (req, res) => {
 });
 
 // Endpoint: Delete Service
-app.delete('/api/services/:id', async (req, res) => {
+apiRouter.delete('/services/:id', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     const result = await query('DELETE FROM services WHERE id = $1 AND tenant_id = $2', [req.params.id, tenantId]);
@@ -128,7 +182,7 @@ app.delete('/api/services/:id', async (req, res) => {
 });
 
 // Endpoint: Get Staff
-app.get('/api/staff', async (req, res) => {
+apiRouter.get('/staff', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     try {
@@ -141,7 +195,7 @@ app.get('/api/staff', async (req, res) => {
 });
 
 // Endpoint: Get Appointments
-app.get('/api/appointments', async (req, res) => {
+apiRouter.get('/appointments', async (req, res) => {
     const staffId = req.query.staff_id as string;
     // @ts-ignore
     const tenantId = req.tenant.id;
@@ -161,7 +215,7 @@ app.get('/api/appointments', async (req, res) => {
 });
 
 // Endpoint: Get Single Appointment
-app.get('/api/appointments/:id', async (req, res) => {
+apiRouter.get('/appointments/:id', async (req, res) => {
     try {
         const result = await query('SELECT a.*, s.name as service_name FROM appointments a LEFT JOIN services s ON a.service_id = s.id WHERE a.id = $1', [req.params.id]);
         if (result.rowCount === 0) return res.status(404).json({ error: 'Appointment not found' });
@@ -172,7 +226,7 @@ app.get('/api/appointments/:id', async (req, res) => {
 });
 
 // Endpoint: Update Appointment Status
-app.patch('/api/appointments/:id/status', async (req, res) => {
+apiRouter.patch('/appointments/:id/status', async (req, res) => {
     const { status } = req.body;
     const validStatuses = ['pending_payment', 'confirmed', 'cancelled', 'completed'];
     if (!validStatuses.includes(status)) {
@@ -188,7 +242,7 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
 });
 
 // Endpoint: Get Availability
-app.get('/api/availability', async (req, res) => {
+apiRouter.get('/availability', async (req, res) => {
     const { date, staff_id } = req.query;
     // @ts-ignore
     const tenantId = req.tenant.id;
@@ -245,8 +299,8 @@ app.get('/api/availability', async (req, res) => {
 });
 
 // Endpoint: Create Booking (Test/PRUEBA mode — no payment gateway)
-app.post('/api/bookings/test', async (req, res) => {
-    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes } = req.body;
+apiRouter.post('/bookings/test', async (req, res) => {
+    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes, image_urls } = req.body;
     // @ts-ignore
     const tenantId = req.tenant.id;
 
@@ -276,8 +330,8 @@ app.post('/api/bookings/test', async (req, res) => {
         const datetime_end_str = `${date} ${endStr}:00 America/Mexico_City`;
 
         const result = await query(
-            'INSERT INTO appointments (id, tenant_id, service_id, staff_id, client_name, client_email, client_phone, datetime_start, datetime_end, status, payment_method, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
-            [id, tenantId, service_id, staff_id, client_name, client_email || '', client_phone, datetime_start_str, datetime_end_str, 'confirmed', 'PRUEBA', service_price]
+            'INSERT INTO appointments (id, tenant_id, service_id, staff_id, client_name, client_email, client_phone, datetime_start, datetime_end, status, payment_method, price, image_urls) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+            [id, tenantId, service_id, staff_id, client_name, client_email || '', client_phone, datetime_start_str, datetime_end_str, 'confirmed', 'PRUEBA', service_price, JSON.stringify(image_urls || [])]
         );
         console.log('Test booking created successfully:', result.rows[0].id);
         res.json({ appointmentId: result.rows[0].id, success: true });
@@ -288,8 +342,8 @@ app.post('/api/bookings/test', async (req, res) => {
 });
 
 // Endpoint: Create Booking (Initiates MercadoPago Payment)
-app.post('/api/bookings', async (req, res) => {
-    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes } = req.body;
+apiRouter.post('/bookings', async (req, res) => {
+    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes, image_urls } = req.body;
     // @ts-ignore
     const tenantId = req.tenant.id;
 
@@ -326,9 +380,9 @@ app.post('/api/bookings', async (req, res) => {
         // Create appointment in 'pending_payment' status
         const aptRes = await query(
             `INSERT INTO appointments 
-            (id, tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, datetime_end, status, notes, price, payment_method) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-            [crypto.randomUUID(), tenantId, client_name, client_phone, client_email, service_id, staff_id, datetime_start_str, datetime_end_str, 'pending_payment', notes, service_price, req.body.payment_method]
+            (id, tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, datetime_end, status, notes, price, payment_method, image_urls) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+            [crypto.randomUUID(), tenantId, client_name, client_phone, client_email, service_id, staff_id, datetime_start_str, datetime_end_str, 'pending_payment', notes, service_price, req.body.payment_method, JSON.stringify(image_urls || [])]
         );
         const appointment = aptRes.rows[0];
 
@@ -363,7 +417,7 @@ app.post('/api/bookings', async (req, res) => {
 });
 
 // Endpoint: MercadoPago Webhook
-app.post('/api/webhooks/mercadopago', async (req, res) => {
+apiRouter.post('/webhooks/mercadopago', async (req, res) => {
     const { type, data } = req.body;
 
     if (type === 'payment') {
@@ -383,7 +437,7 @@ app.post('/api/webhooks/mercadopago', async (req, res) => {
 });
 
 // Endpoint: Update Tenant Branding
-app.put('/api/tenant', async (req, res) => {
+apiRouter.put('/tenant', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     const { name, branding, settings } = req.body;
@@ -400,7 +454,7 @@ app.put('/api/tenant', async (req, res) => {
 });
 
 // Endpoint: Complete Appointment
-app.post('/api/appointments/:id/complete', async (req, res) => {
+apiRouter.post('/appointments/:id/complete', async (req, res) => {
     try {
         const { id } = req.params;
         // @ts-ignore
@@ -416,7 +470,7 @@ app.post('/api/appointments/:id/complete', async (req, res) => {
 });
 
 // Endpoint: Staff Management (POST)
-app.post('/api/staff', async (req, res) => {
+apiRouter.post('/staff', async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
@@ -434,7 +488,7 @@ app.post('/api/staff', async (req, res) => {
 });
 
 // Endpoint: Staff Management (PUT)
-app.put('/api/staff/:id', async (req, res) => {
+apiRouter.put('/staff/:id', async (req, res) => {
     try {
         const { id } = req.params;
         // @ts-ignore
@@ -453,7 +507,7 @@ app.put('/api/staff/:id', async (req, res) => {
 });
 
 // Endpoint: Favorites (GET)
-app.get('/api/favorites', async (req, res) => {
+apiRouter.get('/favorites', async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
@@ -465,7 +519,7 @@ app.get('/api/favorites', async (req, res) => {
 });
 
 // Endpoint: Favorites (POST)
-app.post('/api/favorites/:phone', async (req, res) => {
+apiRouter.post('/favorites/:phone', async (req, res) => {
     try {
         const { phone } = req.params;
         const { favorite } = req.body;
@@ -489,8 +543,22 @@ app.post('/api/favorites/:phone', async (req, res) => {
     }
 });
 
+// Mount the router at both root and /api for maximum compatibility
+app.use('/api', apiRouter);
+app.use(apiRouter);
+
 app.get('/health', (req, res) => res.send('OK'));
 
+// 404 Handler - MUST be after apps.use(apiRouter)
+app.use((req, res) => {
+    console.warn(`[404] ${req.method} ${req.path} - No route matched`);
+    res.status(404).json({
+        error: 'Route not found',
+        method: req.method,
+        path: req.path
+    });
+});
+
 app.listen(port, () => {
-    console.log(`NailFlow API running on http://localhost:${port}`);
+    console.log(`NailFlow API running on port ${port}`);
 });

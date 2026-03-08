@@ -20,7 +20,7 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
     useEffect(() => {
         async function loadServices() {
             try {
-                const data = await api.getServices(tenantId);
+                const data = await api.getServices();
                 setServices(data);
             } catch (err) {
                 console.error('Failed to load services:', err);
@@ -117,7 +117,7 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
                                         {/* Image/Icon */}
                                         <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-inner flex-shrink-0">
                                             {service.image_url ? (
-                                                <img src={service.image_url} alt={service.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                                <img src={api.getPublicUrl(service.image_url)} alt={service.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                             ) : (
                                                 <div className="w-full h-full bg-pink-pale flex items-center justify-center text-3xl">💅</div>
                                             )}

@@ -18,9 +18,7 @@ interface BookingWizardProps {
     staffName?: string;
     staffPhoto?: string;
     salonName?: string;
-    /** Called whenever the step changes — used by the parent to sync the left panel */
     onStepChange?: (step: BookingStep) => void;
-    /** Allow the parent to set the initial step */
     initialStep?: BookingStep;
 }
 
@@ -42,7 +40,13 @@ export default function BookingWizard({
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
-    const [imageUrls, setImageUrls] = useState<string[]>([]);
+
+    // Image state: local Files + blob URLs for preview
+    const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+    const [localPreviews, setLocalPreviews] = useState<string[]>([]);
+
+    // CDN-uploaded URLs — populated only after successful booking
+    const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
 
     const navigate = (step: BookingStep) => {
         setCurrentStep(step);
@@ -56,6 +60,16 @@ export default function BookingWizard({
     const goBack = () => {
         const i = STEPS.indexOf(currentStep);
         if (i > 0) navigate(STEPS[i - 1]);
+    };
+
+    const handleFilesChange = (files: File[], previews: string[]) => {
+        setPendingFiles(files);
+        setLocalPreviews(previews);
+    };
+
+    const handleBookingConfirmed = (cdnUrls: string[]) => {
+        setUploadedImageUrls(cdnUrls);
+        goNext();
     };
 
     const bookingData: BookingData = useMemo(() => {
@@ -75,13 +89,15 @@ export default function BookingWizard({
 
         if (staffPhoto) data.staff_photo = staffPhoto;
         if (clientEmail) data.client_email = clientEmail;
-        if (imageUrls && imageUrls.length > 0) {
-            data.image_urls = imageUrls;
-            data.image_url = imageUrls[0];
+
+        // After booking is confirmed, we have CDN URLs
+        if (uploadedImageUrls.length > 0) {
+            data.image_urls = uploadedImageUrls;
+            data.image_url = uploadedImageUrls[0];
         }
 
         return data as BookingData;
-    }, [tenantId, selectedDate, selectedTime, selectedService, staffId, staffName, staffPhoto, clientName, clientPhone, clientEmail, imageUrls]);
+    }, [tenantId, selectedDate, selectedTime, selectedService, staffId, staffName, staffPhoto, clientName, clientPhone, clientEmail, uploadedImageUrls]);
 
     return (
         <div className="flex flex-col h-full" style={{ background: 'var(--cream)' }}>
@@ -121,8 +137,9 @@ export default function BookingWizard({
             )}
             {currentStep === 'inspiration' && (
                 <ImageUploadStep
-                    imageUrls={imageUrls}
-                    onImagesChange={setImageUrls}
+                    pendingFiles={pendingFiles}
+                    localPreviews={localPreviews}
+                    onFilesChange={handleFilesChange}
                     onNext={goNext}
                     onBack={goBack}
                     staffName={staffName}
@@ -132,6 +149,7 @@ export default function BookingWizard({
             {currentStep === 'summary' && (
                 <SummaryStep
                     booking={bookingData}
+                    localPreviews={localPreviews}
                     onNext={goNext}
                     onBack={goBack}
                     onAddImage={() => navigate('inspiration')}
@@ -140,7 +158,9 @@ export default function BookingWizard({
             {currentStep === 'payment' && (
                 <PaymentStep
                     booking={bookingData}
-                    onNext={goNext}
+                    pendingFiles={pendingFiles}
+                    tenantId={tenantId}
+                    onBookingConfirmed={handleBookingConfirmed}
                     onBack={goBack}
                 />
             )}

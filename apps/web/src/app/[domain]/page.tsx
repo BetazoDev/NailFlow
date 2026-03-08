@@ -8,9 +8,7 @@ interface Props {
     }
 }
 
-export async function generateStaticParams() {
-    return [{ domain: 'demo' }];
-}
+export const dynamic = 'force-dynamic';
 
 export default async function TenantLandingPage({ params }: Props) {
     const tenant = await api.getTenant(params.domain);

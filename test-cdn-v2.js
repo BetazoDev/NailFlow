@@ -13,8 +13,9 @@ async function testUpload() {
 
     const formData = new FormData();
     formData.append('images', fs.createReadStream('test-image.jpg'), { filename: 'test-image.jpg', contentType: 'image/jpeg' });
-    formData.append('client_id', 'c6d224a2-1ebc-480a-8ccc-dcaf06258f01');
-    formData.append('project_id', 'a4ebae0c-6ce2-482a-8774-e1a9aee72c79');
+    // No necesitas especificar client_id ni project_id, la API los deduce de tu llave.
+    // formData.append('client_id', 'c6d224a2-1ebc-480a-8ccc-dcaf06258f01');
+    // formData.append('project_id', 'a4ebae0c-6ce2-482a-8774-e1a9aee72c79');
 
     try {
         const response = await fetch(uploadUrl, {

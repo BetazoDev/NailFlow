@@ -2,6 +2,7 @@
 
 import { Tenant, BookingStep } from '@/lib/types';
 import BookingWizard from './BookingWizard';
+import { api } from '@/lib/api';
 import SplashScreen from '@/components/SplashScreen';
 import { useState } from 'react';
 
@@ -59,7 +60,7 @@ export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, 
                             style={{ background: 'var(--pink)' }}
                         >
                             {tenant.branding.logo_url ? (
-                                <img src={tenant.branding.logo_url} className="w-full h-full object-cover" alt="Logo" />
+                                <img src={api.getPublicUrl(tenant.branding.logo_url)} className="w-full h-full object-cover" alt="Logo" />
                             ) : (
                                 <span className="font-serif text-xl text-white font-bold">{salonName.charAt(0)}</span>
                             )}

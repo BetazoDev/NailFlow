@@ -86,8 +86,10 @@ export default function SettingsPage() {
                 },
                 name: salonName,
             });
+            alert('Ajustes guardados correctamente');
         } catch (error) {
             console.error('Error saving settings:', error);
+            alert('Error al guardar los ajustes. Por favor intenta de nuevo.');
         }
         setSaving(false);
         setSaved(true);
@@ -128,7 +130,7 @@ export default function SettingsPage() {
                             <div className="relative cursor-pointer" onClick={() => photoRef.current?.click()}>
                                 <div className="w-20 h-20 rounded-full overflow-hidden" style={{ background: 'var(--pink-pale)' }}>
                                     {photoPreview ? (
-                                        <img src={photoPreview} alt="foto" className="w-full h-full object-cover" />
+                                        <img src={api.getPublicUrl(photoPreview)} alt="foto" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-3xl font-serif font-semibold" style={{ color: 'var(--charcoal)' }}>A</div>
                                     )}
@@ -152,7 +154,7 @@ export default function SettingsPage() {
                             <div className="relative cursor-pointer" onClick={() => logoRef.current?.click()}>
                                 <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-cream-dark flex items-center justify-center" style={{ background: 'white' }}>
                                     {logoPreview ? (
-                                        <img src={logoPreview} alt="logo" className="w-full h-full object-cover" />
+                                        <img src={api.getPublicUrl(logoPreview)} alt="logo" className="w-full h-full object-cover" />
                                     ) : (
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gray-light)" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                     )}
@@ -259,7 +261,7 @@ export default function SettingsPage() {
                                 <div className="absolute inset-0 rounded-full blur-xl opacity-40 animate-pulse" style={{ background: currentPalette.primary }} />
                                 <div className="relative size-full rounded-full border-4 border-white shadow-soft overflow-hidden">
                                     {photoPreview ? (
-                                        <img src={photoPreview} alt="avatar" className="size-full object-cover" />
+                                        <img src={api.getPublicUrl(photoPreview)} alt="avatar" className="size-full object-cover" />
                                     ) : (
                                         <div className="size-full flex items-center justify-center text-4xl italic bg-aesthetic-cream" style={{ color: currentPalette.accent, fontFamily: currentTypo.fontDisplay }}>{salonName[0] || 'A'}</div>
                                     )}

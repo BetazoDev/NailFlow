@@ -2,11 +2,14 @@ import { Tenant, Staff, Service, Appointment, BookingData, TimeSlot } from './ty
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://demo.diabolicalservices.tech';
 
-const fetchApi = async (path: string, options: RequestInit = {}) => {
+const fetchApi = async (path: string, options: RequestInit = {}, domain?: string) => {
     // Add tenant domain header for resolution
     const headers = new Headers(options.headers || {});
+
     if (typeof window !== 'undefined') {
         headers.set('x-tenant-domain', window.location.hostname);
+    } else if (domain) {
+        headers.set('x-tenant-domain', domain);
     }
 
     const response = await fetch(`${API_URL}${path}`, {
@@ -31,15 +34,16 @@ export const api = {
     // Tenant
     getTenantByDomain: async (domain: string): Promise<Tenant | null> => {
         try {
-            return await fetchApi(`/api/tenant?domain=${domain}`);
+            return await fetchApi(`/api/tenant?domain=${domain}`, {}, domain);
         } catch (e) {
             return null;
         }
     },
     getTenant: async (idOrDomain: string): Promise<Tenant | null> => {
         try {
-            const path = idOrDomain.includes('.') ? `/api/tenant?domain=${idOrDomain}` : `/api/tenant?id=${idOrDomain}`;
-            return await fetchApi(path);
+            const isDomain = idOrDomain.includes('.');
+            const path = isDomain ? `/api/tenant?domain=${idOrDomain}` : `/api/tenant?id=${idOrDomain}`;
+            return await fetchApi(path, {}, isDomain ? idOrDomain : undefined);
         } catch (e) {
             return null;
         }
@@ -155,19 +159,20 @@ export const api = {
     },
 
     // Images (CDN Integration)
-    uploadImage: async (tenantId: string, folder: string, file: File): Promise<string> => {
+    uploadImage: async (tenantId: string, folder: string, file: File, projectType: 'demo' | 'clients' = 'demo'): Promise<string> => {
         const formData = new FormData();
         formData.append('images', file);
 
-        // Los IDs son necesarios si la deducción automática por token falla
-        const clientId = process.env.NEXT_PUBLIC_CDN_CLIENT_ID || 'c6d224a2-1ebc-480a-8ccc-dcaf06258f01';
-        formData.append('client_id', clientId);
-
-        const projectId = process.env.NEXT_PUBLIC_CDN_PROJECT_ID || 'a4ebae0c-6ce2-482a-8774-e1a9aee72c79';
-        formData.append('project_id', projectId);
+        // La API deduce client_id y project_id de la llave automáticamente.
+        // Solo necesitamos pasar el folder si queremos organizar.
+        formData.append('folder', folder);
 
         const uploadUrl = 'https://api.diabolicalservices.tech/api/images/upload';
-        const token = process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+
+        // Use different tokens based on project type
+        const token = projectType === 'clients'
+            ? 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW'
+            : (process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X');
 
         try {
             const response = await fetch(uploadUrl, {
@@ -186,7 +191,12 @@ export const api = {
             const data = await response.json();
 
             // El CDN público usa el formato https://cdn.diabolicalservices.tech/{client-slug}/{filename}
-            const clientSlug = process.env.NEXT_PUBLIC_CDN_CLIENT_SLUG || 'nailssalon';
+            // Para el proyecto Demo el slug es 'nailssalon'
+            // Para el proyecto Clientas el slug es 'nails-salon-clientas' (Deducido, si falla lo ajustamos)
+            const clientSlug = projectType === 'clients' ? 'nailssalon' : 'nailssalon';
+            // NOTA: El usuario dijo que son dos proyectos distintos pero ambos parecen ser de la misma marca.
+            // Si el token es diferente, el CDN sabrá servirlo. 
+            // Según la guía, el slug suele ser fijo por cliente.
 
             if (data.uploaded && data.uploaded.length > 0) {
                 const filename = data.uploaded[0].filename;
@@ -201,5 +211,28 @@ export const api = {
             console.error('Upload Error:', error);
             throw error;
         }
-    }
+    },
+
+    getPublicUrl: (url: string | null | undefined, projectType: 'demo' | 'clients' = 'demo'): string => {
+        if (!url) return '';
+        // If it's already a full URL and has a token, return as is
+        if (url.includes('api_key=') || url.includes('token=')) return url;
+
+        const demoToken = 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+        const clientsToken = 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
+        const token = projectType === 'clients' ? clientsToken : demoToken;
+
+        if (url.startsWith('https://cdn.diabolicalservices.tech/')) {
+            const separator = url.includes('?') ? '&' : '?';
+            return `${url}${separator}api_key=${token}`;
+        }
+
+        // Handle relative paths (legacy or simple names)
+        if (!url.startsWith('http') && url.length > 3) {
+            const slug = 'nailssalon';
+            return `https://cdn.diabolicalservices.tech/${slug}/${url}?api_key=${token}`;
+        }
+
+        return url;
+    },
 };

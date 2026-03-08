@@ -4,19 +4,22 @@ import { BookingData } from '@/lib/types';
 
 interface SummaryStepProps {
     booking: BookingData;
+    /** Local blob URLs for previewing selected images (not yet uploaded) */
+    localPreviews: string[];
     onNext: () => void;
     onBack: () => void;
     onAddImage: () => void;
 }
 
 function formatFullDate(dateStr: string) {
+    if (!dateStr) return '—';
     const d = new Date(dateStr + 'T12:00:00');
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-export default function SummaryStep({ booking, onNext, onBack, onAddImage }: SummaryStepProps) {
-    const imgs = booking.image_urls || (booking.image_url ? [booking.image_url] : []);
-    const advance = Math.round(booking.service_price * 0.4);
+export default function SummaryStep({ booking, localPreviews, onNext, onBack, onAddImage }: SummaryStepProps) {
+    const price = Number(booking.service_price) || 0;
+    const advance = Math.round(price * 0.4);
 
     return (
         <div className="flex flex-col min-h-full animate-fade-in-up" style={{ background: 'var(--cream)' }}>
@@ -47,7 +50,6 @@ export default function SummaryStep({ booking, onNext, onBack, onAddImage }: Sum
             <div className="flex-1 overflow-y-auto px-6 py-8 stagger-children">
                 {/* Main Card */}
                 <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-cream-dark/30 mb-8 relative overflow-hidden">
-                    {/* Decorative element */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-pink-pale/20 rounded-full -mr-16 -mt-16 blur-2xl" />
 
                     <div className="relative z-10">
@@ -67,7 +69,7 @@ export default function SummaryStep({ booking, onNext, onBack, onAddImage }: Sum
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                                     Fecha
                                 </p>
-                                <span className="font-serif text-charcoal font-bold">{booking.date ? formatFullDate(booking.date) : '—'}</span>
+                                <span className="font-serif text-charcoal font-bold">{formatFullDate(booking.date)}</span>
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -97,12 +99,13 @@ export default function SummaryStep({ booking, onNext, onBack, onAddImage }: Sum
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-serif text-lg text-charcoal">Fotos de <span className="italic">referencia</span></h3>
                         <span className="text-[10px] font-bold text-nf-gray uppercase tracking-widest bg-white px-3 py-1 rounded-full border border-cream-dark/30">
-                            {imgs.length} fotos
+                            {localPreviews.length} fotos
                         </span>
                     </div>
                     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                        {imgs.map((url, idx) => (
+                        {localPreviews.map((url, idx) => (
                             <div key={idx} className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 shadow-md border-2 border-white transform rotate-2 hover:rotate-0 transition-all">
+                                {/* blob:// URL — no CDN needed yet */}
                                 <img src={url} alt={`ref-${idx}`} className="w-full h-full object-cover" />
                             </div>
                         ))}
@@ -120,7 +123,7 @@ export default function SummaryStep({ booking, onNext, onBack, onAddImage }: Sum
                     <div className="flex justify-between items-center mb-6">
                         <span className="text-xs font-bold uppercase tracking-[0.2em] opacity-60">Total Servicio</span>
                         <div className="h-px flex-1 mx-4 bg-white/10" />
-                        <span className="font-serif text-2xl font-bold">${booking.service_price.toFixed(2)}</span>
+                        <span className="font-serif text-2xl font-bold">${price.toFixed(2)}</span>
                     </div>
 
                     {advance > 0 && (
@@ -150,13 +153,13 @@ export default function SummaryStep({ booking, onNext, onBack, onAddImage }: Sum
                 <button
                     onClick={onNext}
                     disabled={!booking.date || !booking.time || !booking.service_id}
-                    className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                     Continuar al Pago
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                 </button>
                 <p className="text-center text-[10px] tracking-[0.2em] text-gray-light uppercase font-bold mt-6">
-                    PASO 4 DE 5
+                    PASO 5 DE 6
                 </p>
             </div>
         </div>

@@ -81,7 +81,7 @@ export default function StaffStep({ selectedStaffId, onSelect, onNext, onBack }:
                                     `}
                                 >
                                     <img
-                                        src={staff.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(staff.name)}&background=random`}
+                                        src={api.getPublicUrl(staff.photo_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(staff.name)}&background=random`}
                                         alt={staff.name}
                                         className="w-12 h-12 rounded-full object-cover border-2 bg-gray-100"
                                         style={{ borderColor: staff.color_identifier || '#E8B4B8' }}

@@ -6,21 +6,28 @@ import { api } from '@/lib/api';
 
 interface PaymentStepProps {
     booking: BookingData;
-    onNext: () => void;
+    /** Files pending CDN upload — will be uploaded on booking confirmation */
+    pendingFiles: File[];
+    tenantId: string;
+    /** Called with CDN URLs after successful booking */
+    onBookingConfirmed: (cdnUrls: string[]) => void;
     onBack: () => void;
 }
 
 type PaymentMethod = 'card' | 'apple' | 'mercado' | 'prueba' | 'stripe' | 'paypal' | 'google';
 
-export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProps) {
-    const [method, setMethod] = useState<PaymentMethod>('card');
+export default function PaymentStep({ booking, pendingFiles, tenantId, onBookingConfirmed, onBack }: PaymentStepProps) {
+    const [method, setMethod] = useState<PaymentMethod>('prueba');
     const [cardName, setCardName] = useState('');
     const [cardNumber, setCardNumber] = useState('');
     const [expiry, setExpiry] = useState('');
     const [cvc, setCvc] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingMsg, setLoadingMsg] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
-    const advance = Math.round(booking.service_price * 0.4);
+    const price = Number(booking.service_price) || 0;
+    const advance = Math.round(price * 0.4);
 
     const formatCard = (v: string) => v.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 19);
     const formatExpiry = (v: string) => {
@@ -29,36 +36,49 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
         return n;
     };
 
-    const [error, setError] = useState<string | null>(null);
-
     const handlePayment = async () => {
         setLoading(true);
         setError(null);
+
         try {
+            // Step 1: Upload pending images to CDN (only if there are any)
+            let cdnUrls: string[] = [];
+            if (pendingFiles.length > 0) {
+                setLoadingMsg('Subiendo fotos de referencia...');
+                for (const file of pendingFiles) {
+                    const url = await api.uploadImage(tenantId, 'bookings', file, 'clients');
+                    cdnUrls.push(url);
+                }
+            }
+
+            // Step 2: Create the booking with the CDN URLs
+            setLoadingMsg('Registrando tu cita...');
+            const bookingPayload = {
+                ...booking,
+                payment_method: method,
+                image_urls: cdnUrls,
+                image_url: cdnUrls[0] || undefined,
+            };
+
             if (method === 'prueba') {
-                // Test mode: create appointment directly without payment gateway
-                await api.createBookingTest(booking);
-                setTimeout(() => {
-                    setLoading(false);
-                    onNext();
-                }, 600);
-            } else if (method === 'card' || method === 'apple' || method === 'mercado' || method === 'stripe' || method === 'paypal' || method === 'google') {
-                // For real or placeholder payment methods, create booking and redirect
-                const bookingWithMethod = { ...booking, payment_method: method };
-                const result = await api.createBooking(bookingWithMethod as any);
+                await api.createBookingTest(bookingPayload);
+                setLoadingMsg('¡Cita confirmada!');
+                await new Promise(r => setTimeout(r, 500));
+                onBookingConfirmed(cdnUrls);
+            } else {
+                const result = await api.createBooking(bookingPayload as any);
                 if (result.init_point) {
                     window.location.href = result.init_point;
                 } else {
-                    // Fallback for methods that don't have a redirect yet
-                    setTimeout(() => {
-                        setLoading(false);
-                        onNext();
-                    }, 1000);
+                    await new Promise(r => setTimeout(r, 800));
+                    onBookingConfirmed(cdnUrls);
                 }
             }
         } catch (e: any) {
             console.error('Error creating booking:', e);
             setError(e.message || 'Error al procesar la reserva. Por favor intenta de nuevo.');
+            setLoadingMsg('');
+        } finally {
             setLoading(false);
         }
     };
@@ -78,18 +98,15 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
             {/* Header */}
             <div className="flex flex-col px-6 pt-6 pb-2">
                 <div className="flex items-center mb-6">
-                    <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-pink transition-colors group">
+                    <button onClick={onBack} disabled={loading} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-pink transition-colors group">
                         <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                         </div>
                     </button>
                     <div className="flex gap-1 ml-auto">
-                        <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-pink" />
+                        {[...Array(6)].map((_, i) => (
+                            <div key={i} className="w-1.5 h-1.5 rounded-full bg-pink" style={{ opacity: i < 5 ? 0.4 : 1 }} />
+                        ))}
                     </div>
                 </div>
 
@@ -184,7 +201,7 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
                         <p className="text-nf-gray text-sm px-6">
                             {method === 'prueba'
                                 ? 'Modo de prueba activo. La cita se registrará sin necesidad de pago real.'
-                                : `Serás redirigida a ${method === 'apple' ? 'Apple Pay' : 'Mercado Pago'} para completar el pago.`
+                                : `Serás redirigida a ${method === 'apple' ? 'Apple Pay' : method === 'mercado' ? 'Mercado Pago' : method} para completar el pago.`
                             }
                         </p>
                     </div>
@@ -202,11 +219,14 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
                 <button
                     onClick={handlePayment}
                     disabled={loading}
-                    className="w-full py-4 rounded-full text-base font-serif flex items-center justify-center gap-2 transition-all duration-200"
+                    className="w-full py-4 rounded-full text-base font-serif flex items-center justify-center gap-2 transition-all duration-200 shadow-lg disabled:opacity-70"
                     style={{ background: method === 'prueba' ? 'var(--charcoal)' : 'var(--coral)', color: 'white' }}
                 >
                     {loading ? (
-                        <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            <span className="text-sm">{loadingMsg || 'Procesando...'}</span>
+                        </div>
                     ) : (
                         <>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>

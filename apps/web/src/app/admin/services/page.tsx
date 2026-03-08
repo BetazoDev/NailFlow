@@ -100,7 +100,7 @@ export default function ServicesPage() {
                                     <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-aesthetic-cream/30 border border-aesthetic-accent/20">
                                         {service.image_url && service.image_url.trim() !== '' ? (
                                             <img
-                                                src={service.image_url}
+                                                src={api.getPublicUrl(service.image_url)}
                                                 alt={service.name}
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {

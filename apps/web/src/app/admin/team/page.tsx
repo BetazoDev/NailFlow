@@ -122,8 +122,9 @@ export default function TeamPage() {
 
             resetForm();
             setShowAddModal(false);
-        } catch (e) {
+        } catch (e: any) {
             console.error('Error saving staff member:', e);
+            alert('Error al guardar: ' + (e.message || 'Error desconocido'));
         } finally {
             setSaving(false);
         }
@@ -184,7 +185,7 @@ export default function TeamPage() {
                                             <div className="flex items-center gap-4">
                                                 <div className="size-12 rounded-full flex items-center justify-center text-sm font-display italic bg-white border border-aesthetic-accent text-aesthetic-taupe shadow-minimal transition-transform group-hover:scale-110 overflow-hidden">
                                                     {member.photo_url ? (
-                                                        <img src={member.photo_url} alt={member.name} className="w-full h-full object-cover" />
+                                                        <img src={api.getPublicUrl(member.photo_url)} alt={member.name} className="w-full h-full object-cover" />
                                                     ) : initials}
                                                 </div>
                                                 <div>
@@ -259,7 +260,7 @@ export default function TeamPage() {
                             <div className="flex items-center gap-5 mb-4">
                                 <div className="size-16 rounded-full flex items-center justify-center text-lg font-display italic bg-aesthetic-cream border-2 border-white shadow-soft text-aesthetic-taupe overflow-hidden">
                                     {member.photo_url ? (
-                                        <img src={member.photo_url} alt={member.name} className="w-full h-full object-cover" />
+                                        <img src={api.getPublicUrl(member.photo_url)} alt={member.name} className="w-full h-full object-cover" />
                                     ) : initials}
                                 </div>
                                 <div className="flex-1">
@@ -350,7 +351,7 @@ export default function TeamPage() {
                                     onClick={() => photoInputRef.current?.click()}
                                 >
                                     {newPhotoPreview ? (
-                                        <img src={newPhotoPreview} alt="preview" className="w-full h-full object-cover" />
+                                        <img src={api.getPublicUrl(newPhotoPreview)} alt="preview" className="w-full h-full object-cover" />
                                     ) : (
                                         <span className="material-symbol text-3xl text-aesthetic-muted/30">add_a_photo</span>
                                     )}
