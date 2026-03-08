@@ -39,7 +39,7 @@ export default function BookingWizardPage() {
                 const t = await api.getTenant(searchDomain);
                 if (t) {
                     setTenant(t);
-                    const s = await api.getStaff(t.id);
+                    const s = await api.getStaff();
                     setStaff(s);
                 }
             } catch (err) {

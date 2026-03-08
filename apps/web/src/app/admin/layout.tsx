@@ -57,8 +57,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     setDomain(t.domain);
                 } else {
                     // Fallback to testing state or error state
-                    setTenantId('demo'); // fallback for testing if no tenant created yet by owner
-                    setDomain('demo');
+                    setTenantId('demo-tenant'); // fallback for testing if no tenant created yet by owner
+                    setDomain('demo.diabolicalservices.tech');
                 }
             }
         });

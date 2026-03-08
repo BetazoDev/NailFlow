@@ -186,9 +186,9 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!tenantId) return;
         Promise.all([
-            api.getAppointments(tenantId),
-            api.getServices(tenantId),
-            api.getStaff(tenantId),
+            api.getAppointments(),
+            api.getServices(),
+            api.getStaff(),
         ]).then(([apts, svcs, stf]) => {
             setAppointments(apts);
             setServices(svcs);
@@ -217,7 +217,7 @@ export default function AdminDashboard() {
 
     const todaysAppointments = useMemo(() =>
         appointments
-            .filter(apt => apt.date === todayStr && apt.status !== 'cancelled')
+            .filter(apt => apt.datetime_start && apt.datetime_start.split('T')[0] === todayStr && apt.status !== 'cancelled')
             .sort((a, b) => new Date(a.datetime_start).getTime() - new Date(b.datetime_start).getTime()),
         [appointments, todayStr]
     );
@@ -233,21 +233,21 @@ export default function AdminDashboard() {
     );
 
     const todayIncome = useMemo(() =>
-        completedToday.reduce((sum, a) => sum + (getService(a.service_id)?.estimated_price || 0), 0),
+        completedToday.reduce((sum, a) => sum + (Number(a.price) || getService(a.service_id)?.estimated_price || 0), 0),
         [completedToday, getService]
     );
 
     const weeklyIncome = useMemo(() =>
         completedAppointments
             .filter(a => new Date(a.datetime_start) >= startOfWeek)
-            .reduce((sum, a) => sum + (getService(a.service_id)?.estimated_price || 0), 0),
+            .reduce((sum, a) => sum + (Number(a.price) || getService(a.service_id)?.estimated_price || 0), 0),
         [completedAppointments, startOfWeek, getService]
     );
 
     const monthlyIncome = useMemo(() =>
         completedAppointments
             .filter(a => new Date(a.datetime_start) >= startOfMonth)
-            .reduce((sum, a) => sum + (getService(a.service_id)?.estimated_price || 0), 0),
+            .reduce((sum, a) => sum + (Number(a.price) || getService(a.service_id)?.estimated_price || 0), 0),
         [completedAppointments, startOfMonth, getService]
     );
 
@@ -279,7 +279,7 @@ export default function AdminDashboard() {
     const handleComplete = async (apt: Appointment) => {
         if (!tenantId) return;
         try {
-            await api.completeAppointment(tenantId, apt.id);
+            await api.completeAppointment(apt.id);
             setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'completed' } : a));
             setSelectedApt(null);
         } catch (e) {

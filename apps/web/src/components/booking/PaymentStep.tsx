@@ -10,7 +10,7 @@ interface PaymentStepProps {
     onBack: () => void;
 }
 
-type PaymentMethod = 'card' | 'apple' | 'mercado' | 'prueba';
+type PaymentMethod = 'card' | 'apple' | 'mercado' | 'prueba' | 'stripe' | 'paypal' | 'google';
 
 export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProps) {
     const [method, setMethod] = useState<PaymentMethod>('card');
@@ -42,19 +42,19 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
                     setLoading(false);
                     onNext();
                 }, 600);
-            } else if (method === 'card' || method === 'apple' || method === 'mercado') {
-                // For real payment methods, create booking and redirect to payment gateway
-                const result = await api.createBooking(booking);
+            } else if (method === 'card' || method === 'apple' || method === 'mercado' || method === 'stripe' || method === 'paypal' || method === 'google') {
+                // For real or placeholder payment methods, create booking and redirect
+                const bookingWithMethod = { ...booking, payment_method: method };
+                const result = await api.createBooking(bookingWithMethod as any);
                 if (result.init_point) {
                     window.location.href = result.init_point;
                 } else {
-                    throw new Error('No se pudo iniciar el pago');
+                    // Fallback for methods that don't have a redirect yet
+                    setTimeout(() => {
+                        setLoading(false);
+                        onNext();
+                    }, 1000);
                 }
-            } else {
-                setTimeout(() => {
-                    setLoading(false);
-                    onNext();
-                }, 600);
             }
         } catch (e: any) {
             console.error('Error creating booking:', e);
@@ -63,27 +63,14 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
         }
     };
 
-    const methods: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
-        {
-            id: 'prueba', label: 'Prueba', icon: (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M2 12h20" /><circle cx="12" cy="12" r="10" /></svg>
-            )
-        },
-        {
-            id: 'card', label: 'Tarjeta', icon: (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
-            )
-        },
-        {
-            id: 'apple', label: 'Apple Pay', icon: (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
-            )
-        },
-        {
-            id: 'mercado', label: 'Mercado', icon: (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" /><polyline points="1 10 23 10" /></svg>
-            )
-        },
+    const methods: { id: PaymentMethod; label: string; icon: string }[] = [
+        { id: 'prueba', label: 'PRUEBA', icon: 'test_confirmation' },
+        { id: 'card', label: 'TARJETA', icon: 'credit_card' },
+        { id: 'apple', label: 'APPLE PAY', icon: 'apple' },
+        { id: 'google', label: 'GOOGLE PAY', icon: 'google' },
+        { id: 'stripe', label: 'STRIPE', icon: 'payments' },
+        { id: 'paypal', label: 'PAYPAL', icon: 'account_balance_wallet' },
+        { id: 'mercado', label: 'MERCADO', icon: 'storefront' },
     ];
 
     return (
@@ -131,10 +118,10 @@ export default function PaymentStep({ booking, onNext, onBack }: PaymentStepProp
                                     ${method === m.id ? 'border-pink bg-white shadow-md' : 'border-cream-dark bg-white/60'}
                                 `}
                             >
-                                <div className={method === m.id ? 'text-pink' : 'text-gray-light'}>
-                                    {m.icon}
+                                <div className={method === m.id ? 'text-pink' : 'text-aesthetic-muted/40'}>
+                                    <span className="material-symbol text-2xl font-light">{m.icon}</span>
                                 </div>
-                                <span className={`text-[9px] sm:text-[11px] tracking-[0.1em] uppercase font-semibold ${method === m.id ? 'text-pink' : 'text-nf-gray'}`}>
+                                <span className={`text-[8px] tracking-[0.1em] uppercase font-bold ${method === m.id ? 'text-pink' : 'text-aesthetic-muted/60'}`}>
                                     {m.label}
                                 </span>
                             </button>

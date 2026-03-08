@@ -83,7 +83,7 @@ export default function TeamPage() {
         try {
             let photoUrl = editingMember?.photo_url || '';
             if (newPhotoFile) {
-                photoUrl = await api.uploadImage(newPhotoFile);
+                photoUrl = await api.uploadImage(tenantId, 'team', newPhotoFile);
             }
 
             if (editingMember) {

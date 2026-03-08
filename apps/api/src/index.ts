@@ -208,26 +208,29 @@ app.get('/api/availability', async (req, res) => {
         const bookedTimes = new Set(result.rows.map(r => r.time));
 
         // Get "Now" in Mexico City
-        const mxNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
-        const todayStr = `${mxNow.getFullYear()}-${String(mxNow.getMonth() + 1).padStart(2, '0')}-${String(mxNow.getDate()).padStart(2, '0')}`;
+        const nowInCDMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+        const bufferLimit = new Date(nowInCDMX.getTime() + 3 * 60 * 60 * 1000);
 
-        // We calculate if requested date is today
-        const isToday = date === todayStr;
-
-        // 3-hour advance: minimum time allowed
-        // If it's 19:51, h=19. minAllowed = 19 + 3 + 1 = 23.
-        const minAllowedHour = mxNow.getHours() + 3 + (mxNow.getMinutes() > 0 ? 1 : 0);
+        // Requested date as YYYY-MM-DD
+        const requestedDate = date as string;
 
         const slots = [];
-        for (let h = 9; h < 21; h++) { // Expanded to 9 PM just in case
+        for (let h = 9; h < 21; h++) {
             for (const min of [0, 30]) {
                 const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 
-                // Filter: must be in the future (with 3-hour buffer) if date is today
-                if (isToday) {
-                    if (h < minAllowedHour) continue;
-                    if (h === minAllowedHour && min <= mxNow.getMinutes()) continue;
-                }
+                // Construct a Date object for the slot in CDMX
+                const slotDateTime = new Date(`${requestedDate}T${time}:00`);
+                // Since 'new Date(string)' assumes local time if no TZ, and server might be UTC, 
+                // we should be careful. Better way:
+                const [year, month, day] = requestedDate.split('-').map(Number);
+                const slotDate = new Date(year, month - 1, day, h, min);
+
+                // But wait, the comparison should be in CDMX time.
+                // If nowInCDMX is already local to CDMX, and we construct slotDate as local, 
+                // the comparison is safe as long as they are on the SAME machine or handled as timestamps.
+
+                if (slotDate < bufferLimit) continue;
 
                 if (!bookedTimes.has(time)) {
                     slots.push({ time, available: true });
@@ -254,16 +257,30 @@ app.post('/api/bookings/test', async (req, res) => {
     }
 
     try {
-        // Construct ISO string with explicit -06:00 offset (Mexico City normal time)
-        const datetimeStr = `${date}T${time}:00-06:00`;
-        const aptRes = await query(
-            `INSERT INTO appointments 
-            (tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, status, notes, advance_paid) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-            [tenantId, client_name, client_phone || '', client_email || '', service_id, staff_id || null, datetimeStr, 'confirmed', notes || '', false]
+        const svcRes = await query('SELECT duration_minutes, estimated_price FROM services WHERE id = $1', [service_id]);
+        if (svcRes.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
+        const { duration_minutes: duration, estimated_price: service_price } = svcRes.rows[0];
+
+        const id = crypto.randomUUID();
+
+        // Use Mexico City timezone for datetime_start
+        // We append -06:00 (Standard) or -05:00 (Daylight) offset. 
+        // Better: let Postgres handle it by passing a string with the timezone name
+        const datetime_start_str = `${date} ${time}:00 America/Mexico_City`;
+
+        // Calculate end time
+        const [h, m] = time.split(':').map(Number);
+        const startDate = new Date(2000, 0, 1, h, m);
+        const endDate = new Date(startDate.getTime() + duration * 60000);
+        const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+        const datetime_end_str = `${date} ${endStr}:00 America/Mexico_City`;
+
+        const result = await query(
+            'INSERT INTO appointments (id, tenant_id, service_id, staff_id, client_name, client_email, client_phone, datetime_start, datetime_end, status, payment_method, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+            [id, tenantId, service_id, staff_id, client_name, client_email || '', client_phone, datetime_start_str, datetime_end_str, 'confirmed', 'PRUEBA', service_price]
         );
-        console.log('Test booking created successfully:', aptRes.rows[0].id);
-        res.json({ appointmentId: aptRes.rows[0].id, success: true });
+        console.log('Test booking created successfully:', result.rows[0].id);
+        res.json({ appointmentId: result.rows[0].id, success: true });
     } catch (e) {
         console.error('Test booking failed:', e);
         res.status(500).json({ error: 'Failed to create test booking' });
@@ -281,12 +298,37 @@ app.post('/api/bookings', async (req, res) => {
         if (svcRes.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
         const service = svcRes.rows[0];
 
+        const { service_price, service_duration } = req.body;
+
+        // Implementation of different gateways
+        if (req.body.payment_method === 'stripe') {
+            // TODO: Integrar Stripe API (Sk_test_...)
+            // const session = await stripe.checkout.sessions.create({ ... })
+            // return res.json({ init_point: session.url })
+        }
+
+        if (req.body.payment_method === 'paypal') {
+            // TODO: Integrar PayPal SDK
+        }
+
+        if (req.body.payment_method === 'apple_pay' || req.body.payment_method === 'google_pay') {
+            // TODO: Integrar Wallet APIs
+        }
+
+        // Use Mexico City timezone for datetime_start
+        const datetime_start_str = `${date} ${time}:00 America/Mexico_City`;
+        const [h, m] = time.split(':').map(Number);
+        const startDate = new Date(2000, 0, 1, h, m);
+        const endDate = new Date(startDate.getTime() + (service_duration || 60) * 60000);
+        const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+        const datetime_end_str = `${date} ${endStr}:00 America/Mexico_City`;
+
         // Create appointment in 'pending_payment' status
         const aptRes = await query(
             `INSERT INTO appointments 
-            (tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, status, notes) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [tenantId, client_name, client_phone, client_email, service_id, staff_id, `${date}T${time}:00Z`, 'pending_payment', notes]
+            (id, tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, datetime_end, status, notes, price, payment_method) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+            [crypto.randomUUID(), tenantId, client_name, client_phone, client_email, service_id, staff_id, datetime_start_str, datetime_end_str, 'pending_payment', notes, service_price, req.body.payment_method]
         );
         const appointment = aptRes.rows[0];
 

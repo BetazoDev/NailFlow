@@ -155,25 +155,19 @@ export const api = {
     },
 
     // Images (CDN Integration)
-    uploadImage: async (file: File): Promise<string> => {
+    uploadImage: async (tenantId: string, folder: string, file: File): Promise<string> => {
         const formData = new FormData();
         formData.append('images', file);
-
-        // Utilizamos los IDs configurados en las variables de entorno o los valores por defecto de NailsSalon
-        const clientId = process.env.NEXT_PUBLIC_CDN_CLIENT_ID || 'c6d224a2-1ebc-480a-8ccc-dcaf06258f01';
-        formData.append('client_id', clientId);
-
-        const projectId = process.env.NEXT_PUBLIC_CDN_PROJECT_ID || 'a4ebae0c-6ce2-482a-8774-e1a9aee72c79';
-        formData.append('project_id', projectId);
+        formData.append('image', file); // Sugerido por algunos ejemplos de la guía
 
         const uploadUrl = 'https://api.diabolicalservices.tech/api/images/upload';
-        const token = process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || '';
+        const token = process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
 
         try {
             const response = await fetch(uploadUrl, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`
+                    'x-api-key': token
                 },
                 body: formData
             });
@@ -185,11 +179,14 @@ export const api = {
 
             const data = await response.json();
 
-            if (data.uploaded && data.uploaded.length > 0) {
-                // El CDN público usa el formato https://cdn.diabolicalservices.tech/{client-slug}/{filename}
-                const clientSlug = process.env.NEXT_PUBLIC_CDN_CLIENT_SLUG || 'nailssalon';
-                const filename = data.uploaded[0].filename;
+            // El CDN público usa el formato https://cdn.diabolicalservices.tech/{client-slug}/{filename}
+            const clientSlug = process.env.NEXT_PUBLIC_CDN_CLIENT_SLUG || 'nailssalon';
 
+            if (data.uploaded && data.uploaded.length > 0) {
+                const filename = data.uploaded[0].filename;
+                return `https://cdn.diabolicalservices.tech/${clientSlug}/${filename}`;
+            } else if (data.duplicates && data.duplicates.length > 0) {
+                const filename = data.duplicates[0].filename;
                 return `https://cdn.diabolicalservices.tech/${clientSlug}/${filename}`;
             } else {
                 throw new Error('Error CDN: No se retornó información de la imagen subida.');

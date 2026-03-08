@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 const fs = require('fs');
 
-const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImFkbWluLWlkIiwiZW1haWwiOiJhZG1pbkBkaWFib2xpY2FsLnRlY2giLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzI4MzM3NjAsImV4cCI6MTgwNDM2OTc2MH0.AGehR76_EM6Xv_hG2uUkiEueOOrE7jzAsNw9IvJOgFk';
+const token = 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
 const uploadUrl = 'https://api.diabolicalservices.tech/api/images/upload';
 
 async function testUpload() {

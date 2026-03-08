@@ -67,13 +67,11 @@ function NewServiceContent() {
             if (selectedFile) {
                 console.log('Subiendo imagen...', selectedFile.name);
                 try {
-                    finalImageUrl = await api.uploadImage(selectedFile);
+                    finalImageUrl = await api.uploadImage(tenantId, 'services', selectedFile);
                     console.log('Imagen subida con éxito:', finalImageUrl);
-                } catch (imgError) {
+                } catch (imgError: any) {
                     console.error('Error subiendo imagen:', imgError);
-                    // Continue without image if upload fails? Or throw?
-                    // Let's throw for now so the user knows
-                    throw new Error('Error al subir la imagen. Por favor intenta de nuevo.');
+                    throw new Error(`Error al subir la imagen: ${imgError.message || 'Intente de nuevo'}`);
                 }
             }
 

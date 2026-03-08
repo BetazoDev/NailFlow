@@ -30,7 +30,7 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
         async function loadAvailability() {
             setLoading(true);
             try {
-                const slots = await api.getAvailability(staffId, selectedDate);
+                const slots = await api.getAvailability(selectedDate, staffId);
                 setTimeSlots(slots);
             } catch (err) {
                 console.error('Failed to load availability:', err);
