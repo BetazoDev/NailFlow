@@ -241,6 +241,27 @@ apiRouter.patch('/appointments/:id/status', async (req, res) => {
     }
 });
 
+// Endpoint: Update Appointment Images
+apiRouter.patch('/appointments/:id/images', async (req, res) => {
+    const { image_urls } = req.body;
+    
+    if (!Array.isArray(image_urls)) {
+        return res.status(400).json({ error: 'image_urls must be an array' });
+    }
+
+    try {
+        const result = await query(
+            'UPDATE appointments SET image_urls = $1 WHERE id = $2 RETURNING *', 
+            [JSON.stringify(image_urls), req.params.id]
+        );
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Appointment not found' });
+        res.json(result.rows[0]);
+    } catch (e) {
+        console.error('Failed to update appointment images:', e);
+        res.status(500).json({ error: 'Failed to update appointment images' });
+    }
+});
+
 // Endpoint: Get Availability
 apiRouter.get('/availability', async (req, res) => {
     const { date, staff_id } = req.query;

@@ -9,8 +9,8 @@ interface PaymentStepProps {
     /** Files pending CDN upload — will be uploaded on booking confirmation */
     pendingFiles: File[];
     tenantId: string;
-    /** Called with CDN URLs after successful booking */
-    onBookingConfirmed: (cdnUrls: string[]) => void;
+    /** Called with appointment ID and optionally CDN URLs after successful booking */
+    onBookingConfirmed: (appointmentId: string, cdnUrls?: string[]) => void;
     onBack: () => void;
 }
 
@@ -41,37 +41,43 @@ export default function PaymentStep({ booking, pendingFiles, tenantId, onBooking
         setError(null);
 
         try {
-            // Step 1: Upload pending images to CDN (only if there are any)
-            let cdnUrls: string[] = [];
-            if (pendingFiles.length > 0) {
-                setLoadingMsg('Subiendo fotos de referencia...');
-                for (const file of pendingFiles) {
-                    const url = await api.uploadImage(tenantId, 'bookings', file, 'clients');
-                    cdnUrls.push(url);
-                }
-            }
-
-            // Step 2: Create the booking with the CDN URLs
-            setLoadingMsg('Registrando tu cita...');
-            const bookingPayload = {
-                ...booking,
-                payment_method: method,
-                image_urls: cdnUrls,
-                image_url: cdnUrls[0] || undefined,
-            };
-
             if (method === 'prueba') {
-                await api.createBookingTest(bookingPayload);
+                setLoadingMsg('Registrando tu cita...');
+                const bookingPayload = {
+                    ...booking,
+                    payment_method: method,
+                    image_urls: [], 
+                };
+                const result = await api.createBookingTest(bookingPayload);
                 setLoadingMsg('¡Cita confirmada!');
-                await new Promise(r => setTimeout(r, 500));
-                onBookingConfirmed(cdnUrls);
+                await new Promise(r => setTimeout(r, 300));
+                onBookingConfirmed(result.appointmentId, []);
             } else {
+                // Step 1: Upload pending images to CDN for synchronous methods (like card redirect)
+                let cdnUrls: string[] = [];
+                if (pendingFiles.length > 0) {
+                    setLoadingMsg('Subiendo fotos de referencia...');
+                    for (const file of pendingFiles) {
+                        const url = await api.uploadImage(tenantId, 'bookings', file, 'clients');
+                        cdnUrls.push(url);
+                    }
+                }
+
+                // Step 2: Create the booking with the CDN URLs
+                setLoadingMsg('Registrando tu cita...');
+                const bookingPayload = {
+                    ...booking,
+                    payment_method: method,
+                    image_urls: cdnUrls,
+                    image_url: cdnUrls[0] || undefined,
+                };
+                
                 const result = await api.createBooking(bookingPayload as any);
                 if (result.init_point) {
                     window.location.href = result.init_point;
                 } else {
                     await new Promise(r => setTimeout(r, 800));
-                    onBookingConfirmed(cdnUrls);
+                    onBookingConfirmed(result.appointmentId, cdnUrls);
                 }
             }
         } catch (e: any) {

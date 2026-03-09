@@ -6,6 +6,9 @@ import { api } from '@/lib/api';
 
 interface ConfirmationStepProps {
     booking: BookingData;
+    appointmentId?: string | null;
+    pendingFiles?: File[];
+    tenantId?: string;
     salonName?: string;
 }
 
@@ -15,13 +18,15 @@ function formatFullDate(dateStr: string) {
     return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-export default function ConfirmationStep({ booking, salonName = 'Ana Nails Studio' }: ConfirmationStepProps) {
-    const [saved, setSaved] = useState(false);
-    const [saving, setSaving] = useState(false);
+export default function ConfirmationStep({ booking, appointmentId, pendingFiles = [], tenantId, salonName = 'Ana Nails Studio' }: ConfirmationStepProps) {
+    const [saved, setSaved] = useState(!!appointmentId);
+    const [saving, setSaving] = useState(!appointmentId);
+    const [uploadingImages, setUploadingImages] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (saved || saving || error) return;
+        // If appointment already created (e.g. from PaymentStep), don't create again
+        if (appointmentId || saved || saving || error) return;
 
         async function saveAppointment() {
             setSaving(true);
@@ -38,7 +43,33 @@ export default function ConfirmationStep({ booking, salonName = 'Ana Nails Studi
         }
 
         saveAppointment();
-    }, [booking, saved, saving, error]);
+    }, [booking, appointmentId, saved, saving, error]);
+
+    useEffect(() => {
+        if (appointmentId && pendingFiles.length > 0 && tenantId) {
+            let mounted = true;
+            async function uploadImagesInBackground() {
+                setUploadingImages(true);
+                try {
+                    let cdnUrls: string[] = [];
+                    for (const file of pendingFiles) {
+                        const url = await api.uploadImage(tenantId!, 'bookings', file, 'clients');
+                        cdnUrls.push(url);
+                    }
+                    if (cdnUrls.length > 0 && mounted) {
+                        await api.updateAppointmentImages(appointmentId!, cdnUrls);
+                    }
+                } catch (e) {
+                    console.error('Failed to upload background images:', e);
+                } finally {
+                    if (mounted) setUploadingImages(false);
+                }
+            }
+            uploadImagesInBackground();
+            
+            return () => { mounted = false; };
+        }
+    }, [appointmentId, pendingFiles, tenantId]);
 
     if (error) {
         return (

@@ -136,6 +136,13 @@ export const api = {
     completeAppointment: async (id: string): Promise<void> => {
         return fetchApi(`/api/appointments/${id}/complete`, { method: 'POST' });
     },
+    updateAppointmentImages: async (id: string, image_urls: string[]): Promise<void> => {
+        return fetchApi(`/api/appointments/${id}/images`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_urls }),
+        });
+    },
     holdSlot: async (date: string, time: string, holdId: string): Promise<void> => {
         // Placeholder for demo
         return Promise.resolve();

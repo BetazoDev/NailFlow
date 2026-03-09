@@ -47,6 +47,7 @@ export default function BookingWizard({
 
     // CDN-uploaded URLs — populated only after successful booking
     const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
+    const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<string | null>(null);
 
     const navigate = (step: BookingStep) => {
         setCurrentStep(step);
@@ -67,8 +68,9 @@ export default function BookingWizard({
         setLocalPreviews(previews);
     };
 
-    const handleBookingConfirmed = (cdnUrls: string[]) => {
-        setUploadedImageUrls(cdnUrls);
+    const handleBookingConfirmed = (appointmentId: string, cdnUrls?: string[]) => {
+        if (cdnUrls) setUploadedImageUrls(cdnUrls);
+        setConfirmedAppointmentId(appointmentId);
         goNext();
     };
 
@@ -167,6 +169,9 @@ export default function BookingWizard({
             {currentStep === 'confirmation' && (
                 <ConfirmationStep
                     booking={bookingData}
+                    appointmentId={confirmedAppointmentId}
+                    pendingFiles={pendingFiles}
+                    tenantId={tenantId}
                     salonName={salonName}
                 />
             )}
