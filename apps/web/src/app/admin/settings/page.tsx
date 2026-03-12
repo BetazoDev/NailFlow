@@ -87,9 +87,10 @@ export default function SettingsPage() {
                 name: salonName,
             });
             alert('Ajustes guardados correctamente');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving settings:', error);
-            alert('Error al guardar los ajustes. Por favor intenta de nuevo.');
+            const errorMsg = error.details || error.message || 'Error desconocido';
+            alert('Error al guardar los ajustes: ' + errorMsg);
         }
         setSaving(false);
         setSaved(true);

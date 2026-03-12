@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
-import Head from "next/head";
 
 export const metadata: Metadata = {
   title: "NailFlow — Reserva tu cita",

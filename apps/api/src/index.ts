@@ -16,12 +16,19 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+let tenantBranding: Record<string, any> = {};
+
 // Initialize DB schema
 initDb().catch(console.error);
 
-
-
-let tenantBranding: Record<string, any> = {};
+// Helper for safe UUID generation
+const getUUID = () => {
+    try {
+        return crypto.randomUUID();
+    } catch (e) {
+        return crypto.randomBytes(16).toString('hex');
+    }
+};
 
 // Middleware to extract tenant from request
 app.use(async (req, res, next) => {
@@ -116,6 +123,19 @@ apiRouter.get('/tenant', (req, res) => {
     res.json(req.tenant);
 });
 
+// Endpoint: Get Tenant by Owner ID
+apiRouter.get('/tenants/owner/:ownerId', async (req, res) => {
+    try {
+        const { ownerId } = req.params;
+        const result = await query('SELECT * FROM tenants WHERE owner_id = $1', [ownerId]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Tenant not found' });
+        res.json(result.rows[0]);
+    } catch (e: any) {
+        console.error('Failed to fetch tenant by owner:', e);
+        res.status(500).json({ error: 'Failed to fetch tenant by owner', details: e.message });
+    }
+});
+
 
 // Endpoint: Get Services
 apiRouter.get('/services', async (req, res) => {
@@ -141,16 +161,16 @@ apiRouter.post('/services', async (req, res) => {
             return res.status(400).json({ error: 'Name, duration, and price are required' });
         }
 
-        const id = crypto.randomUUID();
+        const id = getUUID();
         const result = await query(
             'INSERT INTO services (id, tenant_id, name, description, duration_minutes, estimated_price, required_advance, category, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
             [id, tenantId, name, description, Number(duration_minutes), Number(estimated_price), Number(required_advance) || 0, category || 'General', image_url || '']
         );
 
         res.status(201).json(result.rows[0]);
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to create service:', e);
-        res.status(500).json({ error: 'Failed to create service' });
+        res.status(500).json({ error: 'Failed to create service', details: e.message });
     }
 });
 
@@ -334,37 +354,35 @@ apiRouter.post('/bookings/test', async (req, res) => {
     try {
         const svcRes = await query('SELECT duration_minutes, estimated_price FROM services WHERE id = $1', [service_id]);
         if (svcRes.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
-        const { duration_minutes: duration, estimated_price: service_price } = svcRes.rows[0];
+        const { duration_minutes: duration, estimated_price: service_price_db } = svcRes.rows[0];
 
-        const id = crypto.randomUUID();
+        const id = getUUID();
 
         // Use Mexico City timezone for datetime_start
-        // We append -06:00 (Standard) or -05:00 (Daylight) offset. 
-        // Better: let Postgres handle it by passing a string with the timezone name
         const datetime_start_str = `${date} ${time}:00 America/Mexico_City`;
 
         // Calculate end time
         const [h, m] = time.split(':').map(Number);
         const startDate = new Date(2000, 0, 1, h, m);
-        const endDate = new Date(startDate.getTime() + duration * 60000);
+        const endDate = new Date(startDate.getTime() + (duration || 60) * 60000);
         const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
         const datetime_end_str = `${date} ${endStr}:00 America/Mexico_City`;
 
         const result = await query(
-            'INSERT INTO appointments (id, tenant_id, service_id, staff_id, client_name, client_email, client_phone, datetime_start, datetime_end, status, payment_method, price, image_urls) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
-            [id, tenantId, service_id, staff_id, client_name, client_email || '', client_phone, datetime_start_str, datetime_end_str, 'confirmed', 'PRUEBA', service_price, JSON.stringify(image_urls || [])]
+            'INSERT INTO appointments (id, tenant_id, service_id, staff_id, client_name, client_email, client_phone, datetime_start, datetime_end, status, payment_method, price, image_urls, image_url, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *',
+            [id, tenantId, service_id, staff_id, client_name, client_email || '', client_phone, datetime_start_str, datetime_end_str, 'confirmed', 'PRUEBA', service_price_db, JSON.stringify(image_urls || []), req.body.image_url || null, notes]
         );
         console.log('Test booking created successfully:', result.rows[0].id);
         res.json({ appointmentId: result.rows[0].id, success: true });
-    } catch (e) {
+    } catch (e: any) {
         console.error('Test booking failed:', e);
-        res.status(500).json({ error: 'Failed to create test booking' });
+        res.status(500).json({ error: 'Failed to create test booking', details: e.message });
     }
 });
 
 // Endpoint: Create Booking (Initiates MercadoPago Payment)
 apiRouter.post('/bookings', async (req, res) => {
-    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes, image_urls } = req.body;
+    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes, image_urls, image_url } = req.body;
     // @ts-ignore
     const tenantId = req.tenant.id;
 
@@ -373,67 +391,63 @@ apiRouter.post('/bookings', async (req, res) => {
         if (svcRes.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
         const service = svcRes.rows[0];
 
-        const { service_price, service_duration } = req.body;
-
-        // Implementation of different gateways
-        if (req.body.payment_method === 'stripe') {
-            // TODO: Integrar Stripe API (Sk_test_...)
-            // const session = await stripe.checkout.sessions.create({ ... })
-            // return res.json({ init_point: session.url })
-        }
-
-        if (req.body.payment_method === 'paypal') {
-            // TODO: Integrar PayPal SDK
-        }
-
-        if (req.body.payment_method === 'apple_pay' || req.body.payment_method === 'google_pay') {
-            // TODO: Integrar Wallet APIs
-        }
-
         // Use Mexico City timezone for datetime_start
         const datetime_start_str = `${date} ${time}:00 America/Mexico_City`;
         const [h, m] = time.split(':').map(Number);
         const startDate = new Date(2000, 0, 1, h, m);
-        const endDate = new Date(startDate.getTime() + (service_duration || 60) * 60000);
+        const duration = service.duration_minutes || 60;
+        const endDate = new Date(startDate.getTime() + duration * 60000);
         const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
         const datetime_end_str = `${date} ${endStr}:00 America/Mexico_City`;
 
-        // Create appointment in 'pending_payment' status
+        // Determine initial status based on payment method
+        const isMercadoPago = req.body.payment_method === 'mercado';
+        const initialStatus = isMercadoPago ? 'pending_payment' : 'confirmed';
+
+        // Create appointment
         const aptRes = await query(
             `INSERT INTO appointments 
-            (id, tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, datetime_end, status, notes, price, payment_method, image_urls) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-            [crypto.randomUUID(), tenantId, client_name, client_phone, client_email, service_id, staff_id, datetime_start_str, datetime_end_str, 'pending_payment', notes, service_price, req.body.payment_method, JSON.stringify(image_urls || [])]
+            (id, tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, datetime_end, status, notes, price, payment_method, image_urls, image_url) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+            [getUUID(), tenantId, client_name, client_phone, client_email, service_id, staff_id, datetime_start_str, datetime_end_str, initialStatus, notes, service.estimated_price, req.body.payment_method, JSON.stringify(image_urls || []), image_url || null]
         );
         const appointment = aptRes.rows[0];
 
-        // Create MP Preference
-        const preference = new Preference(mpClient);
-        const response = await preference.create({
-            body: {
-                items: [{
-                    id: service.id,
-                    title: service.name,
-                    quantity: 1,
-                    unit_price: Number(service.required_advance),
-                }],
-                external_reference: appointment.id.toString(),
-                notification_url: `${process.env.APP_BASE_URL}/api/webhooks/mercadopago`,
-                back_urls: {
-                    success: `https://${req.headers['host']}/book/success`,
-                    failure: `https://${req.headers['host']}/book/error`,
-                },
-                auto_return: 'approved',
-            }
-        });
+        if (isMercadoPago) {
+            // Create MP Preference
+            const preference = new Preference(mpClient);
+            const response = await preference.create({
+                body: {
+                    items: [{
+                        id: service.id,
+                        title: service.name,
+                        quantity: 1,
+                        unit_price: Number(service.required_advance || 0),
+                    }],
+                    external_reference: appointment.id.toString(),
+                    notification_url: `${process.env.APP_BASE_URL}/api/webhooks/mercadopago`,
+                    back_urls: {
+                        success: `https://${req.headers['host']}/book/success`,
+                        failure: `https://${req.headers['host']}/book/error`,
+                    },
+                    auto_return: 'approved',
+                }
+            });
 
+            return res.json({
+                appointmentId: appointment.id,
+                init_point: response.init_point
+            });
+        }
+
+        // For other methods, just return the appointment ID
         res.json({
             appointmentId: appointment.id,
-            init_point: response.init_point
+            success: true
         });
-    } catch (e) {
+    } catch (e: any) {
         console.error('Booking failed:', e);
-        res.status(500).json({ error: 'Booking process failed' });
+        res.status(500).json({ error: 'Booking process failed', details: e.message });
     }
 });
 
@@ -496,15 +510,32 @@ apiRouter.post('/staff', async (req, res) => {
         // @ts-ignore
         const tenantId = req.tenant.id;
         const { name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule } = req.body;
-        const id = crypto.randomUUID();
+
+        if (!name) return res.status(400).json({ error: 'Name is required' });
+
+        const id = getUUID();
         const result = await query(
             'INSERT INTO staff (id, tenant_id, name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
-            [id, tenantId, name, email, role, specialty, photo_url, slug || name.toLowerCase().replace(/\s+/g, '-'), active !== false, bio, color_identifier, services_offered || [], weekly_schedule || {}]
+            [
+                id,
+                tenantId,
+                name,
+                email || null,
+                role || 'staff',
+                specialty || null,
+                photo_url || null,
+                slug || name.toLowerCase().replace(/\s+/g, '-'),
+                active !== false,
+                bio || null,
+                color_identifier || '#C97794',
+                services_offered || [],
+                weekly_schedule ? JSON.stringify(weekly_schedule) : JSON.stringify({})
+            ]
         );
         res.json(result.rows[0]);
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to create staff member:', e);
-        res.status(500).json({ error: 'Failed to create staff member' });
+        res.status(500).json({ error: 'Failed to create staff member', details: e.message });
     }
 });
 
@@ -515,15 +546,44 @@ apiRouter.put('/staff/:id', async (req, res) => {
         // @ts-ignore
         const tenantId = req.tenant.id;
         const { name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule } = req.body;
+
+        // We use COALESCE to keep existing values if not provided in the update
         const result = await query(
-            'UPDATE staff SET name = $1, email = $2, role = $3, specialty = $4, photo_url = $5, slug = $6, active = $7, bio = $8, color_identifier = $9, services_offered = $10, weekly_schedule = $11 WHERE id = $12 AND tenant_id = $13 RETURNING *',
-            [name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule, id, tenantId]
+            `UPDATE staff SET 
+                name = COALESCE($1, name), 
+                email = COALESCE($2, email), 
+                role = COALESCE($3, role), 
+                specialty = COALESCE($4, specialty), 
+                photo_url = COALESCE($5, photo_url), 
+                slug = COALESCE($6, slug), 
+                active = COALESCE($7, active), 
+                bio = COALESCE($8, bio), 
+                color_identifier = COALESCE($9, color_identifier), 
+                services_offered = COALESCE($10, services_offered), 
+                weekly_schedule = COALESCE($11, weekly_schedule) 
+            WHERE id = $12 AND tenant_id = $13 RETURNING *`,
+            [
+                name || null,
+                email || null,
+                role || null,
+                specialty || null,
+                photo_url || null,
+                slug || null,
+                active === undefined ? null : active,
+                bio || null,
+                color_identifier || null,
+                services_offered || null,
+                weekly_schedule ? JSON.stringify(weekly_schedule) : null,
+                id,
+                tenantId
+            ]
         );
+
         if (result.rowCount === 0) return res.status(404).json({ error: 'Staff member not found' });
         res.json(result.rows[0]);
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to update staff member:', e);
-        res.status(500).json({ error: 'Failed to update staff member' });
+        res.status(500).json({ error: 'Failed to update staff member', details: e.message });
     }
 });
 

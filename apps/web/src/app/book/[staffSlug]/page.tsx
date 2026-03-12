@@ -1,3 +1,4 @@
+import React from 'react';
 import BookingWizard from '@/components/booking/BookingWizard';
 import { api } from '@/lib/api';
 import { notFound } from 'next/navigation';
@@ -29,7 +30,6 @@ export default async function StaffBookingPage({ params }: Props) {
     const cssVars = Object.entries(palette.cssVars)
         .map(([key, value]) => `${key}: ${value};`)
         .join(' ');
-    const typoVars = `--font-display: ${typo.fontDisplay}; --font-sans: ${typo.fontSans};`;
 
     // Resolve the staff member by slug
     const allStaff = await api.getStaff();
@@ -47,13 +47,13 @@ export default async function StaffBookingPage({ params }: Props) {
     const staffPhoto = staffMember?.photo_url || undefined;
 
     return (
-        <div className="min-h-screen bg-cream lg:flex lg:items-center lg:justify-center p-0 md:p-4 lg:p-8" style={{
-            ...cssVars.split(';').reduce((acc, curr) => {
+        <div className="min-h-screen bg-cream lg:flex lg:items-center lg:justify-center p-0 md:p-4 lg:p-8" style={({
+            ...cssVars.split(';').reduce((acc: Record<string, string>, curr) => {
                 const [k, v] = curr.split(':');
                 if (k && v) acc[k.trim()] = v.trim();
                 return acc;
-            }, {} as any), '--font-display': typo.fontDisplay, '--font-sans': typo.fontSans
-        }}>
+            }, {}), '--font-display': typo.fontDisplay, '--font-sans': typo.fontSans
+        }) as React.CSSProperties}>
             {/* Container: Full width mobile, split card on desktop */}
             <div className="w-full h-screen md:h-auto lg:max-w-6xl md:bg-white md:rounded-[32px] md:shadow-2xl overflow-hidden relative flex flex-col lg:flex-row md:min-h-[85vh] md:max-h-[900px]">
 
@@ -64,11 +64,11 @@ export default async function StaffBookingPage({ params }: Props) {
                 >
                     <div className="lg:max-w-sm">
                         <div
-                            className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl flex items-center justify-center shadow-lg mb-6"
+                            className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden mb-6"
                             style={{ background: `linear-gradient(135deg, ${tenant.branding.primary_color}, ${tenant.branding.secondary_color})` }}
                         >
                             {tenant.branding.logo_url ? (
-                                <img src={api.getPublicUrl(tenant.branding.logo_url)} className="object-cover lg:w-20 lg:h-20 rounded-2xl" alt="Logo" />
+                                <img src={api.getPublicUrl(tenant.branding.logo_url)} className="w-full h-full object-cover" alt="Logo" />
                             ) : (
                                 <span className="font-serif text-3xl text-white uppercase">{tenant.domain.charAt(0)}</span>
                             )}

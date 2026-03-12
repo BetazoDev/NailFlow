@@ -40,6 +40,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const [tenantId, setTenantId] = useState<string | null>(null);
     const [domain, setDomain] = useState<string | null>(null);
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+    const [salonName, setSalonName] = useState<string>('NailFlow');
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -55,10 +58,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 if (t) {
                     setTenantId(t.id);
                     setDomain(t.domain);
+                    setLogoUrl(t.branding?.logo_url || null);
+                    setPhotoUrl(t.branding?.photo_url || null);
+                    setSalonName(t.name || 'NailFlow');
                 } else {
                     // Fallback to testing state or error state
                     setTenantId('demo-tenant'); // fallback for testing if no tenant created yet by owner
                     setDomain('demo.diabolicalservices.tech');
+
+                    // Also try to load demo-tenant data directly for branding
+                    api.getTenantById('demo-tenant').then(dt => {
+                        if (dt) {
+                            setLogoUrl(dt.branding?.logo_url || null);
+                            setPhotoUrl(dt.branding?.photo_url || null);
+                            setSalonName(dt.name || 'NailFlow');
+                        }
+                    });
                 }
             }
         });
@@ -71,6 +86,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         api.getTenantById(tenantId).then(tenant => {
             if (!tenant) return;
+            setLogoUrl(tenant.branding?.logo_url || null);
+            setPhotoUrl(tenant.branding?.photo_url || null);
+            setSalonName(tenant.name || 'NailFlow');
             const p = PALETTES.find(item => item.id === tenant.branding?.palette_id);
             const t = TYPOGRAPHY.find(item => item.id === tenant.branding?.typography);
 
@@ -100,15 +118,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const getIsActive = (href: string) => pathname === href || (href !== '/admin' && pathname.startsWith(href));
 
     return (
-        <div className="min-h-screen bg-cream flex flex-col lg:flex-row">
+        <div className="h-screen bg-cream flex flex-col lg:flex-row overflow-hidden">
             {/* Desktop Sidebar (hidden on mobile) */}
-            <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-cream-dark h-screen sticky top-0 shadow-sm z-20">
+            <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-cream-dark h-full shadow-sm z-20 flex-shrink-0">
                 <div className="p-8">
                     <div className="flex items-center gap-3 mb-10">
-                        <div className="size-10 rounded-xl flex items-center justify-center shadow-soft bg-aesthetic-accent">
-                            <span className="text-aesthetic-taupe font-bold font-display text-lg italic">N</span>
+                        <div className="size-10 rounded-xl flex items-center justify-center shadow-soft bg-aesthetic-accent overflow-hidden">
+                            {logoUrl ? (
+                                <img src={api.getPublicUrl(logoUrl)} alt="Logo" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-aesthetic-taupe font-bold font-display text-lg italic">N</span>
+                            )}
                         </div>
-                        <h2 className="font-display text-2xl font-light italic tracking-tight text-aesthetic-taupe">NailFlow</h2>
+                        <h2 className="font-display text-xl font-light italic tracking-tight text-aesthetic-taupe truncate">{salonName}</h2>
                     </div>
 
                     <nav className="flex flex-col gap-2">
@@ -137,19 +159,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <span className="text-sm font-medium">Cerrar sesión</span>
                     </button>
                     <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border border-gray-300">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                        <div className="w-10 h-10 rounded-full bg-aesthetic-soft-pink flex items-center justify-center overflow-hidden border border-aesthetic-accent shadow-minimal">
+                            {photoUrl ? (
+                                <img src={api.getPublicUrl(photoUrl)} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="font-display italic text-aesthetic-taupe text-lg">{salonName[0]}</span>
+                            )}
                         </div>
-                        <div>
-                            <p className="text-xs font-semibold text-charcoal leading-tight">Admin Demo</p>
-                            <p className="text-[10px] text-nf-gray uppercase">{userRole === 'owner' ? 'Propietario' : 'Staff'}</p>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-aesthetic-taupe leading-tight truncate">{salonName}</p>
+                            <p className="text-[10px] text-aesthetic-muted uppercase tracking-wider">{userRole === 'owner' ? 'Propietario' : 'Staff'}</p>
                         </div>
+                        {logoUrl && (
+                            <div className="size-8 rounded-lg overflow-hidden border border-cream-dark shadow-sm bg-white p-1">
+                                <img src={api.getPublicUrl(logoUrl)} alt="Brand Logo" className="w-full h-full object-contain" />
+                            </div>
+                        )}
                     </div>
                 </div>
             </aside>
 
             {/* Mobile constraints structure for the main content */}
-            <main className="flex-1 flex justify-center lg:justify-start lg:p-10 min-h-screen">
+            <main className="flex-1 flex justify-center lg:justify-start lg:p-10 h-full overflow-hidden">
                 <div className="w-full h-full lg:max-w-6xl relative flex flex-col bg-cream lg:bg-transparent lg:rounded-none">
 
                     {/* Content Area */}

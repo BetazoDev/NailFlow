@@ -5,10 +5,16 @@ import { useEffect, useState } from 'react';
 interface SplashScreenProps {
     salonName?: string;
     tagline?: string;
+    logoUrl?: string; // New prop for branding
     onFinish: () => void;
 }
 
-export default function SplashScreen({ salonName = "L'Atelier Nails", tagline = 'Art at your fingertips', onFinish }: SplashScreenProps) {
+export default function SplashScreen({
+    salonName = "L'Atelier Nails",
+    tagline = 'Art at your fingertips',
+    logoUrl,
+    onFinish
+}: SplashScreenProps) {
     const [show, setShow] = useState(true);
 
     useEffect(() => {
@@ -28,13 +34,19 @@ export default function SplashScreen({ salonName = "L'Atelier Nails", tagline = 
                 pointerEvents: show ? 'auto' : 'none',
             }}
         >
-            {/* Nail brush icon */}
+            {/* Branding Logo or Brush icon */}
             <div className="mb-8 animate-scale-in" style={{ animationDuration: '0.6s' }}>
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                    <rect x="28" y="4" width="10" height="30" rx="5" fill="var(--pink)" opacity="0.7" transform="rotate(20 28 4)" />
-                    <ellipse cx="16" cy="38" rx="8" ry="5" fill="var(--coral)" opacity="0.6" />
-                    <rect x="20" y="20" width="6" height="16" rx="3" fill="var(--charcoal-light)" opacity="0.5" />
-                </svg>
+                {logoUrl ? (
+                    <div className="w-24 h-24 rounded-3xl overflow-hidden shadow-soft border-4 border-white">
+                        <img src={logoUrl} alt={salonName} className="w-full h-full object-cover" />
+                    </div>
+                ) : (
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                        <rect x="28" y="4" width="10" height="30" rx="5" fill="var(--pink)" opacity="0.7" transform="rotate(20 28 4)" />
+                        <ellipse cx="16" cy="38" rx="8" ry="5" fill="var(--coral)" opacity="0.6" />
+                        <rect x="20" y="20" width="6" height="16" rx="3" fill="var(--charcoal-light)" opacity="0.5" />
+                    </svg>
+                )}
             </div>
 
             {/* Salon name */}

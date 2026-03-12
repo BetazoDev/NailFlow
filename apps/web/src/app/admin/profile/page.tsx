@@ -7,7 +7,6 @@ import {
     updatePassword,
     EmailAuthProvider,
     reauthenticateWithCredential,
-    getAuth
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
@@ -18,8 +17,12 @@ export default function ProfilePage() {
     // Tenant Info
     const [salonName, setSalonName] = useState('');
     const [tagline, setTagline] = useState('');
+    const [currentBranding, setCurrentBranding] = useState<Record<string, unknown> | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [saveMsg, setSaveMsg] = useState('');
+    const logoRef = useRef<HTMLInputElement>(null);
 
     // Password
     const [currentPassword, setCurrentPassword] = useState('');
@@ -38,6 +41,8 @@ export default function ProfilePage() {
             if (tenant) {
                 setSalonName(tenant.name || '');
                 setTagline(tenant.branding?.tagline || '');
+                setLogoPreview(tenant.branding?.logo_url || null);
+                setCurrentBranding(tenant.branding);
             }
         });
     }, [tenantId]);
@@ -47,10 +52,25 @@ export default function ProfilePage() {
         setSaving(true);
         setSaveMsg('');
         try {
-            await api.updateTenant(tenantId, { name: salonName });
+            let finalLogoUrl = logoPreview || '';
+            if (logoFile) {
+                finalLogoUrl = await api.uploadImage(tenantId, 'branding', logoFile);
+                setLogoPreview(finalLogoUrl);
+            }
+
+            const updatedBranding = currentBranding
+                ? { ...currentBranding, logo_url: finalLogoUrl, tagline }
+                : { logo_url: finalLogoUrl, tagline, primary_color: '#C97794', secondary_color: '#F8D2D8' };
+
+            await api.updateTenant(tenantId, {
+                name: salonName,
+                branding: updatedBranding
+            });
+            setCurrentBranding(updatedBranding);
+
             setSaveMsg('¡Información actualizada con éxito!');
-        } catch (e) {
-            setSaveMsg('Error al guardar. Intenta de nuevo.');
+        } catch (e: unknown) {
+            setSaveMsg((e as Error).message || 'Error al guardar. Intenta de nuevo.');
         } finally {
             setSaving(false);
             setTimeout(() => setSaveMsg(''), 3000);
@@ -85,11 +105,12 @@ export default function ProfilePage() {
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
-        } catch (e: any) {
-            if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+        } catch (e: unknown) {
+            const firebaseError = e as { code?: string; message?: string };
+            if (firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/invalid-credential') {
                 setPwError('La contraseña actual es incorrecta.');
             } else {
-                setPwError(e.message || 'Error al cambiar la contraseña.');
+                setPwError(firebaseError.message || 'Error al cambiar la contraseña.');
             }
         } finally {
             setPwSaving(false);
@@ -137,6 +158,43 @@ export default function ProfilePage() {
             <div className="px-6">
                 {tab === 'info' && (
                     <div className="bg-white rounded-[2rem] p-8 border border-aesthetic-accent shadow-minimal space-y-6">
+                        <div className="space-y-4">
+                            <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Logotipo del negocio</label>
+                            <div className="flex items-center gap-6">
+                                <div className="relative cursor-pointer" onClick={() => logoRef.current?.click()}>
+                                    <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-aesthetic-accent/50 flex items-center justify-center bg-aesthetic-cream/40">
+                                        {logoPreview ? (
+                                            <img src={api.getPublicUrl(logoPreview)} alt="logo" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--aesthetic-muted)" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                        )}
+                                    </div>
+                                    <div className="absolute -bottom-1 -right-1 size-7 bg-aesthetic-pink rounded-full flex items-center justify-center border-2 border-white shadow-soft text-white">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+                                    </div>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs text-aesthetic-muted/80 leading-relaxed mb-1">
+                                        Sube el logotipo de tu salón para que aparezca en tu agenda pública y en la página de reservas.
+                                    </p>
+                                    <p className="text-[9px] font-bold text-aesthetic-pink tracking-widest uppercase">
+                                        JPG, PNG. max 2MB.
+                                    </p>
+                                </div>
+                            </div>
+                            <input
+                                type="file"
+                                ref={logoRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        setLogoFile(e.target.files[0]);
+                                        setLogoPreview(URL.createObjectURL(e.target.files[0]));
+                                    }
+                                }}
+                            />
+                        </div>
                         <div className="space-y-2">
                             <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Nombre del salón</label>
                             <input

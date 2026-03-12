@@ -124,7 +124,8 @@ export default function TeamPage() {
             setShowAddModal(false);
         } catch (e: any) {
             console.error('Error saving staff member:', e);
-            alert('Error al guardar: ' + (e.message || 'Error desconocido'));
+            const errorMsg = e.details || e.message || 'Error desconocido';
+            alert('Error al guardar: ' + errorMsg);
         } finally {
             setSaving(false);
         }

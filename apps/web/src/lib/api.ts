@@ -112,7 +112,6 @@ export const api = {
     },
 
     // Appointments & Booking
-    // Appointments & Booking
     getAppointments: async (): Promise<Appointment[]> => {
         return fetchApi('/api/appointments');
     },
@@ -136,6 +135,13 @@ export const api = {
     completeAppointment: async (id: string): Promise<void> => {
         return fetchApi(`/api/appointments/${id}/complete`, { method: 'POST' });
     },
+    updateAppointmentStatus: async (id: string, status: string): Promise<void> => {
+        return fetchApi(`/api/appointments/${id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+        });
+    },
     updateAppointmentImages: async (id: string, image_urls: string[]): Promise<void> => {
         return fetchApi(`/api/appointments/${id}/images`, {
             method: 'PATCH',
@@ -143,13 +149,14 @@ export const api = {
             body: JSON.stringify({ image_urls }),
         });
     },
-    holdSlot: async (date: string, time: string, holdId: string): Promise<void> => {
-        // Placeholder for demo
-        return Promise.resolve();
+
+    // Unused or unimplemented functions are stubbed here
+    holdTimeSlot: async (_date: string, _time: string, _holdId: string) => {
+        return { success: true };
     },
-    releaseSlot: async (date: string, time: string): Promise<void> => {
-        // Placeholder for demo
-        return Promise.resolve();
+
+    releaseTimeSlot: async (_date: string, _time: string) => {
+        return { success: true };
     },
 
     // CRM / Favorites
@@ -222,6 +229,8 @@ export const api = {
 
     getPublicUrl: (url: string | null | undefined, projectType: 'demo' | 'clients' = 'demo'): string => {
         if (!url) return '';
+        // If it's a blob URL (local preview), return as is
+        if (url.startsWith('blob:')) return url;
         // If it's already a full URL and has a token, return as is
         if (url.includes('api_key=') || url.includes('token=')) return url;
 

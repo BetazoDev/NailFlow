@@ -9,6 +9,167 @@ import { useTenant } from '@/lib/tenant-context';
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAY_SHORT = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 
+const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+    confirmed: { label: 'CONFIRMADA', color: 'var(--aesthetic-pink)', bg: 'var(--aesthetic-soft-pink)' },
+    pending_payment: { label: 'PENDIENTE', color: 'var(--aesthetic-taupe)', bg: 'var(--aesthetic-beige)' },
+    cancelled: { label: 'CANCELADA', color: 'var(--gray-light)', bg: 'var(--cream-dark)' },
+    completed: { label: 'COMPLETADA', color: '#88C999', bg: 'rgba(136, 201, 153, 0.1)' },
+};
+
+interface AppointmentDetailProps {
+    apt: Appointment;
+    service?: Service;
+    onClose: () => void;
+    onComplete: () => Promise<void>;
+}
+
+function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDetailProps) {
+    const [completing, setCompleting] = useState(false);
+    const s = STATUS_LABELS[apt.status] || STATUS_LABELS.pending_payment;
+    const startDate = new Date(apt.datetime_start);
+    const dateStr = startDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = startDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const duration = service?.duration_minutes || 60;
+    const advance = service ? Math.round(service.estimated_price * 0.4) : 0;
+    const total = service?.estimated_price || 0;
+    const balance = total - advance;
+
+    return (
+        <div className="fixed inset-0 z-50 flex justify-end animate-fade-in" onClick={onClose}>
+            <div className="absolute inset-0 bg-charcoal/30 backdrop-blur-sm" />
+            <div className="relative w-full max-w-md bg-cream h-full shadow-2xl animate-slide-in-right overflow-y-auto" onClick={e => e.stopPropagation()}>
+                {/* Top bar */}
+                <div className="flex items-center justify-between px-6 pt-6 pb-4">
+                    <button onClick={onClose} className="text-aesthetic-muted hover:text-aesthetic-taupe transition-colors">
+                        <span className="material-symbol font-light">arrow_back</span>
+                    </button>
+                    <button className="text-aesthetic-muted hover:text-aesthetic-taupe transition-colors">
+                        <span className="material-symbol font-light">more_horiz</span>
+                    </button>
+                </div>
+
+                {/* Client header */}
+                <div className="px-6 pb-6">
+                    <h1 className="font-display text-4xl font-light italic text-aesthetic-taupe mb-2 tracking-tight">{apt.client_name}</h1>
+                    <div className="flex items-center gap-3">
+                        <span className="text-[10px] tracking-[0.2em] uppercase font-bold px-3 py-1 rounded-full" style={{ background: s.bg, color: s.color }}>
+                            {s.label}
+                        </span>
+                        <span className="text-aesthetic-muted text-sm font-display italic tracking-wide">{service?.name || 'Servicio'}</span>
+                    </div>
+                </div>
+
+                {/* Details card */}
+                <div className="mx-6 bg-white/60 backdrop-blur-sm rounded-[2.5rem] border border-aesthetic-accent p-8 mb-5 shadow-minimal">
+                    <p className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase mb-6 font-display italic font-medium">Detalles del turno</p>
+                    <div className="grid grid-cols-2 gap-y-8 gap-x-4">
+                        <div>
+                            <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Fecha</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe capitalize leading-tight">{dateStr}</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Hora</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">{timeStr}</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Duración</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">{duration} min</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Estudio</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">Main Salon</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Reference photos */}
+                {(apt.image_url || (apt.image_urls && apt.image_urls.length > 0)) && (
+                    <div className="px-6 mb-5">
+                        <p className="text-[10px] tracking-[0.15em] text-nf-gray uppercase mb-3">Fotos de Referencia</p>
+                        <div className="flex gap-3 overflow-x-auto pb-2">
+                            {(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map((url, idx) => (
+                                <div key={idx} className="w-28 h-28 rounded-2xl overflow-hidden flex-shrink-0">
+                                    <img src={url} alt={`ref-${idx}`} className="w-full h-full object-cover" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Client notes */}
+                {apt.notes && (
+                    <div className="px-6 mb-5">
+                        <p className="text-[10px] tracking-[0.15em] text-nf-gray uppercase mb-3">Notas de la Clienta</p>
+                        <blockquote className="italic text-charcoal text-sm leading-relaxed border-l-2 pl-4" style={{ borderColor: 'var(--pink)' }}>
+                            &ldquo;{apt.notes}&rdquo;
+                        </blockquote>
+                    </div>
+                )}
+
+                {/* Payment info */}
+                {total > 0 && (
+                    <div className="mx-6 mb-5">
+                        <p className="text-[10px] tracking-[0.15em] text-nf-gray uppercase mb-3">Información de Pago</p>
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-nf-gray">Total Servicio</span>
+                                <span className="font-medium text-charcoal">${total}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-nf-gray flex items-center gap-1">
+                                    <span className="w-3 h-3 rounded-full bg-green-400 inline-block" />
+                                    Anticipo Pagado
+                                </span>
+                                <span className="font-medium text-charcoal">${advance}</span>
+                            </div>
+                            <div className="border-t border-cream-dark pt-2 flex justify-between">
+                                <span className="font-semibold text-charcoal">Saldo Pendiente</span>
+                                <span className="font-serif font-bold text-xl text-charcoal">${balance}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* WhatsApp CTA */}
+                <div className="px-6 pb-4">
+                    <a
+                        href={`https://wa.me/${apt.client_phone.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(apt.client_name)}%2C%20te%20recuerdo%20tu%20cita`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-5 rounded-full font-display italic text-lg tracking-wide border border-aesthetic-pink/20 bg-aesthetic-soft-pink text-aesthetic-taupe flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-minimal active:scale-[0.98]"
+                    >
+                        <span className="material-symbol text-xl">chat</span>
+                        Contactar por WhatsApp
+                    </a>
+                </div>
+
+                {apt.status !== 'completed' && apt.status !== 'cancelled' && (
+                    <div className="px-6 pb-4">
+                        <button
+                            onClick={async () => {
+                                setCompleting(true);
+                                await onComplete();
+                                setCompleting(false);
+                            }}
+                            disabled={completing}
+                            className="w-full py-5 rounded-full font-display italic text-lg tracking-wide bg-aesthetic-taupe text-white flex items-center justify-center gap-3 transition-all duration-300 hover:bg-black active:scale-[0.98] disabled:opacity-50"
+                        >
+                            {completing ? (
+                                <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <span className="material-symbol text-xl text-[#88C999]">check_circle</span>
+                                    Completar Cita
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function addDays(date: Date, n: number) {
     const d = new Date(date);
     d.setDate(d.getDate() + n);
@@ -24,14 +185,15 @@ export default function AgendaPage() {
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
     const [completing, setCompleting] = useState<string | null>(null);
     const { tenantId } = useTenant();
 
     useEffect(() => {
         if (!tenantId) return;
         Promise.all([
-            api.getAppointments(tenantId),
-            api.getServices(tenantId),
+            api.getAppointments(),
+            api.getServices(),
         ]).then(([apts, svcs]) => {
             setAppointments(apts);
             setServices(svcs);
@@ -52,7 +214,8 @@ export default function AgendaPage() {
         })
         .sort((a, b) => new Date(a.datetime_start).getTime() - new Date(b.datetime_start).getTime());
 
-    const dayEarnings = useMemo(() =>
+    // dayEarnings is calculated but used only if rendered later
+    const _dayEarnings = useMemo(() =>
         dayAppointments
             .filter(a => a.status === 'completed')
             .reduce((sum, a) => sum + (getService(a.service_id)?.estimated_price || 0), 0),
@@ -64,7 +227,7 @@ export default function AgendaPage() {
         if (!svc || !tenantId) return;
         setCompleting(apt.id);
         try {
-            await api.completeAppointment(tenantId, apt.id);
+            await api.completeAppointment(apt.id);
             setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'completed' as const } : a));
         } catch (e) {
             console.error('Error completing appointment:', e);
@@ -169,7 +332,10 @@ export default function AgendaPage() {
                                     </div>
 
                                     {/* Card */}
-                                    <div className={`bg-white rounded-[2rem] p-6 shadow-minimal border border-aesthetic-accent group-hover:border-aesthetic-pink/30 transition-all duration-500 ${isCompleted ? 'opacity-60 bg-aesthetic-cream/20' : ''}`}>
+                                    <button
+                                        onClick={() => setSelectedApt(apt)}
+                                        className={`w-full text-left bg-white rounded-[2rem] p-6 shadow-minimal border border-aesthetic-accent group-hover:border-aesthetic-pink/30 transition-all duration-500 ${isCompleted ? 'opacity-60 bg-aesthetic-cream/20' : ''}`}
+                                    >
                                         <div className="flex items-center justify-between gap-4">
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="font-display text-2xl italic text-aesthetic-taupe truncate mb-1">{apt.client_name}</h4>
@@ -193,7 +359,7 @@ export default function AgendaPage() {
                                                 </div>
                                             ) : isCompletable ? (
                                                 <button
-                                                    onClick={() => handleComplete(apt)}
+                                                    onClick={(e) => { e.stopPropagation(); handleComplete(apt); }}
                                                     disabled={completing === apt.id}
                                                     className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#88C999]/10 text-[#5a9a6a] hover:bg-[#88C999]/20 transition-all active:scale-95 disabled:opacity-50"
                                                 >
@@ -211,13 +377,23 @@ export default function AgendaPage() {
                                             )}
                                             <span className="text-sm font-semibold text-aesthetic-taupe">${svc?.estimated_price || 0}</span>
                                         </div>
-                                    </div>
+                                    </button>
                                 </div>
                             );
                         })}
                     </div>
                 )}
             </div>
+
+            {/* Appointment detail drawer */}
+            {selectedApt && (
+                <AppointmentDetail
+                    apt={selectedApt}
+                    service={getService(selectedApt.service_id)}
+                    onClose={() => setSelectedApt(null)}
+                    onComplete={() => handleComplete(selectedApt)}
+                />
+            )}
 
             {/* FAB */}
             <button className="fixed bottom-10 right-8 size-16 rounded-full bg-aesthetic-taupe text-white shadow-soft flex items-center justify-center group active:scale-95 transition-all z-40">

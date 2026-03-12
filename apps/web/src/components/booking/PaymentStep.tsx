@@ -41,28 +41,29 @@ export default function PaymentStep({ booking, pendingFiles, tenantId, onBooking
         setError(null);
 
         try {
+            // Step 1: Upload pending images to CDN (only if there are any)
+            const cdnUrls: string[] = [];
+            if (pendingFiles.length > 0) {
+                setLoadingMsg('Subiendo fotos de referencia...');
+                for (const file of pendingFiles) {
+                    const url = await api.uploadImage(tenantId, 'bookings', file, 'clients');
+                    cdnUrls.push(url);
+                }
+            }
+
             if (method === 'prueba') {
                 setLoadingMsg('Registrando tu cita...');
                 const bookingPayload = {
                     ...booking,
                     payment_method: method,
-                    image_urls: [], 
+                    image_urls: cdnUrls,
+                    image_url: cdnUrls[0] || undefined,
                 };
                 const result = await api.createBookingTest(bookingPayload);
                 setLoadingMsg('¡Cita confirmada!');
                 await new Promise(r => setTimeout(r, 300));
-                onBookingConfirmed(result.appointmentId, []);
+                onBookingConfirmed(result.appointmentId, cdnUrls);
             } else {
-                // Step 1: Upload pending images to CDN for synchronous methods (like card redirect)
-                let cdnUrls: string[] = [];
-                if (pendingFiles.length > 0) {
-                    setLoadingMsg('Subiendo fotos de referencia...');
-                    for (const file of pendingFiles) {
-                        const url = await api.uploadImage(tenantId, 'bookings', file, 'clients');
-                        cdnUrls.push(url);
-                    }
-                }
-
                 // Step 2: Create the booking with the CDN URLs
                 setLoadingMsg('Registrando tu cita...');
                 const bookingPayload = {
@@ -71,7 +72,7 @@ export default function PaymentStep({ booking, pendingFiles, tenantId, onBooking
                     image_urls: cdnUrls,
                     image_url: cdnUrls[0] || undefined,
                 };
-                
+
                 const result = await api.createBooking(bookingPayload as any);
                 if (result.init_point) {
                     window.location.href = result.init_point;
@@ -82,7 +83,8 @@ export default function PaymentStep({ booking, pendingFiles, tenantId, onBooking
             }
         } catch (e: any) {
             console.error('Error creating booking:', e);
-            setError(e.message || 'Error al procesar la reserva. Por favor intenta de nuevo.');
+            const errorMsg = e.details || e.message || 'Error al procesar la reserva. Por favor intenta de nuevo.';
+            setError(errorMsg);
             setLoadingMsg('');
         } finally {
             setLoading(false);
@@ -90,10 +92,10 @@ export default function PaymentStep({ booking, pendingFiles, tenantId, onBooking
     };
 
     const methods: { id: PaymentMethod; label: string; icon: string }[] = [
-        { id: 'prueba', label: 'PRUEBA', icon: 'test_confirmation' },
+        { id: 'prueba', label: 'PRUEBA', icon: 'verified' },
         { id: 'card', label: 'TARJETA', icon: 'credit_card' },
-        { id: 'apple', label: 'APPLE PAY', icon: 'apple' },
-        { id: 'google', label: 'GOOGLE PAY', icon: 'google' },
+        { id: 'apple', label: 'APPLE PAY', icon: 'token' },
+        { id: 'google', label: 'GOOGLE PAY', icon: 'contactless' },
         { id: 'stripe', label: 'STRIPE', icon: 'payments' },
         { id: 'paypal', label: 'PAYPAL', icon: 'account_balance_wallet' },
         { id: 'mercado', label: 'MERCADO', icon: 'storefront' },

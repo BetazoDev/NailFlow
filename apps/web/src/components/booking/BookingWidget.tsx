@@ -39,7 +39,14 @@ export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, 
     const currentIndex = STEPS.findIndex(s => s.id === currentStep);
 
     if (!splashDone) {
-        return <SplashScreen salonName={salonName} onFinish={() => setSplashDone(true)} />;
+        return (
+            <SplashScreen
+                salonName={salonName}
+                tagline={tenant.branding.tagline}
+                logoUrl={tenant.branding.logo_url ? api.getPublicUrl(tenant.branding.logo_url) : undefined}
+                onFinish={() => setSplashDone(true)}
+            />
+        );
     }
 
     return (
@@ -71,24 +78,28 @@ export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, 
                         </div>
                     </div>
 
-                    {/* Staff preview if provided */}
-                    {staffName && (
-                        <div className="mb-8 flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/10">
-                            <div className="size-10 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
-                                {staffPhoto ? (
-                                    <img src={staffPhoto} alt={staffName} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-xs font-serif text-white/60 bg-white/10">
-                                        {staffName.charAt(0).toUpperCase()}
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <p className="text-white/40 text-[9px] tracking-[0.2em] uppercase mb-0.5">Tu especialista</p>
-                                <p className="text-white text-sm font-medium capitalize">{staffName}</p>
-                            </div>
+                    {/* Staff or Business profile photo */}
+                    <div className="mb-8 flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/10">
+                        <div className="size-10 rounded-full overflow-hidden border border-white/20 flex-shrink-0 bg-white/10">
+                            {staffPhoto ? (
+                                <img src={staffPhoto} alt={staffName} className="w-full h-full object-cover" />
+                            ) : tenant.branding.photo_url ? (
+                                <img src={api.getPublicUrl(tenant.branding.photo_url)} alt="Business" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-xs font-serif text-white/60">
+                                    {staffName ? staffName.charAt(0).toUpperCase() : salonName.charAt(0)}
+                                </div>
+                            )}
                         </div>
-                    )}
+                        <div>
+                            <p className="text-white/40 text-[9px] tracking-[0.2em] uppercase mb-0.5">
+                                {staffName ? 'Tu especialista' : 'Tu salón'}
+                            </p>
+                            <p className="text-white text-sm font-medium capitalize truncate max-w-[150px]">
+                                {staffName || salonName}
+                            </p>
+                        </div>
+                    </div>
 
                     {/* Step indicators */}
                     <p className="text-[10px] tracking-[0.2em] text-white/30 uppercase font-semibold mb-5">

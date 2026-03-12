@@ -29,9 +29,9 @@ export default function ClientsPage() {
     useEffect(() => {
         if (!tenantId) return;
         Promise.all([
-            api.getAppointments(tenantId),
-            api.getServices(tenantId),
-            api.getFavorites(tenantId),
+            api.getAppointments(),
+            api.getServices(),
+            api.getFavorites(),
         ]).then(([apts, svcs, favs]) => {
             setAppointments(apts);
             setServices(svcs);
@@ -39,8 +39,20 @@ export default function ClientsPage() {
         }).finally(() => setLoading(false));
     }, [tenantId]);
 
-    const getServiceName = useCallback((id: string) => services.find(s => s.id === id)?.name || 'Servicio', [services]);
-    const getServicePrice = useCallback((id: string) => services.find(s => s.id === id)?.estimated_price || 0, [services]);
+    const getServiceName = useCallback((id: string, apt?: Appointment) => {
+        const svc = services.find(s => s.id === id);
+        if (svc) return svc.name;
+        if (apt?.service_name) return apt.service_name;
+        return 'Servicio';
+    }, [services]);
+
+    const getServicePrice = useCallback((id: string, apt?: Appointment) => {
+        const svc = services.find(s => s.id === id);
+        if (svc) return Number(svc.estimated_price) || 0;
+        if (apt?.service_price) return Number(apt.service_price) || 0;
+        if (apt?.price) return Number(apt.price) || 0;
+        return 0;
+    }, [services]);
 
     const clients: Client[] = useMemo(() => {
         const map = new Map<string, Client>();
@@ -48,10 +60,12 @@ export default function ClientsPage() {
             // Key by phone primarily, also check email for merging
             const key = apt.client_phone;
             const existing = map.get(key);
-            const svcName = getServiceName(apt.service_id);
+            const svcName = getServiceName(apt.service_id, apt);
+            const svcPrice = getServicePrice(apt.service_id, apt);
+
             if (existing) {
                 existing.visits += 1;
-                existing.totalSpent += getServicePrice(apt.service_id);
+                existing.totalSpent = Number(existing.totalSpent) + svcPrice;
                 if (apt.datetime_start > existing.lastVisit) {
                     existing.lastVisit = apt.datetime_start;
                     existing.lastService = svcName;
@@ -68,7 +82,7 @@ export default function ClientsPage() {
                     for (const [, client] of map) {
                         if (client.email === apt.client_email) {
                             client.visits += 1;
-                            client.totalSpent += getServicePrice(apt.service_id);
+                            client.totalSpent = Number(client.totalSpent) + svcPrice;
                             if (apt.datetime_start > client.lastVisit) {
                                 client.lastVisit = apt.datetime_start;
                                 client.lastService = svcName;
@@ -88,7 +102,7 @@ export default function ClientsPage() {
                         visits: 1,
                         lastVisit: apt.datetime_start,
                         lastService: svcName,
-                        totalSpent: getServicePrice(apt.service_id),
+                        totalSpent: svcPrice,
                         services: [svcName],
                         preferences: extras.preferences,
                         allergies: extras.allergies,
@@ -124,7 +138,7 @@ export default function ClientsPage() {
         if (!tenantId) return;
         const newState = !client.favorite;
         try {
-            await api.setFavorite(tenantId, client.phone, newState);
+            await api.setFavorite(client.phone, newState);
             setFavorites(prev => {
                 const next = new Set(prev);
                 if (newState) next.add(client.phone);
@@ -141,7 +155,7 @@ export default function ClientsPage() {
         return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '');
     };
 
-    const formatFullDate = (dateStr: string) => {
+    const _formatFullDate = (dateStr: string) => {
         const d = new Date(dateStr);
         return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
     };

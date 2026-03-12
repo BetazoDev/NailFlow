@@ -64,6 +64,7 @@ export default function BookingWizardPage() {
     const primaryStaff = staff[0];
 
     const bookingData: BookingData = useMemo(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = {
             tenant_id: tenant?.id || 'demo',
             date: selectedDate || '',
@@ -129,7 +130,7 @@ export default function BookingWizardPage() {
 
                     {/* Progress dots */}
                     <div className="flex items-center gap-1.5 mx-auto">
-                        {STEPS.filter(s => s !== 'confirmation').map((s, i) => {
+                        {STEPS.filter(s => s !== 'confirmation').map((s, _i) => {
                             const stepIdx = STEPS.indexOf(s);
                             const isActive = stepIdx === currentIndex;
                             const isCompleted = stepIdx < currentIndex;

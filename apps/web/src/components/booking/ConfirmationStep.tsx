@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { BookingData } from '@/lib/types';
-import { api } from '@/lib/api';
 
 interface ConfirmationStepProps {
     booking: BookingData;
@@ -18,58 +17,16 @@ function formatFullDate(dateStr: string) {
     return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-export default function ConfirmationStep({ booking, appointmentId, pendingFiles = [], tenantId, salonName = 'Ana Nails Studio' }: ConfirmationStepProps) {
-    const [saved, setSaved] = useState(!!appointmentId);
-    const [saving, setSaving] = useState(!appointmentId);
-    const [uploadingImages, setUploadingImages] = useState(false);
-    const [error, setError] = useState('');
+export default function ConfirmationStep({ booking, salonName = 'Ana Nails Studio' }: ConfirmationStepProps) {
+    const [saved, setSaved] = useState(false);
+    const [saving] = useState(false);
+    const [error] = useState('');
 
     useEffect(() => {
-        // If appointment already created (e.g. from PaymentStep), don't create again
-        if (appointmentId || saved || saving || error) return;
-
-        async function saveAppointment() {
-            setSaving(true);
-            try {
-                // Use the API helper for consistency
-                await api.createBooking(booking);
-                setSaved(true);
-            } catch (e) {
-                console.error('Failed to save appointment:', e);
-                setError('No se pudo guardar la cita. Por favor intenta de nuevo.');
-            } finally {
-                setSaving(false);
-            }
-        }
-
-        saveAppointment();
-    }, [booking, appointmentId, saved, saving, error]);
-
-    useEffect(() => {
-        if (appointmentId && pendingFiles.length > 0 && tenantId) {
-            let mounted = true;
-            async function uploadImagesInBackground() {
-                setUploadingImages(true);
-                try {
-                    let cdnUrls: string[] = [];
-                    for (const file of pendingFiles) {
-                        const url = await api.uploadImage(tenantId!, 'bookings', file, 'clients');
-                        cdnUrls.push(url);
-                    }
-                    if (cdnUrls.length > 0 && mounted) {
-                        await api.updateAppointmentImages(appointmentId!, cdnUrls);
-                    }
-                } catch (e) {
-                    console.error('Failed to upload background images:', e);
-                } finally {
-                    if (mounted) setUploadingImages(false);
-                }
-            }
-            uploadImagesInBackground();
-            
-            return () => { mounted = false; };
-        }
-    }, [appointmentId, pendingFiles, tenantId]);
+        // Booking is now saved in PaymentStep to avoid partial states
+        // This component just displays the result.
+        setSaved(true);
+    }, []);
 
     if (error) {
         return (
@@ -182,6 +139,20 @@ export default function ConfirmationStep({ booking, appointmentId, pendingFiles 
                             </div>
                             <span className="text-[9px] font-bold text-pink uppercase tracking-widest">Confirmado</span>
                         </div>
+
+                        {(booking.image_urls && booking.image_urls.length > 0) && (
+                            <div className="pt-6 border-t border-cream-dark/30">
+                                <p className="text-[9px] font-bold text-nf-gray uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+                                    Inspiración
+                                </p>
+                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                    {booking.image_urls.map((url, i) => (
+                                        <img key={i} src={url} alt="" className="w-12 h-12 rounded-xl object-cover border border-cream-dark shadow-sm" />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Scalloped edge effect */}

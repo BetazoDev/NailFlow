@@ -79,6 +79,8 @@ export interface Appointment {
   datetime_start: string;
   datetime_end: string;
   price?: number;
+  service_name?: string;
+  service_price?: number;
   image_url?: string;
   image_urls?: string[];
   notes?: string;

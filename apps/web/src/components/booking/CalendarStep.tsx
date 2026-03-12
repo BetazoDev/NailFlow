@@ -11,7 +11,7 @@ interface CalendarStepProps {
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAY_NAMES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 
-export default function CalendarStep({ selectedDate, onSelect, onNext }: CalendarStepProps) {
+export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext }: CalendarStepProps) {
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today.getMonth());
     const [currentYear, setCurrentYear] = useState(today.getFullYear());

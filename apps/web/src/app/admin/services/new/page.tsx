@@ -20,6 +20,7 @@ function NewServiceContent() {
     const [price, setPrice] = useState('');
     const [duration, setDuration] = useState(60);
     const [category, setCategory] = useState('');
+    const [existingCategories, setExistingCategories] = useState<string[]>([]);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
@@ -28,23 +29,29 @@ function NewServiceContent() {
     const { tenantId } = useTenant();
 
     useEffect(() => {
-        if (id && tenantId) {
+        if (tenantId) {
             setLoading(true);
             api.getServices()
                 .then(services => {
-                    const data = services.find(s => s.id === id);
-                    if (data) {
-                        setName(data.name || '');
-                        setDescription(data.description || '');
-                        setPrice(data.estimated_price?.toString() || '');
-                        setDuration(data.duration_minutes || 60);
-                        setCategory(data.category || '');
-                        setImagePreview(data.image_url || null);
+                    // Extract unique categories
+                    const cats = Array.from(new Set(services.map(s => s.category).filter(Boolean) as string[]));
+                    setExistingCategories(cats);
+
+                    if (id) {
+                        const data = services.find(s => s.id === id);
+                        if (data) {
+                            setName(data.name || '');
+                            setDescription(data.description || '');
+                            setPrice(data.estimated_price?.toString() || '');
+                            setDuration(data.duration_minutes || 60);
+                            setCategory(data.category || '');
+                            setImagePreview(data.image_url || null);
+                        }
                     }
                 })
                 .finally(() => setLoading(false));
         }
-    }, [id]);
+    }, [id, tenantId]);
 
     const handleImage = (files: FileList | null) => {
         if (!files || files.length === 0) return;
@@ -99,7 +106,7 @@ function NewServiceContent() {
             router.refresh();
         } catch (error: any) {
             console.error('Error saving service:', error);
-            setError(error.message || 'Error al guardar el servicio. Intenta de nuevo.');
+            setError(error.details || error.message || 'Error al guardar el servicio. Intenta de nuevo.');
         } finally {
             setSaving(false);
         }
@@ -162,12 +169,21 @@ function NewServiceContent() {
                         {/* Category */}
                         <div className="space-y-2">
                             <label className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Categoría</label>
-                            <input
-                                className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 text-base font-display italic shadow-minimal transition-all placeholder:text-aesthetic-muted/30"
-                                placeholder="ej. Manicura, Pedicura, etc."
-                                value={category}
-                                onChange={e => setCategory(e.target.value)}
-                            />
+                            <div className="relative">
+                                <input
+                                    list="categories"
+                                    className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 text-base font-display italic shadow-minimal transition-all placeholder:text-aesthetic-muted/30"
+                                    placeholder="Selecciona o escribe una categoría"
+                                    value={category}
+                                    onChange={e => setCategory(e.target.value)}
+                                />
+                                <datalist id="categories">
+                                    {existingCategories.map(cat => (
+                                        <option key={cat} value={cat} />
+                                    ))}
+                                </datalist>
+                                <span className="material-symbol absolute right-4 top-1/2 -translate-y-1/2 text-aesthetic-muted/30 pointer-events-none">expand_more</span>
+                            </div>
                         </div>
 
                         {/* Description */}
