@@ -115,8 +115,9 @@ export const api = {
     getAppointments: async (): Promise<Appointment[]> => {
         return fetchApi('/api/appointments');
     },
-    getAvailability: async (staffId: string, date: string): Promise<TimeSlot[]> => {
-        return fetchApi(`/api/availability?date=${date}&staff_id=${staffId}`);
+    getAvailability: async (staffId: string, date: string, serviceId?: string): Promise<TimeSlot[]> => {
+        const url = `/api/availability?date=${date}&staff_id=${staffId}${serviceId ? `&service_id=${serviceId}` : ''}`;
+        return fetchApi(url);
     },
     createBooking: async (data: BookingData): Promise<{ appointmentId: string; init_point: string }> => {
         return fetchApi('/api/bookings', {
@@ -150,13 +151,21 @@ export const api = {
         });
     },
 
-    // Unused or unimplemented functions are stubbed here
-    holdTimeSlot: async (_date: string, _time: string, _holdId: string) => {
-        return { success: true };
+    // Hold & Release Slots (Concurrency)
+    holdSlot: async (date: string, time: string, holdId: string, staffId: string = 'general') => {
+        return fetchApi('/api/availability/hold', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, time, hold_id: holdId, staff_id: staffId }),
+        });
     },
 
-    releaseTimeSlot: async (_date: string, _time: string) => {
-        return { success: true };
+    releaseSlot: async (date: string, time: string, holdId: string) => {
+        return fetchApi('/api/availability/release', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, time, hold_id: holdId }),
+        });
     },
 
     // CRM / Favorites

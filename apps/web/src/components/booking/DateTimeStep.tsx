@@ -13,55 +13,53 @@ interface DateTimeStepProps {
     onBack?: () => void;
     tenantId?: string;
     staffId?: string;
+    serviceId?: string;
 }
 
-export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect, onTimeSelect, onNext, onBack, tenantId = 'demo', staffId }: DateTimeStepProps) {
+export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect, onTimeSelect, onNext, onBack, tenantId = 'demo', staffId, serviceId }: DateTimeStepProps) {
     return (
-        <div className="flex flex-col min-h-full animate-fade-in-up" style={{ background: 'var(--cream)' }}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-2">
-                {onBack && (
-                    <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-pink transition-colors group">
-                        <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        <div className="flex flex-col h-full overflow-hidden animate-fade-in-up" style={{ background: 'var(--cream)' }}>
+            {/* STICKY HEADER */}
+            <div className="flex-none bg-white/80 backdrop-blur-md border-b border-cream-dark/50 z-20">
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                        {onBack ? (
+                            <button onClick={onBack} className="w-10 h-10 rounded-full bg-cream flex items-center justify-center text-nf-gray hover:text-pink transition-all border border-cream-dark/50 shadow-sm">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                            </button>
+                        ) : <div className="w-10" />}
+                        
+                        <div className="flex gap-1.5 bg-cream px-3 py-1.5 rounded-full border border-cream-dark/50">
+                            {[1, 2, 3, 4, 5, 6].map((i) => (
+                                <div key={i} className={`w-2 h-2 rounded-full transition-all duration-500 ${i === 3 ? 'bg-pink scale-125' : (i < 3 ? 'bg-pink/40' : 'bg-cream-dark opacity-40')}`} />
+                            ))}
                         </div>
-                    </button>
-                )}
-                <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-cream-dark opacity-30" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-cream-dark opacity-30" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-cream-dark opacity-30" />
+                        <div className="w-10" />
+                    </div>
+                    <p className="text-[10px] tracking-[0.25em] text-pink uppercase font-black mb-1">Paso 3: Disponibilidad</p>
+                    <h1 className="font-serif text-3xl lg:text-4xl text-charcoal leading-tight">
+                        Elige tu <span className="text-pink italic">momento</span>
+                    </h1>
                 </div>
             </div>
 
-            <div className="px-6 pt-4 pb-2">
-                <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 3: Disponibilidad</p>
-                <h1 className="font-serif text-3xl text-charcoal leading-tight">
-                    Elige tu <span className="text-pink">momento</span>
-                </h1>
-                <div className="w-8 h-px bg-pink mt-3" />
-            </div>
-
-            {/* Calendar */}
-            <div className="px-6 py-6 overflow-y-auto flex-1">
+            {/* SCROLLABLE CONTENT */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {!selectedDate ? (
-                    <div className="stagger-children">
+                    <div className="p-6 stagger-children">
                         <CalendarStep
                             selectedDate={selectedDate}
                             onSelect={onDateSelect}
                         />
-                        <div className="mt-8 p-6 rounded-[2rem] bg-pink-pale/30 border border-pink-light/20 flex gap-4 items-start">
-                            <span className="text-2xl">⏳</span>
-                            <p className="text-[11px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider">
-                                Selecciona un día disponible para ver los horarios que tenemos preparados para ti.
+                        <div className="mt-8 p-6 rounded-[2.5rem] bg-white border border-cream-dark/50 shadow-sm flex gap-4 items-center">
+                            <div className="w-12 h-12 rounded-2xl bg-pink/5 flex items-center justify-center text-2xl">⏳</div>
+                            <p className="text-[11px] text-nf-gray font-bold uppercase tracking-wider leading-relaxed">
+                                Selecciona un día disponible para ver <span className="text-pink">horarios libres</span>.
                             </p>
                         </div>
                     </div>
                 ) : (
-                    <div className="-mx-6">
+                    <div className="animate-fade-in">
                         <TimeSlotStep
                             selectedDate={selectedDate}
                             selectedTime={selectedTime}
@@ -70,17 +68,20 @@ export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect,
                             onBack={() => onDateSelect('')}
                             tenantId={tenantId}
                             staffId={staffId}
+                            serviceId={serviceId}
                         />
                     </div>
                 )}
             </div>
 
-            {/* Progress counter */}
-            <div className="px-6 pb-12 pt-4">
-                <p className="text-center text-[10px] tracking-[0.2em] text-gray-light uppercase font-bold">
-                    PASO 3 DE 5
-                </p>
-            </div>
+            {/* STICKY PROGRESS INDICATOR (If no time selected yet, otherwise TimeSlotStep handles the CTA) */}
+            {!selectedTime && (
+                <div className="flex-none p-4 bg-white/50 backdrop-blur-sm border-t border-cream-dark/20 text-center">
+                    <p className="text-[9px] tracking-[0.3em] text-nf-gray/40 uppercase font-black">
+                        PROGRESO DE RESERVA: 50%
+                    </p>
+                </div>
+            )}
         </div>
     );
 }

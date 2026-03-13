@@ -47,69 +47,86 @@ export default async function StaffBookingPage({ params }: Props) {
     const staffPhoto = staffMember?.photo_url || undefined;
 
     return (
-        <div className="min-h-screen bg-cream lg:flex lg:items-center lg:justify-center p-0 md:p-4 lg:p-8" style={({
+        <div className="min-h-screen bg-cream lg:h-screen lg:overflow-hidden p-0 md:p-0 lg:p-0" style={({
             ...cssVars.split(';').reduce((acc: Record<string, string>, curr) => {
                 const [k, v] = curr.split(':');
                 if (k && v) acc[k.trim()] = v.trim();
                 return acc;
             }, {}), '--font-display': typo.fontDisplay, '--font-sans': typo.fontSans
         }) as React.CSSProperties}>
-            {/* Container: Full width mobile, split card on desktop */}
-            <div className="w-full h-screen md:h-auto lg:max-w-6xl md:bg-white md:rounded-[32px] md:shadow-2xl overflow-hidden relative flex flex-col lg:flex-row md:min-h-[85vh] md:max-h-[900px]">
+            {/* Main Layout Container */}
+            <div className="w-full h-full flex flex-col lg:flex-row overflow-hidden">
 
-                {/* Left Side (Desktop) / Header (Mobile) */}
+                {/* Left Side (Desktop Sidebar) / Header (Mobile) */}
                 <div
-                    className="px-6 pt-12 pb-8 lg:p-16 lg:w-[45%] flex flex-col justify-end lg:justify-center relative z-10 shadow-[0_4px_32px_rgba(0,0,0,0.05)] lg:shadow-[32px_0_32px_rgba(0,0,0,0.02)]"
-                    style={{ background: 'linear-gradient(160deg, var(--cream) 0%, var(--pink-pale) 40%, var(--cream-dark) 100%)' }}
+                    className="w-full lg:w-[40%] xl:w-[35%] lg:h-screen flex flex-col relative z-20 shadow-xl overflow-y-auto no-scrollbar"
+                    style={{ background: 'linear-gradient(165deg, var(--cream) 0%, var(--pink-pale) 40%, var(--cream-dark) 100%)' }}
                 >
-                    <div className="lg:max-w-sm">
-                        <div
-                            className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden mb-6"
-                            style={{ background: `linear-gradient(135deg, ${tenant.branding.primary_color}, ${tenant.branding.secondary_color})` }}
-                        >
-                            {tenant.branding.logo_url ? (
-                                <img src={api.getPublicUrl(tenant.branding.logo_url)} className="w-full h-full object-cover" alt="Logo" />
-                            ) : (
-                                <span className="font-serif text-3xl text-white uppercase">{tenant.domain.charAt(0)}</span>
+                    <div className="flex-1 px-8 pt-12 pb-24 lg:p-16 flex flex-col justify-center">
+                        <div className="lg:max-w-sm mx-auto lg:mx-0">
+                            <div
+                                className="w-20 h-20 lg:w-24 lg:h-24 rounded-3xl flex items-center justify-center shadow-2xl overflow-hidden mb-8 transform -rotate-3 hover:rotate-0 transition-transform duration-500"
+                                style={{ background: `linear-gradient(135deg, ${tenant.branding.primary_color}, ${tenant.branding.secondary_color})` }}
+                            >
+                                {tenant.branding.logo_url ? (
+                                    <img src={api.getPublicUrl(tenant.branding.logo_url)} className="w-full h-full object-cover" alt="Logo" />
+                                ) : (
+                                    <span className="font-serif text-4xl text-white uppercase">{tenant.domain.charAt(0)}</span>
+                                )}
+                            </div>
+                            <h1 className="font-serif text-4xl lg:text-6xl font-bold text-charcoal mb-4 uppercase tracking-tight leading-none">{tenant.name || tenant.domain.split('.')[0]}</h1>
+                            
+                            <div className="h-1 w-20 bg-pink rounded-full mb-6" />
+
+                            <p className="text-base lg:text-xl text-charcoal-light font-medium max-w-[320px] mb-8 leading-relaxed">
+                                Agenda tu experiencia personalizada con <span className="font-bold text-pink border-b-2 border-pink/20 pb-0.5 capitalize">{staffName}</span>
+                            </p>
+
+                            {staffPhoto && (
+                                <div className="flex items-center gap-4 p-4 rounded-3xl bg-white/40 border border-white/60 backdrop-blur-md shadow-sm transition-all hover:shadow-md hover:bg-white/60">
+                                    <div className="size-14 rounded-full overflow-hidden border-2 border-white shadow-soft">
+                                        <img src={api.getPublicUrl(staffPhoto)} alt={staffName} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-charcoal uppercase tracking-wider capitalize">{staffName}</p>
+                                        <p className="text-xs text-charcoal-light italic font-medium">Especialista Senior</p>
+                                    </div>
+                                    <div className="ml-auto w-8 h-8 rounded-full bg-pink/10 flex items-center justify-center text-pink">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                    </div>
+                                </div>
                             )}
                         </div>
-                        <h1 className="font-serif text-3xl lg:text-5xl font-semibold text-charcoal mb-3 uppercase truncate">{tenant.name || tenant.domain.split('.')[0]}</h1>
-                        <p className="text-sm lg:text-lg text-charcoal-light font-medium max-w-[280px] mb-2">
-                            Agenda tu cita interactiva con <span className="font-semibold text-pink capitalize">{staffName}</span>
-                        </p>
-                        {staffPhoto && (
-                            <div className="mt-4 flex items-center gap-3">
-                                <div className="size-12 rounded-full overflow-hidden border-2 border-white shadow-soft">
-                                    <img src={api.getPublicUrl(staffPhoto)} alt={staffName} className="w-full h-full object-cover" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold text-charcoal capitalize">{staffName}</p>
-                                    <p className="text-xs text-charcoal-light italic">Tu especialista</p>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
-                    {/* Decorative elements for desktop */}
-                    <div className="hidden lg:block absolute top-[10%] right-[10%] w-32 h-32 rounded-full bg-pink-light/30 blur-3xl pointer-events-none" />
-                    <div className="hidden lg:block absolute bottom-[10%] left-[10%] w-48 h-48 rounded-full bg-coral-light/20 blur-3xl pointer-events-none" />
+                    {/* Fixed Bottom Banner for Sidebar */}
+                    <div className="sticky bottom-0 left-0 right-0 p-6 lg:p-8 bg-white/20 backdrop-blur-sm border-t border-white/40">
+                        <div className="flex items-center gap-3 justify-center lg:justify-start">
+                            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                            </div>
+                            <p className="text-[11px] font-bold text-charcoal uppercase tracking-[0.1em]">Reserva 100% segura</p>
+                        </div>
+                    </div>
+
+                    {/* Decorative elements */}
+                    <div className="hidden lg:block absolute top-[5%] right-[-5%] w-64 h-64 rounded-full bg-pink-light/20 blur-[100px] pointer-events-none" />
                 </div>
 
-                {/* Right Side (Desktop) / Wizard (Mobile) */}
-                <div className="flex-1 bg-white flex flex-col pt-4 lg:pt-0">
-                    <div className="flex-1 w-full max-w-xl mx-auto lg:p-4">
-                        <div className="h-full lg:max-h-[800px] lg:h-[85vh] bg-white lg:border lg:border-cream-dark/40 lg:rounded-3xl lg:shadow-xl lg:mt-6 overflow-hidden flex flex-col">
-                            <BookingWizard
-                                tenantId={tenant.id}
-                                staffId={staffId}
-                                staffName={staffName}
-                                staffPhoto={staffPhoto}
-                                salonName={tenant.name}
-                            />
-                        </div>
+                {/* Right Side (Booking Area) */}
+                <div className="flex-1 lg:h-screen overflow-hidden bg-white flex flex-col relative">
+                    <div className="flex-1 w-full max-w-2xl mx-auto h-full overflow-y-auto no-scrollbar lg:custom-scrollbar">
+                        <BookingWizard
+                            tenantId={tenant.id}
+                            staffId={staffId}
+                            staffName={staffName}
+                            staffPhoto={staffPhoto}
+                            salonName={tenant.name}
+                        />
                     </div>
                 </div>
             </div>
         </div>
     );
+}
 }
