@@ -129,4 +129,3 @@ export default async function StaffBookingPage({ params }: Props) {
         </div>
     );
 }
-}
