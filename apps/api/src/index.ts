@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import { getTenantByDomain, getTenantById } from './tenant';
 import { db } from './lib/firebase';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { query } from './lib/db';
+import { DateTime } from 'luxon';
 import { initDb } from './init-db';
 import crypto from 'crypto';
 
@@ -290,54 +291,86 @@ apiRouter.patch('/appointments/:id/images', async (req, res) => {
 
 // Endpoint: Get Availability
 apiRouter.get('/availability', async (req, res) => {
-    const { date, staff_id } = req.query;
+    const { date, staff_id, service_id } = req.query;
     // @ts-ignore
     const tenantId = req.tenant.id;
 
     if (!date) return res.status(400).json({ error: 'Date is required' });
 
     try {
-        // Query booked times, converting to Mexico City timezone for comparison
-        const result = await query(
-            `SELECT TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'HH24:MI') as time 
-             FROM appointments 
-             WHERE tenant_id = $1 
-             AND TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD') = $2 
-             AND status IN ('confirmed', 'pending_payment')`,
-            [tenantId, date]
-        );
-        const bookedTimes = new Set(result.rows.map(r => r.time));
+        let requestedDuration = 60; // Default fallback
 
-        // Get "Now" in Mexico City
-        const nowInCDMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
-        const bufferLimit = new Date(nowInCDMX.getTime() + 3 * 60 * 60 * 1000);
+        if (service_id) {
+            const svcRes = await query('SELECT duration_minutes FROM services WHERE id = $1 AND tenant_id = $2', [service_id, tenantId]);
+            if (svcRes.rowCount && svcRes.rowCount > 0 && svcRes.rows[0].duration_minutes > 0) {
+                requestedDuration = Number(svcRes.rows[0].duration_minutes);
+            }
+        }
+        
+        let workingHours = { start: '09:00', end: '21:00' };
 
-        // Requested date as YYYY-MM-DD
-        const requestedDate = date as string;
-
-        const slots = [];
-        for (let h = 9; h < 21; h++) {
-            for (const min of [0, 30]) {
-                const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-
-                // Construct a Date object for the slot in CDMX
-                const slotDateTime = new Date(`${requestedDate}T${time}:00`);
-                // Since 'new Date(string)' assumes local time if no TZ, and server might be UTC, 
-                // we should be careful. Better way:
-                const [year, month, day] = requestedDate.split('-').map(Number);
-                const slotDate = new Date(year, month - 1, day, h, min);
-
-                // But wait, the comparison should be in CDMX time.
-                // If nowInCDMX is already local to CDMX, and we construct slotDate as local, 
-                // the comparison is safe as long as they are on the SAME machine or handled as timestamps.
-
-                if (slotDate < bufferLimit) continue;
-
-                if (!bookedTimes.has(time)) {
-                    slots.push({ time, available: true });
+        if (staff_id) {
+            const staffRes = await query(`SELECT weekly_schedule FROM staff WHERE id = $1 AND tenant_id = $2`, [staff_id, tenantId]);
+            if (staffRes.rowCount && staffRes.rowCount > 0 && staffRes.rows[0].weekly_schedule) {
+                const schedule = staffRes.rows[0].weekly_schedule;
+                const dt = DateTime.fromISO(date as string, { zone: 'America/Mexico_City' });
+                const dayName = dt.setLocale('en').toFormat('EEEE').toLowerCase(); // e.g., 'monday'
+                
+                if (schedule[dayName]) {
+                    if (!schedule[dayName].active) {
+                        return res.json([]); // Staff is out
+                    }
+                    if (schedule[dayName].start && schedule[dayName].end) {
+                        workingHours = { start: schedule[dayName].start, end: schedule[dayName].end };
+                    }
                 }
             }
         }
+
+        const result = await query(
+            `SELECT datetime_start, datetime_end 
+             FROM appointments 
+             WHERE tenant_id = $1 AND (staff_id = $2 OR $2 IS NULL)
+             AND TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD') = $3 
+             AND status IN ('confirmed', 'pending_payment')`,
+            [tenantId, staff_id || null, date]
+        );
+
+        const appointments = result.rows.map(r => ({
+            start: DateTime.fromJSDate(r.datetime_start).setZone('America/Mexico_City'),
+            end: DateTime.fromJSDate(r.datetime_end).setZone('America/Mexico_City')
+        }));
+
+        const nowInCDMX = DateTime.now().setZone('America/Mexico_City');
+        const bufferLimit = nowInCDMX.plus({ hours: 3 });
+
+        const slots = [];
+        const dtBase = DateTime.fromISO(date as string, { zone: 'America/Mexico_City' });
+        
+        const [startH, startM] = workingHours.start.split(':').map(Number);
+        const [endH, endM] = workingHours.end.split(':').map(Number);
+        const startTimeIndex = startH * 60 + startM;
+        const endTimeIndex = endH * 60 + endM;
+
+        for (let minOffset = startTimeIndex; minOffset <= endTimeIndex - requestedDuration; minOffset += 30) {
+            const slotH = Math.floor(minOffset / 60);
+            const slotM = minOffset % 60;
+            
+            const slotStart = dtBase.set({ hour: slotH, minute: slotM });
+            const slotEnd = slotStart.plus({ minutes: requestedDuration });
+
+            if (slotStart < bufferLimit) continue; // Buffer limit passed
+
+            const hasOverlap = appointments.some(apt => slotStart < apt.end && slotEnd > apt.start);
+
+            if (!hasOverlap) {
+                slots.push({
+                    time: slotStart.toFormat('HH:mm'),
+                    available: true
+                });
+            }
+        }
+
         res.json(slots);
     } catch (e) {
         console.error('Failed to fetch availability:', e);
@@ -463,13 +496,22 @@ apiRouter.post('/webhooks/mercadopago', async (req, res) => {
 
     if (type === 'payment') {
         try {
-            // Usually we'd fetch details from MP with data.id here.
-            // For now, let's just mark the reference as paid if we can find it.
-            // External reference was appointment.id
             const paymentId = data.id;
+            console.log(`Payment incoming webhook hit: ${paymentId}`);
 
-            // Note: In real scenarios, MP sends a notification, then you GET the payment to see external_reference
-            console.log(`Payment incoming: ${paymentId}`);
+            const payment = new Payment(mpClient);
+            const paymentData = await payment.get({ id: paymentId });
+            
+            if (paymentData.status === 'approved' && paymentData.external_reference) {
+                console.log(`Payment ${paymentId} approved for appointment ${paymentData.external_reference}`);
+                
+                await query(
+                    `UPDATE appointments SET status = 'confirmed', advance_paid = true WHERE id = $1`,
+                    [paymentData.external_reference]
+                );
+            } else {
+                console.log(`Payment ${paymentId} status: ${paymentData.status}`);
+            }
         } catch (e) {
             console.error('Webhook processing failed:', e);
         }

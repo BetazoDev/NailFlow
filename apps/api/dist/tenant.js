@@ -5,7 +5,7 @@ exports.getTenantById = getTenantById;
 const db_1 = require("./lib/db");
 async function getTenantByDomain(domain) {
     let searchDomain = domain;
-    if (domain.includes('localhost')) {
+    if (domain.includes('localhost') || domain === 'api-demo.diabolicalservices.tech') {
         searchDomain = 'demo.diabolicalservices.tech';
     }
     const res = await (0, db_1.query)('SELECT * FROM tenants WHERE domain = $1', [searchDomain]);

@@ -115,8 +115,9 @@ export const api = {
     getAppointments: async (): Promise<Appointment[]> => {
         return fetchApi('/api/appointments');
     },
-    getAvailability: async (staffId: string, date: string): Promise<TimeSlot[]> => {
-        return fetchApi(`/api/availability?date=${date}&staff_id=${staffId}`);
+    getAvailability: async (staffId: string, date: string, serviceId?: string): Promise<TimeSlot[]> => {
+        const svcParam = serviceId ? `&service_id=${serviceId}` : '';
+        return fetchApi(`/api/availability?date=${date}&staff_id=${staffId}${svcParam}`);
     },
     createBooking: async (data: BookingData): Promise<{ appointmentId: string; init_point: string }> => {
         return fetchApi('/api/bookings', {

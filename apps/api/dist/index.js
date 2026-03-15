@@ -8,6 +8,7 @@ const cors_1 = __importDefault(require("cors"));
 const tenant_1 = require("./tenant");
 const mercadopago_1 = require("mercadopago");
 const db_1 = require("./lib/db");
+const luxon_1 = require("luxon");
 const init_db_1 = require("./init-db");
 const crypto_1 = __importDefault(require("crypto"));
 // Initialize MP Client 
@@ -16,21 +17,37 @@ const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
+let tenantBranding = {};
 // Initialize DB schema
 (0, init_db_1.initDb)().catch(console.error);
-let tenantBranding = {};
+// Helper for safe UUID generation
+const getUUID = () => {
+    try {
+        return crypto_1.default.randomUUID();
+    }
+    catch (e) {
+        return crypto_1.default.randomBytes(16).toString('hex');
+    }
+};
 // Middleware to extract tenant from request
 app.use(async (req, res, next) => {
-    // Skip tenant domain resolution for webhooks
-    if (req.path.startsWith('/api/webhooks')) {
+    // Basic request logging
+    console.log(`[API Request] ${req.method} ${req.url}`, {
+        host: req.headers.host,
+        tenantDomain: req.headers['x-tenant-domain'],
+        tenantId: req.headers['x-tenant-id']
+    });
+    // Skip tenant domain resolution for webhooks and health
+    const skipPaths = ['/health', '/api/webhooks', '/api/health'];
+    if (skipPaths.some(p => req.path.startsWith(p))) {
         return next();
     }
-    const tenantDomain = (req.headers['x-tenant-domain'] || req.query.domain);
+    const tenantDomain = (req.headers['x-tenant-domain'] || req.query.domain || req.headers.host);
     const tenantId = (req.headers['x-tenant-id'] || req.query.id);
     const ownerId = req.query.owner_id;
     try {
         let tenant = null;
-        if (tenantId) {
+        if (tenantId && tenantId !== 'undefined') {
             tenant = await (0, tenant_1.getTenantById)(tenantId);
         }
         else if (ownerId) {
@@ -38,7 +55,17 @@ app.use(async (req, res, next) => {
             tenant = res.rows.length > 0 ? res.rows[0] : null;
         }
         else {
-            tenant = await (0, tenant_1.getTenantByDomain)(tenantDomain || 'demo.diabolicalservices.tech');
+            // Clean domain (remove port if present)
+            const cleanDomain = tenantDomain?.split(':')[0] || 'demo.diabolicalservices.tech';
+            tenant = await (0, tenant_1.getTenantByDomain)(cleanDomain);
+            // Fallback for demo if still not found
+            if (!tenant && (cleanDomain.includes('diabolicalservices.tech') || cleanDomain.includes('localhost'))) {
+                tenant = await (0, tenant_1.getTenantById)('demo-tenant');
+            }
+        }
+        if (!tenant) {
+            console.warn(`Tenant not found for: ${tenantDomain || tenantId}. Falling back to demo.`);
+            tenant = await (0, tenant_1.getTenantById)('demo-tenant');
         }
         if (!tenant) {
             return res.status(404).json({ error: 'Tenant not found' });
@@ -52,13 +79,54 @@ app.use(async (req, res, next) => {
         res.status(500).json({ error: 'Internal server error resolving tenant' });
     }
 });
+// Create API Router to handle both cases (/api or direct)
+const apiRouter = express_1.default.Router();
+// Health check inside router too
+apiRouter.get('/health', (req, res) => res.send('OK'));
+// Endpoint: Admin Cleanup (wipe services, staff, appointments for tenant)
+// Protected by secret key - only for demo reset
+apiRouter.post('/admin/cleanup', async (req, res) => {
+    const { secret } = req.body;
+    const CLEANUP_SECRET = process.env.CLEANUP_SECRET || 'nailflow-demo-reset-2026';
+    if (secret !== CLEANUP_SECRET) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    try {
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        await (0, db_1.query)('DELETE FROM appointments WHERE tenant_id = $1', [tenantId]);
+        await (0, db_1.query)('DELETE FROM staff WHERE tenant_id = $1', [tenantId]);
+        await (0, db_1.query)('DELETE FROM services WHERE tenant_id = $1', [tenantId]);
+        // Reset branding to clean state
+        await (0, db_1.query)(`UPDATE tenants SET branding = $1 WHERE id = $2`, [JSON.stringify({ primary_color: '#E8B4B8', secondary_color: '#82C3A6', palette_id: 'soft-rose', typography: 'Outfit' }), tenantId]);
+        res.json({ success: true, message: 'All tenant data wiped successfully.' });
+    }
+    catch (e) {
+        console.error('Cleanup failed:', e);
+        res.status(500).json({ error: 'Cleanup failed' });
+    }
+});
 // Endpoint: Get Tenant configuration
-app.get('/api/tenant', (req, res) => {
+apiRouter.get('/tenant', (req, res) => {
     // @ts-ignore
     res.json(req.tenant);
 });
+// Endpoint: Get Tenant by Owner ID
+apiRouter.get('/tenants/owner/:ownerId', async (req, res) => {
+    try {
+        const { ownerId } = req.params;
+        const result = await (0, db_1.query)('SELECT * FROM tenants WHERE owner_id = $1', [ownerId]);
+        if (result.rowCount === 0)
+            return res.status(404).json({ error: 'Tenant not found' });
+        res.json(result.rows[0]);
+    }
+    catch (e) {
+        console.error('Failed to fetch tenant by owner:', e);
+        res.status(500).json({ error: 'Failed to fetch tenant by owner', details: e.message });
+    }
+});
 // Endpoint: Get Services
-app.get('/api/services', async (req, res) => {
+apiRouter.get('/services', async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
@@ -71,7 +139,7 @@ app.get('/api/services', async (req, res) => {
     }
 });
 // Endpoint: Create Service
-app.post('/api/services', async (req, res) => {
+apiRouter.post('/services', async (req, res) => {
     try {
         const { name, description, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
         // @ts-ignore
@@ -79,17 +147,17 @@ app.post('/api/services', async (req, res) => {
         if (!name || !duration_minutes || !estimated_price) {
             return res.status(400).json({ error: 'Name, duration, and price are required' });
         }
-        const id = crypto_1.default.randomUUID();
+        const id = getUUID();
         const result = await (0, db_1.query)('INSERT INTO services (id, tenant_id, name, description, duration_minutes, estimated_price, required_advance, category, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *', [id, tenantId, name, description, Number(duration_minutes), Number(estimated_price), Number(required_advance) || 0, category || 'General', image_url || '']);
         res.status(201).json(result.rows[0]);
     }
     catch (e) {
         console.error('Failed to create service:', e);
-        res.status(500).json({ error: 'Failed to create service' });
+        res.status(500).json({ error: 'Failed to create service', details: e.message });
     }
 });
 // Endpoint: Update Service
-app.put('/api/services/:id', async (req, res) => {
+apiRouter.put('/services/:id', async (req, res) => {
     try {
         const { name, description, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
         // @ts-ignore
@@ -105,7 +173,7 @@ app.put('/api/services/:id', async (req, res) => {
     }
 });
 // Endpoint: Delete Service
-app.delete('/api/services/:id', async (req, res) => {
+apiRouter.delete('/services/:id', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     const result = await (0, db_1.query)('DELETE FROM services WHERE id = $1 AND tenant_id = $2', [req.params.id, tenantId]);
@@ -114,7 +182,7 @@ app.delete('/api/services/:id', async (req, res) => {
     res.json({ success: true });
 });
 // Endpoint: Get Staff
-app.get('/api/staff', async (req, res) => {
+apiRouter.get('/staff', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     try {
@@ -127,7 +195,7 @@ app.get('/api/staff', async (req, res) => {
     }
 });
 // Endpoint: Get Appointments
-app.get('/api/appointments', async (req, res) => {
+apiRouter.get('/appointments', async (req, res) => {
     const staffId = req.query.staff_id;
     // @ts-ignore
     const tenantId = req.tenant.id;
@@ -147,9 +215,11 @@ app.get('/api/appointments', async (req, res) => {
     }
 });
 // Endpoint: Get Single Appointment
-app.get('/api/appointments/:id', async (req, res) => {
+apiRouter.get('/appointments/:id', async (req, res) => {
     try {
-        const result = await (0, db_1.query)('SELECT a.*, s.name as service_name FROM appointments a LEFT JOIN services s ON a.service_id = s.id WHERE a.id = $1', [req.params.id]);
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        const result = await (0, db_1.query)('SELECT a.*, s.name as service_name FROM appointments a LEFT JOIN services s ON a.service_id = s.id WHERE a.id = $1 AND a.tenant_id = $2', [req.params.id, tenantId]);
         if (result.rowCount === 0)
             return res.status(404).json({ error: 'Appointment not found' });
         res.json(result.rows[0]);
@@ -159,14 +229,16 @@ app.get('/api/appointments/:id', async (req, res) => {
     }
 });
 // Endpoint: Update Appointment Status
-app.patch('/api/appointments/:id/status', async (req, res) => {
+apiRouter.patch('/appointments/:id/status', async (req, res) => {
     const { status } = req.body;
+    // @ts-ignore
+    const tenantId = req.tenant.id;
     const validStatuses = ['pending_payment', 'confirmed', 'cancelled', 'completed'];
     if (!validStatuses.includes(status)) {
         return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
     }
     try {
-        const result = await (0, db_1.query)('UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *', [status, req.params.id]);
+        const result = await (0, db_1.query)('UPDATE appointments SET status = $1 WHERE id = $2 AND tenant_id = $3 RETURNING *', [status, req.params.id, tenantId]);
         if (result.rowCount === 0)
             return res.status(404).json({ error: 'Appointment not found' });
         res.json(result.rows[0]);
@@ -175,44 +247,87 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
         res.status(500).json({ error: 'Failed to update appointment' });
     }
 });
+// Endpoint: Update Appointment Images
+apiRouter.patch('/appointments/:id/images', async (req, res) => {
+    const { image_urls } = req.body;
+    // @ts-ignore
+    const tenantId = req.tenant.id;
+    if (!Array.isArray(image_urls)) {
+        return res.status(400).json({ error: 'image_urls must be an array' });
+    }
+    try {
+        const result = await (0, db_1.query)('UPDATE appointments SET image_urls = $1 WHERE id = $2 AND tenant_id = $3 RETURNING *', [JSON.stringify(image_urls), req.params.id, tenantId]);
+        if (result.rowCount === 0)
+            return res.status(404).json({ error: 'Appointment not found' });
+        res.json(result.rows[0]);
+    }
+    catch (e) {
+        console.error('Failed to update appointment images:', e);
+        res.status(500).json({ error: 'Failed to update appointment images' });
+    }
+});
 // Endpoint: Get Availability
-app.get('/api/availability', async (req, res) => {
-    const { date, staff_id } = req.query;
+apiRouter.get('/availability', async (req, res) => {
+    const { date, staff_id, service_id } = req.query;
     // @ts-ignore
     const tenantId = req.tenant.id;
     if (!date)
         return res.status(400).json({ error: 'Date is required' });
     try {
-        // Query booked times, converting to Mexico City timezone for comparison
-        const result = await (0, db_1.query)(`SELECT TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'HH24:MI') as time 
-             FROM appointments 
-             WHERE tenant_id = $1 
-             AND TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD') = $2 
-             AND status IN ('confirmed', 'pending_payment')`, [tenantId, date]);
-        const bookedTimes = new Set(result.rows.map(r => r.time));
-        // Get "Now" in Mexico City
-        const nowInCDMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
-        const bufferLimit = new Date(nowInCDMX.getTime() + 3 * 60 * 60 * 1000);
-        // Requested date as YYYY-MM-DD
-        const requestedDate = date;
-        const slots = [];
-        for (let h = 9; h < 21; h++) {
-            for (const min of [0, 30]) {
-                const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-                // Construct a Date object for the slot in CDMX
-                const slotDateTime = new Date(`${requestedDate}T${time}:00`);
-                // Since 'new Date(string)' assumes local time if no TZ, and server might be UTC, 
-                // we should be careful. Better way:
-                const [year, month, day] = requestedDate.split('-').map(Number);
-                const slotDate = new Date(year, month - 1, day, h, min);
-                // But wait, the comparison should be in CDMX time.
-                // If nowInCDMX is already local to CDMX, and we construct slotDate as local, 
-                // the comparison is safe as long as they are on the SAME machine or handled as timestamps.
-                if (slotDate < bufferLimit)
-                    continue;
-                if (!bookedTimes.has(time)) {
-                    slots.push({ time, available: true });
+        let requestedDuration = 60; // Default fallback
+        if (service_id) {
+            const svcRes = await (0, db_1.query)('SELECT duration_minutes FROM services WHERE id = $1 AND tenant_id = $2', [service_id, tenantId]);
+            if (svcRes.rowCount && svcRes.rowCount > 0 && svcRes.rows[0].duration_minutes > 0) {
+                requestedDuration = Number(svcRes.rows[0].duration_minutes);
+            }
+        }
+        let workingHours = { start: '09:00', end: '21:00' };
+        if (staff_id) {
+            const staffRes = await (0, db_1.query)(`SELECT weekly_schedule FROM staff WHERE id = $1 AND tenant_id = $2`, [staff_id, tenantId]);
+            if (staffRes.rowCount && staffRes.rowCount > 0 && staffRes.rows[0].weekly_schedule) {
+                const schedule = staffRes.rows[0].weekly_schedule;
+                const dt = luxon_1.DateTime.fromISO(date, { zone: 'America/Mexico_City' });
+                const dayName = dt.setLocale('en').toFormat('EEEE').toLowerCase(); // e.g., 'monday'
+                if (schedule[dayName]) {
+                    if (!schedule[dayName].active) {
+                        return res.json([]); // Staff is out
+                    }
+                    if (schedule[dayName].start && schedule[dayName].end) {
+                        workingHours = { start: schedule[dayName].start, end: schedule[dayName].end };
+                    }
                 }
+            }
+        }
+        const result = await (0, db_1.query)(`SELECT datetime_start, datetime_end 
+             FROM appointments 
+             WHERE tenant_id = $1 AND (staff_id = $2 OR $2 IS NULL)
+             AND TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD') = $3 
+             AND status IN ('confirmed', 'pending_payment')`, [tenantId, staff_id || null, date]);
+        const appointments = result.rows.map(r => ({
+            start: luxon_1.DateTime.fromJSDate(r.datetime_start).setZone('America/Mexico_City'),
+            end: luxon_1.DateTime.fromJSDate(r.datetime_end).setZone('America/Mexico_City')
+        }));
+        const nowInCDMX = luxon_1.DateTime.now().setZone('America/Mexico_City');
+        const bufferLimit = nowInCDMX.plus({ hours: 3 });
+        const slots = [];
+        const dtBase = luxon_1.DateTime.fromISO(date, { zone: 'America/Mexico_City' });
+        const [startH, startM] = workingHours.start.split(':').map(Number);
+        const [endH, endM] = workingHours.end.split(':').map(Number);
+        const startTimeIndex = startH * 60 + startM;
+        const endTimeIndex = endH * 60 + endM;
+        for (let minOffset = startTimeIndex; minOffset <= endTimeIndex - requestedDuration; minOffset += 30) {
+            const slotH = Math.floor(minOffset / 60);
+            const slotM = minOffset % 60;
+            const slotStart = dtBase.set({ hour: slotH, minute: slotM });
+            const slotEnd = slotStart.plus({ minutes: requestedDuration });
+            if (slotStart < bufferLimit)
+                continue; // Buffer limit passed
+            const hasOverlap = appointments.some(apt => slotStart < apt.end && slotEnd > apt.start);
+            if (!hasOverlap) {
+                slots.push({
+                    time: slotStart.toFormat('HH:mm'),
+                    available: true
+                });
             }
         }
         res.json(slots);
@@ -223,8 +338,8 @@ app.get('/api/availability', async (req, res) => {
     }
 });
 // Endpoint: Create Booking (Test/PRUEBA mode — no payment gateway)
-app.post('/api/bookings/test', async (req, res) => {
-    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes } = req.body;
+apiRouter.post('/bookings/test', async (req, res) => {
+    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes, image_urls } = req.body;
     // @ts-ignore
     const tenantId = req.tenant.id;
     console.log('Received test booking request:', { tenantId, client_name, date, time });
@@ -235,30 +350,28 @@ app.post('/api/bookings/test', async (req, res) => {
         const svcRes = await (0, db_1.query)('SELECT duration_minutes, estimated_price FROM services WHERE id = $1', [service_id]);
         if (svcRes.rowCount === 0)
             return res.status(404).json({ error: 'Service not found' });
-        const { duration_minutes: duration, estimated_price: service_price } = svcRes.rows[0];
-        const id = crypto_1.default.randomUUID();
+        const { duration_minutes: duration, estimated_price: service_price_db } = svcRes.rows[0];
+        const id = getUUID();
         // Use Mexico City timezone for datetime_start
-        // We append -06:00 (Standard) or -05:00 (Daylight) offset. 
-        // Better: let Postgres handle it by passing a string with the timezone name
         const datetime_start_str = `${date} ${time}:00 America/Mexico_City`;
         // Calculate end time
         const [h, m] = time.split(':').map(Number);
         const startDate = new Date(2000, 0, 1, h, m);
-        const endDate = new Date(startDate.getTime() + duration * 60000);
+        const endDate = new Date(startDate.getTime() + (duration || 60) * 60000);
         const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
         const datetime_end_str = `${date} ${endStr}:00 America/Mexico_City`;
-        const result = await (0, db_1.query)('INSERT INTO appointments (id, tenant_id, service_id, staff_id, client_name, client_email, client_phone, datetime_start, datetime_end, status, payment_method, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *', [id, tenantId, service_id, staff_id, client_name, client_email || '', client_phone, datetime_start_str, datetime_end_str, 'confirmed', 'PRUEBA', service_price]);
+        const result = await (0, db_1.query)('INSERT INTO appointments (id, tenant_id, service_id, staff_id, client_name, client_email, client_phone, datetime_start, datetime_end, status, payment_method, price, image_urls, image_url, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *', [id, tenantId, service_id, staff_id, client_name, client_email || '', client_phone, datetime_start_str, datetime_end_str, 'confirmed', 'PRUEBA', service_price_db, JSON.stringify(image_urls || []), req.body.image_url || null, notes]);
         console.log('Test booking created successfully:', result.rows[0].id);
         res.json({ appointmentId: result.rows[0].id, success: true });
     }
     catch (e) {
         console.error('Test booking failed:', e);
-        res.status(500).json({ error: 'Failed to create test booking' });
+        res.status(500).json({ error: 'Failed to create test booking', details: e.message });
     }
 });
 // Endpoint: Create Booking (Initiates MercadoPago Payment)
-app.post('/api/bookings', async (req, res) => {
-    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes } = req.body;
+apiRouter.post('/bookings', async (req, res) => {
+    const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes, image_urls, image_url } = req.body;
     // @ts-ignore
     const tenantId = req.tenant.id;
     try {
@@ -266,71 +379,74 @@ app.post('/api/bookings', async (req, res) => {
         if (svcRes.rowCount === 0)
             return res.status(404).json({ error: 'Service not found' });
         const service = svcRes.rows[0];
-        const { service_price, service_duration } = req.body;
-        // Implementation of different gateways
-        if (req.body.payment_method === 'stripe') {
-            // TODO: Integrar Stripe API (Sk_test_...)
-            // const session = await stripe.checkout.sessions.create({ ... })
-            // return res.json({ init_point: session.url })
-        }
-        if (req.body.payment_method === 'paypal') {
-            // TODO: Integrar PayPal SDK
-        }
-        if (req.body.payment_method === 'apple_pay' || req.body.payment_method === 'google_pay') {
-            // TODO: Integrar Wallet APIs
-        }
         // Use Mexico City timezone for datetime_start
         const datetime_start_str = `${date} ${time}:00 America/Mexico_City`;
         const [h, m] = time.split(':').map(Number);
         const startDate = new Date(2000, 0, 1, h, m);
-        const endDate = new Date(startDate.getTime() + (service_duration || 60) * 60000);
+        const duration = service.duration_minutes || 60;
+        const endDate = new Date(startDate.getTime() + duration * 60000);
         const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
         const datetime_end_str = `${date} ${endStr}:00 America/Mexico_City`;
-        // Create appointment in 'pending_payment' status
+        // Determine initial status based on payment method
+        const isMercadoPago = req.body.payment_method === 'mercado';
+        const initialStatus = isMercadoPago ? 'pending_payment' : 'confirmed';
+        // Create appointment
         const aptRes = await (0, db_1.query)(`INSERT INTO appointments 
-            (id, tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, datetime_end, status, notes, price, payment_method) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`, [crypto_1.default.randomUUID(), tenantId, client_name, client_phone, client_email, service_id, staff_id, datetime_start_str, datetime_end_str, 'pending_payment', notes, service_price, req.body.payment_method]);
+            (id, tenant_id, client_name, client_phone, client_email, service_id, staff_id, datetime_start, datetime_end, status, notes, price, payment_method, image_urls, image_url) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`, [getUUID(), tenantId, client_name, client_phone, client_email, service_id, staff_id, datetime_start_str, datetime_end_str, initialStatus, notes, service.estimated_price, req.body.payment_method, JSON.stringify(image_urls || []), image_url || null]);
         const appointment = aptRes.rows[0];
-        // Create MP Preference
-        const preference = new mercadopago_1.Preference(mpClient);
-        const response = await preference.create({
-            body: {
-                items: [{
-                        id: service.id,
-                        title: service.name,
-                        quantity: 1,
-                        unit_price: Number(service.required_advance),
-                    }],
-                external_reference: appointment.id.toString(),
-                notification_url: `${process.env.APP_BASE_URL}/api/webhooks/mercadopago`,
-                back_urls: {
-                    success: `https://${req.headers['host']}/book/success`,
-                    failure: `https://${req.headers['host']}/book/error`,
-                },
-                auto_return: 'approved',
-            }
-        });
+        if (isMercadoPago) {
+            // Create MP Preference
+            const preference = new mercadopago_1.Preference(mpClient);
+            const response = await preference.create({
+                body: {
+                    items: [{
+                            id: service.id,
+                            title: service.name,
+                            quantity: 1,
+                            unit_price: Number(service.required_advance || 0),
+                        }],
+                    external_reference: appointment.id.toString(),
+                    notification_url: `${process.env.APP_BASE_URL}/api/webhooks/mercadopago`,
+                    back_urls: {
+                        success: `https://${req.headers['host']}/book/success`,
+                        failure: `https://${req.headers['host']}/book/error`,
+                    },
+                    auto_return: 'approved',
+                }
+            });
+            return res.json({
+                appointmentId: appointment.id,
+                init_point: response.init_point
+            });
+        }
+        // For other methods, just return the appointment ID
         res.json({
             appointmentId: appointment.id,
-            init_point: response.init_point
+            success: true
         });
     }
     catch (e) {
         console.error('Booking failed:', e);
-        res.status(500).json({ error: 'Booking process failed' });
+        res.status(500).json({ error: 'Booking process failed', details: e.message });
     }
 });
 // Endpoint: MercadoPago Webhook
-app.post('/api/webhooks/mercadopago', async (req, res) => {
+apiRouter.post('/webhooks/mercadopago', async (req, res) => {
     const { type, data } = req.body;
     if (type === 'payment') {
         try {
-            // Usually we'd fetch details from MP with data.id here.
-            // For now, let's just mark the reference as paid if we can find it.
-            // External reference was appointment.id
             const paymentId = data.id;
-            // Note: In real scenarios, MP sends a notification, then you GET the payment to see external_reference
-            console.log(`Payment incoming: ${paymentId}`);
+            console.log(`Payment incoming webhook hit: ${paymentId}`);
+            const payment = new mercadopago_1.Payment(mpClient);
+            const paymentData = await payment.get({ id: paymentId });
+            if (paymentData.status === 'approved' && paymentData.external_reference) {
+                console.log(`Payment ${paymentId} approved for appointment ${paymentData.external_reference}`);
+                await (0, db_1.query)(`UPDATE appointments SET status = 'confirmed', advance_paid = true WHERE id = $1`, [paymentData.external_reference]);
+            }
+            else {
+                console.log(`Payment ${paymentId} status: ${paymentData.status}`);
+            }
         }
         catch (e) {
             console.error('Webhook processing failed:', e);
@@ -339,7 +455,7 @@ app.post('/api/webhooks/mercadopago', async (req, res) => {
     res.sendStatus(200);
 });
 // Endpoint: Update Tenant Branding
-app.put('/api/tenant', async (req, res) => {
+apiRouter.put('/tenant', async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     const { name, branding, settings } = req.body;
@@ -352,7 +468,7 @@ app.put('/api/tenant', async (req, res) => {
     }
 });
 // Endpoint: Complete Appointment
-app.post('/api/appointments/:id/complete', async (req, res) => {
+apiRouter.post('/appointments/:id/complete', async (req, res) => {
     try {
         const { id } = req.params;
         // @ts-ignore
@@ -365,39 +481,82 @@ app.post('/api/appointments/:id/complete', async (req, res) => {
     }
 });
 // Endpoint: Staff Management (POST)
-app.post('/api/staff', async (req, res) => {
+apiRouter.post('/staff', async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
         const { name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule } = req.body;
-        const id = crypto_1.default.randomUUID();
-        const result = await (0, db_1.query)('INSERT INTO staff (id, tenant_id, name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *', [id, tenantId, name, email, role, specialty, photo_url, slug || name.toLowerCase().replace(/\s+/g, '-'), active !== false, bio, color_identifier, services_offered || [], weekly_schedule || {}]);
+        if (!name)
+            return res.status(400).json({ error: 'Name is required' });
+        const id = getUUID();
+        const result = await (0, db_1.query)('INSERT INTO staff (id, tenant_id, name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *', [
+            id,
+            tenantId,
+            name,
+            email || null,
+            role || 'staff',
+            specialty || null,
+            photo_url || null,
+            slug || name.toLowerCase().replace(/\s+/g, '-'),
+            active !== false,
+            bio || null,
+            color_identifier || '#C97794',
+            services_offered || [],
+            weekly_schedule ? JSON.stringify(weekly_schedule) : JSON.stringify({})
+        ]);
         res.json(result.rows[0]);
     }
     catch (e) {
         console.error('Failed to create staff member:', e);
-        res.status(500).json({ error: 'Failed to create staff member' });
+        res.status(500).json({ error: 'Failed to create staff member', details: e.message });
     }
 });
 // Endpoint: Staff Management (PUT)
-app.put('/api/staff/:id', async (req, res) => {
+apiRouter.put('/staff/:id', async (req, res) => {
     try {
         const { id } = req.params;
         // @ts-ignore
         const tenantId = req.tenant.id;
         const { name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule } = req.body;
-        const result = await (0, db_1.query)('UPDATE staff SET name = $1, email = $2, role = $3, specialty = $4, photo_url = $5, slug = $6, active = $7, bio = $8, color_identifier = $9, services_offered = $10, weekly_schedule = $11 WHERE id = $12 AND tenant_id = $13 RETURNING *', [name, email, role, specialty, photo_url, slug, active, bio, color_identifier, services_offered, weekly_schedule, id, tenantId]);
+        // We use COALESCE to keep existing values if not provided in the update
+        const result = await (0, db_1.query)(`UPDATE staff SET 
+                name = COALESCE($1, name), 
+                email = COALESCE($2, email), 
+                role = COALESCE($3, role), 
+                specialty = COALESCE($4, specialty), 
+                photo_url = COALESCE($5, photo_url), 
+                slug = COALESCE($6, slug), 
+                active = COALESCE($7, active), 
+                bio = COALESCE($8, bio), 
+                color_identifier = COALESCE($9, color_identifier), 
+                services_offered = COALESCE($10, services_offered), 
+                weekly_schedule = COALESCE($11, weekly_schedule) 
+            WHERE id = $12 AND tenant_id = $13 RETURNING *`, [
+            name || null,
+            email || null,
+            role || null,
+            specialty || null,
+            photo_url || null,
+            slug || null,
+            active === undefined ? null : active,
+            bio || null,
+            color_identifier || null,
+            services_offered || null,
+            weekly_schedule ? JSON.stringify(weekly_schedule) : null,
+            id,
+            tenantId
+        ]);
         if (result.rowCount === 0)
             return res.status(404).json({ error: 'Staff member not found' });
         res.json(result.rows[0]);
     }
     catch (e) {
         console.error('Failed to update staff member:', e);
-        res.status(500).json({ error: 'Failed to update staff member' });
+        res.status(500).json({ error: 'Failed to update staff member', details: e.message });
     }
 });
 // Endpoint: Favorites (GET)
-app.get('/api/favorites', async (req, res) => {
+apiRouter.get('/favorites', async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
@@ -409,7 +568,7 @@ app.get('/api/favorites', async (req, res) => {
     }
 });
 // Endpoint: Favorites (POST)
-app.post('/api/favorites/:phone', async (req, res) => {
+apiRouter.post('/favorites/:phone', async (req, res) => {
     try {
         const { phone } = req.params;
         const { favorite } = req.body;
@@ -427,7 +586,19 @@ app.post('/api/favorites/:phone', async (req, res) => {
         res.status(500).json({ error: 'Failed to update favorite' });
     }
 });
+// Mount the router at both root and /api for maximum compatibility
+app.use('/api', apiRouter);
+app.use(apiRouter);
 app.get('/health', (req, res) => res.send('OK'));
+// 404 Handler - MUST be after apps.use(apiRouter)
+app.use((req, res) => {
+    console.warn(`[404] ${req.method} ${req.path} - No route matched`);
+    res.status(404).json({
+        error: 'Route not found',
+        method: req.method,
+        path: req.path
+    });
+});
 app.listen(port, () => {
-    console.log(`NailFlow API running on http://localhost:${port}`);
+    console.log(`NailFlow API running on port ${port}`);
 });
