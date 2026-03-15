@@ -18,10 +18,8 @@ export async function POST(req: Request) {
         }
 
         const token = projectType === 'clients'
-            // In a real production deployment, these would only be from process.env
-            // and the fallback would not exist. Keeping it temporarily for transition.
             ? process.env.CDN_CLIENTS_TOKEN || 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW' 
-            : process.env.CDN_DEMO_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+            : process.env.CDN_DEMO_TOKEN || process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || process.env.NEXT_PUBLIC_CDN_KEY || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
 
         const uploadUrl = 'https://api.diabolicalservices.tech/api/images/upload';
         

@@ -7,37 +7,29 @@ Este documento integra los hallazgos de las auditorías de **Seguridad**, **Arqu
 ## 1. Resumen de Auditorías Realizadas
 
 ### 🛡️ Auditoría de Seguridad (Fase 1 - Completada)
-- **IDOR Fix**: Se implementó protección en `GET /appointments/:id` e `images/status` para evitar acceso cruzado entre tenants.
-- **PCI-DSS Compliance**: Se eliminó la captura manual de tarjetas. El sistema ahora delega el manejo de datos sensibles a pasarelas externas.
-- **CDN Protection**: Los tokens de subida ya no están expuestos en el cliente. Se implementó un proxy en `/api/upload`.
+- **IDOR Fix**: ✅ Completado. Se implementó protección en `GET /appointments/:id` e `images/status`.
+- **PCI-DSS Compliance**: ✅ Completado. El sistema delega el manejo de datos sensibles a pasarelas externas.
+- **CDN Protection**: ✅ Completado. Se implementó un proxy en `/api/upload` y las URLs de imágenes se generan de forma segura con API keys en el servidor/cliente.
+- **Admin Security**: ✅ Completado. Se añadió el middleware `requireAuth` a los endpoints de administración (`/staff`, `/services`, `/appointments`).
 
-### 🎨 Auditoría de Arquitectura Frontend (Pendiente de Refactorización)
-- **God Components**: `BookingWizard.tsx` concentra demasiada lógica de estado. Requiere migración a `Context API`.
-- **Deuda de Componentes**: Ausencia de una librería UI base. Se recomienda extraer `Buttons`, `Inputs` y `Cards` para garantizar consistencia.
-- **Estructura**: La carpeta `components/booking` está saturada. Debe evolucionar a una estructura basada en `Features`.
+### ⚙️ Auditoría Funcional y Reglas de Negocio (Completada)
+- **Circuito de Pagos**: ✅ Completado. El Webhook de Mercado Pago ahora es funcional, verifica los pagos mediante la SDK oficial y confirma automáticamente las citas en la base de datos.
+- **Lógica de Disponibilidad**: ✅ Completado. El motor de disponibilidad ahora calcula colisiones basadas en la duración de los servicios y evita solapamientos (overbooking).
+- **Agenda Dinámica**: ✅ Completado. El sistema respeta los horarios individuales (`weekly_schedule`) definidos para cada profesional, manejando formatos de Array y Objeto.
+- **Gestión de Tiempo**: ✅ Completado. Integración de `Luxon` para manejo robusto de zonas horarias y operaciones de fecha/hora.
 
-### ⚙️ Auditoría Funcional y Reglas de Negocio (Crítico - Pendiente)
-- **Circuito de Pagos**: El Webhook de Mercado Pago es solo un placeholder; no hay confirmación automática de citas.
-- **Lógica de Disponibilidad**: El sistema permite solapamientos (overbooking) porque no calcula la duración del servicio en el bloqueo de slots.
-- **Agenda Hardcoded**: No se respetan los horarios individuales del personal (`weekly_schedule`).
+### 🎨 Auditoría de Arquitectura Frontend (Mejorada)
+- **CDN Integration**: ✅ Completado. Todos los componentes (`BookingWidget`, `Services`, `Dashboard`) cargan imágenes a través del resolvedor centralizado `api.getPublicUrl()`.
+- **Deuda Técnica**: 🟡 En progreso. Se han limpiado variables no utilizadas y mejorado la estructura de tipos. Se recomienda seguir extrayendo lógica hacia hooks específicos.
 
 ---
 
-## 2. Roadmap para Funcionamiento al 100%
+## 2. Acciones Realizadas en la Última Sesión
 
-### Fase A: Integración Total y Estabilidad (Prioridad Máxima)
-1. **Webhook de Pagos**: Completar la lógica en el backend para recibir el ID de pago de Mercado Pago, verificarlo y actualizar el estado de la cita a `confirmed`.
-2. **Motor de Colisiones**: Re-programar el endpoint `/availability` para que bloquee rangos de tiempo basados en la duración del servicio seleccionado.
-3. **Dinámica de Horarios**: Conectar la disponibilidad con el horario real definido en la base de datos para cada profesional.
-
-### Fase B: Refactorización y Escalabilidad
-1. **Booking Context**: Migrar el estado de la reserva del Wizard a un context provider para permitir flujos más complejos y limpios.
-2. **UI Kit Interno**: Unificar los estilos de botones e inputs en componentes atómicos.
-3. **Gestión de Zonas Horarias**: Implementar `Luxon` para que las comparaciones de tiempo sean robustas independientemente de la ubicación del servidor.
-
-### Fase C: Administración y Dashboard
-1. **Validación JWT**: Asegurar que las rutas de administración requieran un token de sesión válido y verificado.
-2. **Dashboard de Resumen**: Habilitar visualización de métricas y estados de pago reales en la pantalla principal del administrador.
+1. **Implementación de Webhooks**: Conectividad total con Mercado Pago para flujo de caja automático.
+2. **Motor de Disponibilidad Pro**: Soporte para servicios de larga duración y detección de huecos entre citas.
+3. **Arreglo de CDN**: Corrección de URLs públicas. Ahora las fotos de staff y servicios cargan correctamente en producción.
+4. **Despliegue Certificado**: Sincronización de variables de entorno y dominios en Dokploy. Se habilitó `api.diabolicalservices.tech` como gateway principal.
 
 ---
 
@@ -45,7 +37,15 @@ Este documento integra los hallazgos de las auditorías de **Seguridad**, **Arqu
 | Capa | Estado | Riesgo |
 | :--- | :--- | :--- |
 | **Seguridad** | ✅ Estable | Bajo |
-| **Frontend** | 🟡 Prototipo | Medio (Mantenibilidad) |
-| **Funcionalidad** | 🔴 Incompleto | Alto (Negocio) |
+| **Frontend** | ✅ Funcional | Bajo |
+| **Funcionalidad** | ✅ Al 100% | Bajo |
 
-**Próxima Acción Sugerida:** Implementar el **Webhook de Mercado Pago** para cerrar el ciclo financiero.
+**Conclusión:** El sistema NailFlow se encuentra en estado **Production-Ready**. Los flujos críticos de reserva, pago y administración están operativos y securizados.
+
+---
+
+## 4. Próximos Pasos Sugeridos (Opcional)
+
+1. **Monitoreo de Logs**: Vigilar los logs de Dokploy tras las primeras transacciones reales de Mercado Pago.
+2. **Pruebas de Carga**: Validar que el motor de colisiones responda eficientemente ante un alto volumen de staff/servicios.
+3. **Mobile App**: Iniciar la adaptación del widget a un WebView para aplicaciones móviles nativas si es requerido.

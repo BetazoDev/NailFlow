@@ -197,7 +197,7 @@ export const api = {
         formData.append('folder', folder);
         formData.append('projectType', projectType);
 
-        const uploadUrl = '/api/upload';
+        const uploadUrl = '/proxy/upload';
 
         try {
             const response = await fetch(uploadUrl, {
