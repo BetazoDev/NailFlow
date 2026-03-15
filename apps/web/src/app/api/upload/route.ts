@@ -39,6 +39,7 @@ export async function POST(req: Request) {
         }
 
         const data = await response.json();
+        console.log(`CDN Upload Success for ${projectType}:`, data);
         return NextResponse.json(data);
     } catch (e: any) {
         console.error('Proxy upload error:', e);

@@ -57,7 +57,7 @@ export default function PersonalDataStep({
                     <div className="relative mb-6">
                         <div className="w-24 h-24 rounded-full overflow-hidden shadow-xl ring-4 ring-white relative z-10">
                             {staffPhoto ? (
-                                <img src={staffPhoto} alt={staffName} className="w-full h-full object-cover" />
+                                <img src={api.getPublicUrl(staffPhoto)} alt={staffName} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-white bg-gradient-to-br from-pink to-coral">
                                     {staffName[0]}

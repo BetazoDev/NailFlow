@@ -239,8 +239,8 @@ apiRouter.get('/staff', async (req, res) => {
     }
 });
 
-// Endpoint: Get Appointments
-apiRouter.get('/appointments', async (req, res) => {
+// Endpoint: Get Appointments (Protected)
+apiRouter.get('/appointments', requireAuth, async (req, res) => {
     const staffId = req.query.staff_id as string;
     // @ts-ignore
     const tenantId = req.tenant.id;
@@ -259,8 +259,8 @@ apiRouter.get('/appointments', async (req, res) => {
     }
 });
 
-// Endpoint: Get Single Appointment
-apiRouter.get('/appointments/:id', async (req, res) => {
+// Endpoint: Get Single Appointment (Protected)
+apiRouter.get('/appointments/:id', requireAuth, async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
@@ -272,8 +272,8 @@ apiRouter.get('/appointments/:id', async (req, res) => {
     }
 });
 
-// Endpoint: Update Appointment Status
-apiRouter.patch('/appointments/:id/status', async (req, res) => {
+// Endpoint: Update Appointment Status (Protected)
+apiRouter.patch('/appointments/:id/status', requireAuth, async (req, res) => {
     const { status } = req.body;
     // @ts-ignore
     const tenantId = req.tenant.id;
@@ -338,14 +338,36 @@ apiRouter.get('/availability', async (req, res) => {
             if (staffRes.rowCount && staffRes.rowCount > 0 && staffRes.rows[0].weekly_schedule) {
                 const schedule = staffRes.rows[0].weekly_schedule;
                 const dt = DateTime.fromISO(date as string, { zone: 'America/Mexico_City' });
+                const dayIndex = dt.weekday % 7; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
                 const dayName = dt.setLocale('en').toFormat('EEEE').toLowerCase(); // e.g., 'monday'
                 
-                if (schedule[dayName]) {
-                    if (!schedule[dayName].active) {
+                let daySchedule = null;
+                
+                // Handle both object-based and array-based schedules
+                if (Array.isArray(schedule)) {
+                    daySchedule = schedule.find((s: any) => 
+                        s.day_of_week === dayIndex || 
+                        s.day === dayIndex || 
+                        s.dayName?.toLowerCase() === dayName
+                    );
+                    // Map array format to our internal structure
+                    if (daySchedule) {
+                        daySchedule = {
+                            active: daySchedule.active !== false,
+                            start: daySchedule.start_time || daySchedule.start || '09:00',
+                            end: daySchedule.end_time || daySchedule.end || '18:00'
+                        };
+                    }
+                } else if (schedule[dayName]) {
+                    daySchedule = schedule[dayName];
+                }
+
+                if (daySchedule) {
+                    if (!daySchedule.active) {
                         return res.json([]); // Staff is out
                     }
-                    if (schedule[dayName].start && schedule[dayName].end) {
-                        workingHours = { start: schedule[dayName].start, end: schedule[dayName].end };
+                    if (daySchedule.start && daySchedule.end) {
+                        workingHours = { start: daySchedule.start, end: daySchedule.end };
                     }
                 }
             }
@@ -509,14 +531,13 @@ apiRouter.post('/bookings', async (req, res) => {
         if (svcRes.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
         const service = svcRes.rows[0];
 
-        // Use Mexico City timezone for datetime_start
-        const datetime_start_str = `${date} ${time}:00 America/Mexico_City`;
-        const [h, m] = time.split(':').map(Number);
-        const startDate = new Date(2000, 0, 1, h, m);
-        const duration = service.duration_minutes || 60;
-        const endDate = new Date(startDate.getTime() + duration * 60000);
-        const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
-        const datetime_end_str = `${date} ${endStr}:00 America/Mexico_City`;
+        // Use Luxon for robust datetime handling
+        const start = DateTime.fromISO(`${date}T${time}`, { zone: 'America/Mexico_City' });
+        const duration = Number(service.duration_minutes || 60);
+        const end = start.plus({ minutes: duration });
+
+        const datetime_start_str = start.toISO();
+        const datetime_end_str = end.toISO();
 
         // Determine initial status based on payment method
         const isMercadoPago = req.body.payment_method === 'mercado';
@@ -532,6 +553,18 @@ apiRouter.post('/bookings', async (req, res) => {
         const appointment = aptRes.rows[0];
 
         if (isMercadoPago) {
+            const advanceAmount = Number(service.required_advance || 0);
+            
+            // Mercado Pago requires a positive amount
+            if (advanceAmount <= 0) {
+                console.log('Skipping MP Preference: Advance amount is 0');
+                return res.json({
+                    appointmentId: appointment.id,
+                    success: true,
+                    message: 'Confirmed without payment (No advance required)'
+                });
+            }
+
             // Create MP Preference
             const preference = new Preference(mpClient);
             const response = await preference.create({
@@ -540,13 +573,14 @@ apiRouter.post('/bookings', async (req, res) => {
                         id: service.id,
                         title: service.name,
                         quantity: 1,
-                        unit_price: Number(service.required_advance || 0),
+                        unit_price: advanceAmount,
+                        currency_id: 'MXN'
                     }],
                     external_reference: appointment.id.toString(),
-                    notification_url: `${process.env.APP_BASE_URL}/api/webhooks/mercadopago`,
+                    notification_url: `${process.env.APP_BASE_URL || 'https://api.diabolicalservices.tech'}/api/webhooks/mercadopago`,
                     back_urls: {
-                        success: `https://${req.headers['host']}/book/success`,
-                        failure: `https://${req.headers['host']}/book/error`,
+                        success: `${req.headers.origin || 'https://' + req.headers.host}/book/success`,
+                        failure: `${req.headers.origin || 'https://' + req.headers.host}/book/error`,
                     },
                     auto_return: 'approved',
                 }
@@ -568,31 +602,42 @@ apiRouter.post('/bookings', async (req, res) => {
         res.status(500).json({ error: 'Booking process failed', details: e.message });
     }
 });
-
 // Endpoint: MercadoPago Webhook
 apiRouter.post('/webhooks/mercadopago', async (req, res) => {
-    const { type, data } = req.body;
+    const { type, data, action } = req.body;
+    
+    // Support both 'type=payment' and 'action=payment.created/updated'
+    const isPayment = type === 'payment' || action?.startsWith('payment.');
 
-    if (type === 'payment') {
+    if (isPayment) {
         try {
-            const paymentId = data.id;
-            console.log(`Payment incoming webhook hit: ${paymentId}`);
+            const paymentId = data?.id || req.body.resource?.split('/').pop();
+            if (!paymentId) return res.sendStatus(400);
+
+            console.log(`[MP Webhook] Processing payment: ${paymentId}`);
 
             const payment = new Payment(mpClient);
             const paymentData = await payment.get({ id: paymentId });
             
-            if (paymentData.status === 'approved' && paymentData.external_reference) {
-                console.log(`Payment ${paymentId} approved for appointment ${paymentData.external_reference}`);
-                
-                await query(
-                    `UPDATE appointments SET status = 'confirmed', advance_paid = true WHERE id = $1`,
-                    [paymentData.external_reference]
+            const appointmentId = paymentData.external_reference;
+            const status = paymentData.status;
+
+            console.log(`[MP Webhook] Payment ${paymentId} status: ${status} for Appointment ${appointmentId}`);
+
+            if (status === 'approved' && appointmentId) {
+                const updateRes = await query(
+                    `UPDATE appointments SET status = 'confirmed', advance_paid = true, payment_ref = $2 WHERE id = $1 RETURNING id`,
+                    [appointmentId, paymentId]
                 );
-            } else {
-                console.log(`Payment ${paymentId} status: ${paymentData.status}`);
+                
+                if (updateRes.rowCount === 0) {
+                    console.warn(`[MP Webhook] Appointment ${appointmentId} not found in database.`);
+                } else {
+                    console.log(`[MP Webhook] Success: Appointment ${appointmentId} confirmed.`);
+                }
             }
-        } catch (e) {
-            console.error('Webhook processing failed:', e);
+        } catch (e: any) {
+            console.error('[MP Webhook] Processing failed:', e.message);
         }
     }
     res.sendStatus(200);

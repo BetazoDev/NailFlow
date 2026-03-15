@@ -1,7 +1,7 @@
 import { Tenant, Staff, Service, Appointment, BookingData, TimeSlot } from './types';
 import { auth } from './firebase';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://demo.diabolicalservices.tech';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.diabolicalservices.tech';
 
 const fetchApi = async (path: string, options: RequestInit = {}, domain?: string) => {
     // Add tenant domain header for resolution
@@ -212,15 +212,16 @@ export const api = {
 
             const data = await response.json();
 
-            const clientSlug = projectType === 'clients' ? 'nailssalon' : 'nailssalon';
+            const clientSlug = 'nailssalon'; // Current slug for NailFlow project resources
 
             if (data.uploaded && data.uploaded.length > 0) {
-                const filename = data.uploaded[0].filename;
-                return `https://cdn.diabolicalservices.tech/${clientSlug}/${filename}`;
+                const item = data.uploaded[0];
+                return item.url || item.cdnUrl || `https://cdn.diabolicalservices.tech/${clientSlug}/${item.filename}`;
             } else if (data.duplicates && data.duplicates.length > 0) {
-                const filename = data.duplicates[0].filename;
-                return `https://cdn.diabolicalservices.tech/${clientSlug}/${filename}`;
+                const item = data.duplicates[0];
+                return item.url || item.cdnUrl || `https://cdn.diabolicalservices.tech/${clientSlug}/${item.filename}`;
             } else {
+                console.error('CDN Response missing data:', data);
                 throw new Error('Error CDN: No se retornó información de la imagen subida.');
             }
         } catch (error) {
@@ -242,6 +243,7 @@ export const api = {
 
         if (url.startsWith('https://cdn.diabolicalservices.tech/')) {
             const separator = url.includes('?') ? '&' : '?';
+            // According to the guide, 'api_key' is the standard param
             return `${url}${separator}api_key=${token}`;
         }
 

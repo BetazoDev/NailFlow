@@ -82,7 +82,7 @@ export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, 
                     <div className="mb-8 flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/10">
                         <div className="size-10 rounded-full overflow-hidden border border-white/20 flex-shrink-0 bg-white/10">
                             {staffPhoto ? (
-                                <img src={staffPhoto} alt={staffName} className="w-full h-full object-cover" />
+                                <img src={api.getPublicUrl(staffPhoto)} alt={staffName} className="w-full h-full object-cover" />
                             ) : tenant.branding.photo_url ? (
                                 <img src={api.getPublicUrl(tenant.branding.photo_url)} alt="Business" className="w-full h-full object-cover" />
                             ) : (
