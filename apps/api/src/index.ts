@@ -237,7 +237,9 @@ apiRouter.get('/appointments', async (req, res) => {
 // Endpoint: Get Single Appointment
 apiRouter.get('/appointments/:id', async (req, res) => {
     try {
-        const result = await query('SELECT a.*, s.name as service_name FROM appointments a LEFT JOIN services s ON a.service_id = s.id WHERE a.id = $1', [req.params.id]);
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        const result = await query('SELECT a.*, s.name as service_name FROM appointments a LEFT JOIN services s ON a.service_id = s.id WHERE a.id = $1 AND a.tenant_id = $2', [req.params.id, tenantId]);
         if (result.rowCount === 0) return res.status(404).json({ error: 'Appointment not found' });
         res.json(result.rows[0]);
     } catch (e) {
@@ -248,12 +250,14 @@ apiRouter.get('/appointments/:id', async (req, res) => {
 // Endpoint: Update Appointment Status
 apiRouter.patch('/appointments/:id/status', async (req, res) => {
     const { status } = req.body;
+    // @ts-ignore
+    const tenantId = req.tenant.id;
     const validStatuses = ['pending_payment', 'confirmed', 'cancelled', 'completed'];
     if (!validStatuses.includes(status)) {
         return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
     }
     try {
-        const result = await query('UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *', [status, req.params.id]);
+        const result = await query('UPDATE appointments SET status = $1 WHERE id = $2 AND tenant_id = $3 RETURNING *', [status, req.params.id, tenantId]);
         if (result.rowCount === 0) return res.status(404).json({ error: 'Appointment not found' });
         res.json(result.rows[0]);
     } catch (e) {
@@ -264,6 +268,8 @@ apiRouter.patch('/appointments/:id/status', async (req, res) => {
 // Endpoint: Update Appointment Images
 apiRouter.patch('/appointments/:id/images', async (req, res) => {
     const { image_urls } = req.body;
+    // @ts-ignore
+    const tenantId = req.tenant.id;
     
     if (!Array.isArray(image_urls)) {
         return res.status(400).json({ error: 'image_urls must be an array' });
@@ -271,8 +277,8 @@ apiRouter.patch('/appointments/:id/images', async (req, res) => {
 
     try {
         const result = await query(
-            'UPDATE appointments SET image_urls = $1 WHERE id = $2 RETURNING *', 
-            [JSON.stringify(image_urls), req.params.id]
+            'UPDATE appointments SET image_urls = $1 WHERE id = $2 AND tenant_id = $3 RETURNING *', 
+            [JSON.stringify(image_urls), req.params.id, tenantId]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: 'Appointment not found' });
         res.json(result.rows[0]);
@@ -284,85 +290,50 @@ apiRouter.patch('/appointments/:id/images', async (req, res) => {
 
 // Endpoint: Get Availability
 apiRouter.get('/availability', async (req, res) => {
-    const { date, staff_id, service_id } = req.query;
+    const { date, staff_id } = req.query;
     // @ts-ignore
     const tenantId = req.tenant.id;
 
     if (!date) return res.status(400).json({ error: 'Date is required' });
 
     try {
-        // 1. Get Service Duration (Buffer logic)
-        let serviceDuration = 60;
-        if (service_id) {
-            const svc = await query('SELECT duration_minutes FROM services WHERE id = $1', [service_id]);
-            if (svc.rows.length) serviceDuration = svc.rows[0].duration_minutes;
-        }
-
-        // 2. Get Booked Appointments
+        // Query booked times, converting to Mexico City timezone for comparison
         const result = await query(
-            `SELECT 
-                TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'HH24:MI') as start_time,
-                TO_CHAR(datetime_end AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'HH24:MI') as end_time
+            `SELECT TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'HH24:MI') as time 
              FROM appointments 
              WHERE tenant_id = $1 
              AND TO_CHAR(datetime_start AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD') = $2 
-             AND status IN ('confirmed', 'pending_payment')
-             ORDER BY datetime_start ASC`,
+             AND status IN ('confirmed', 'pending_payment')`,
             [tenantId, date]
         );
-        const appointments = result.rows;
+        const bookedTimes = new Set(result.rows.map(r => r.time));
 
-        // 3. Get Active Holds (Concurracy)
-        // Cleanup expired holds first
-        await query("DELETE FROM slot_holds WHERE expires_at < CURRENT_TIMESTAMP");
-        const holdResult = await query(
-            "SELECT range_time FROM slot_holds WHERE tenant_id = $1 AND range_date = $2",
-            [tenantId, date]
-        );
-        const heldTimes = new Set(holdResult.rows.map(r => r.range_time));
-
-        // 4. Get "Now" in Mexico City
+        // Get "Now" in Mexico City
         const nowInCDMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
-        const bufferLimit = new Date(nowInCDMX.getTime() + 1 * 60 * 60 * 1000); // Allow booking 1 hour in advance
+        const bufferLimit = new Date(nowInCDMX.getTime() + 3 * 60 * 60 * 1000);
 
+        // Requested date as YYYY-MM-DD
         const requestedDate = date as string;
+
         const slots = [];
-
-        // 5. Generate Dynamic Slots
-        // Logic: Try 10-minute intervals from 9:00 to 20:00
         for (let h = 9; h < 21; h++) {
-            for (let min = 0; min < 60; min += 10) {
+            for (const min of [0, 30]) {
                 const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-                
+
+                // Construct a Date object for the slot in CDMX
+                const slotDateTime = new Date(`${requestedDate}T${time}:00`);
+                // Since 'new Date(string)' assumes local time if no TZ, and server might be UTC, 
+                // we should be careful. Better way:
                 const [year, month, day] = requestedDate.split('-').map(Number);
-                const slotStart = new Date(year, month - 1, day, h, min);
-                const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
+                const slotDate = new Date(year, month - 1, day, h, min);
 
-                if (slotStart < bufferLimit) continue;
-                if (heldTimes.has(time)) continue;
+                // But wait, the comparison should be in CDMX time.
+                // If nowInCDMX is already local to CDMX, and we construct slotDate as local, 
+                // the comparison is safe as long as they are on the SAME machine or handled as timestamps.
 
-                // Check for appointment overlap
-                let isOverlap = false;
-                for (const apt of appointments) {
-                    const [ah_s, am_s] = apt.start_time.split(':').map(Number);
-                    const [ah_e, am_e] = apt.end_time.split(':').map(Number);
-                    
-                    const aptStart = new Date(year, month - 1, day, ah_s, am_s);
-                    const aptEnd = new Date(year, month - 1, day, ah_e, am_e);
+                if (slotDate < bufferLimit) continue;
 
-                    // User Rule: End time of A + 10 mins <= Start time of B
-                    // So we must ensure our Slot Start is AFTER Apt End + 10 mins OR Slot End is BEFORE Apt Start - 10 mins
-                    const bufferedAptEnd = new Date(aptEnd.getTime() + 10 * 60000);
-                    const bufferedAptStart = new Date(aptStart.getTime() - 10 * 60000);
-
-                    // Overlap if (slotStart < bufferedAptEnd) AND (slotEnd > bufferedAptStart)
-                    if (slotStart < bufferedAptEnd && slotEnd > bufferedAptStart) {
-                        isOverlap = true;
-                        break;
-                    }
-                }
-
-                if (!isOverlap) {
+                if (!bookedTimes.has(time)) {
                     slots.push({ time, available: true });
                 }
             }
@@ -371,42 +342,6 @@ apiRouter.get('/availability', async (req, res) => {
     } catch (e) {
         console.error('Failed to fetch availability:', e);
         res.status(500).json({ error: 'Failed to fetch availability' });
-    }
-});
-
-// Endpoint: Hold Slot
-apiRouter.post('/availability/hold', async (req, res) => {
-    const { date, time, staff_id, hold_id } = req.body;
-    // @ts-ignore
-    const tenantId = req.tenant.id;
-
-    if (!date || !time || !hold_id) return res.status(400).json({ error: 'Missing hold details' });
-
-    try {
-        await query(
-            "INSERT INTO slot_holds (id, tenant_id, staff_id, range_date, range_time, hold_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
-            [getUUID(), tenantId, staff_id || 'general', date, time, hold_id]
-        );
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to hold slot' });
-    }
-});
-
-// Endpoint: Release Slot
-apiRouter.post('/availability/release', async (req, res) => {
-    const { date, time, hold_id } = req.body;
-    // @ts-ignore
-    const tenantId = req.tenant.id;
-
-    try {
-        await query(
-            "DELETE FROM slot_holds WHERE tenant_id = $1 AND range_date = $2 AND range_time = $3 AND hold_id = $4",
-            [tenantId, date, time, hold_id]
-        );
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to release slot' });
     }
 });
 

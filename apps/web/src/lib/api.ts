@@ -115,9 +115,8 @@ export const api = {
     getAppointments: async (): Promise<Appointment[]> => {
         return fetchApi('/api/appointments');
     },
-    getAvailability: async (staffId: string, date: string, serviceId?: string): Promise<TimeSlot[]> => {
-        const url = `/api/availability?date=${date}&staff_id=${staffId}${serviceId ? `&service_id=${serviceId}` : ''}`;
-        return fetchApi(url);
+    getAvailability: async (staffId: string, date: string): Promise<TimeSlot[]> => {
+        return fetchApi(`/api/availability?date=${date}&staff_id=${staffId}`);
     },
     createBooking: async (data: BookingData): Promise<{ appointmentId: string; init_point: string }> => {
         return fetchApi('/api/bookings', {
@@ -151,21 +150,13 @@ export const api = {
         });
     },
 
-    // Hold & Release Slots (Concurrency)
-    holdSlot: async (date: string, time: string, holdId: string, staffId: string = 'general') => {
-        return fetchApi('/api/availability/hold', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date, time, hold_id: holdId, staff_id: staffId }),
-        });
+    // Unused or unimplemented functions are stubbed here
+    holdTimeSlot: async (_date: string, _time: string, _holdId: string) => {
+        return { success: true };
     },
 
-    releaseSlot: async (date: string, time: string, holdId: string) => {
-        return fetchApi('/api/availability/release', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date, time, hold_id: holdId }),
-        });
+    releaseTimeSlot: async (_date: string, _time: string) => {
+        return { success: true };
     },
 
     // CRM / Favorites
@@ -185,24 +176,14 @@ export const api = {
     uploadImage: async (tenantId: string, folder: string, file: File, projectType: 'demo' | 'clients' = 'demo'): Promise<string> => {
         const formData = new FormData();
         formData.append('images', file);
-
-        // La API deduce client_id y project_id de la llave automáticamente.
-        // Solo necesitamos pasar el folder si queremos organizar.
         formData.append('folder', folder);
+        formData.append('projectType', projectType);
 
-        const uploadUrl = 'https://api.diabolicalservices.tech/api/images/upload';
-
-        // Use different tokens based on project type
-        const token = projectType === 'clients'
-            ? 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW'
-            : (process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X');
+        const uploadUrl = '/api/upload';
 
         try {
             const response = await fetch(uploadUrl, {
                 method: 'POST',
-                headers: {
-                    'x-api-key': token
-                },
                 body: formData
             });
 
@@ -213,13 +194,7 @@ export const api = {
 
             const data = await response.json();
 
-            // El CDN público usa el formato https://cdn.diabolicalservices.tech/{client-slug}/{filename}
-            // Para el proyecto Demo el slug es 'nailssalon'
-            // Para el proyecto Clientas el slug es 'nails-salon-clientas' (Deducido, si falla lo ajustamos)
             const clientSlug = projectType === 'clients' ? 'nailssalon' : 'nailssalon';
-            // NOTA: El usuario dijo que son dos proyectos distintos pero ambos parecen ser de la misma marca.
-            // Si el token es diferente, el CDN sabrá servirlo. 
-            // Según la guía, el slug suele ser fijo por cliente.
 
             if (data.uploaded && data.uploaded.length > 0) {
                 const filename = data.uploaded[0].filename;

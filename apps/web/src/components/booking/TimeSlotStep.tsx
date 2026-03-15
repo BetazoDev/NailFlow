@@ -12,10 +12,9 @@ interface TimeSlotStepProps {
     onBack: () => void;
     tenantId?: string;
     staffId?: string;
-    serviceId?: string;
 }
 
-export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onNext, onBack, tenantId = 'demo', staffId = 'staff-1', serviceId }: TimeSlotStepProps) {
+export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onNext, onBack, tenantId = 'demo', staffId = 'staff-1' }: TimeSlotStepProps) {
     const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
     const [loading, setLoading] = useState(false);
     const holdIdRef = useRef(`hold_${Date.now()}_${Math.random().toString(36).slice(2)}`);
@@ -31,7 +30,7 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
         async function loadAvailability() {
             setLoading(true);
             try {
-                const slots = await api.getAvailability(staffId, selectedDate, serviceId);
+                const slots = await api.getAvailability(selectedDate, staffId);
                 setTimeSlots(slots);
             } catch (err) {
                 console.error('Failed to load availability:', err);
@@ -41,23 +40,22 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
             }
         }
         loadAvailability();
-    }, [selectedDate, staffId, serviceId]);
+    }, [selectedDate, tenantId]);
 
     const handleSlotSelect = useCallback(async (time: string) => {
         // Release previous hold if any
         if (prevSlotRef.current && prevSlotRef.current !== time) {
-            api.releaseSlot(selectedDate, prevSlotRef.current, holdIdRef.current).catch(() => { });
+            api.releaseSlot(selectedDate, prevSlotRef.current).catch(() => { });
         }
         // Hold the new slot
         try {
-            await api.holdSlot(selectedDate, time, holdIdRef.current, staffId);
+            await api.holdSlot(selectedDate, time, holdIdRef.current);
         } catch (e) {
             console.error('Failed to hold slot:', e);
-            // Optionally: show a toast that slot was taken
         }
         prevSlotRef.current = time;
         onSelect(time);
-    }, [selectedDate, onSelect, staffId]);
+    }, [tenantId, selectedDate, onSelect]);
 
     const morningSlots = timeSlots.filter(s => parseInt(s.time.split(':')[0]) < 13);
     const afternoonSlots = timeSlots.filter(s => parseInt(s.time.split(':')[0]) >= 13);
