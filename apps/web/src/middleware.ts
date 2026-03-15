@@ -10,7 +10,7 @@ export const config = {
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
          */
-        "/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)",
+        "/((?!api/|proxy/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)",
     ],
 };
 
