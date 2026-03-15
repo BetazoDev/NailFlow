@@ -28,7 +28,7 @@ export async function POST(req: Request) {
         const response = await fetch(uploadUrl, {
             method: 'POST',
             headers: {
-                'x-api-key': token
+                'Authorization': `Bearer ${token}`
             },
             body: outboundFormData
         });

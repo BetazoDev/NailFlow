@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { getTenantByDomain, getTenantById } from './tenant';
-import { db } from './lib/firebase';
+import { db, auth } from './lib/firebase';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { query } from './lib/db';
 import { DateTime } from 'luxon';
@@ -89,6 +89,29 @@ app.use(async (req, res, next) => {
 // Create API Router to handle both cases (/api or direct)
 const apiRouter = express.Router();
 
+// Auth Middleware
+const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // In test mode without token or for local dev without enforcing
+    // Note: To secure production fully, you would want to remove this bypass
+    if (process.env.NODE_ENV === 'test') return next();
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized. Missing or invalid Authorization header.' });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    try {
+        const decodedToken = await auth.verifyIdToken(token);
+        // @ts-ignore
+        req.user = decodedToken;
+        next();
+    } catch (e: any) {
+        console.error('JWT Verification failed:', e.message);
+        return res.status(401).json({ error: 'Unauthorized. Invalid token.' });
+    }
+};
+
 // Health check inside router too
 apiRouter.get('/health', (req, res) => res.send('OK'));
 
@@ -152,7 +175,7 @@ apiRouter.get('/services', async (req, res) => {
 });
 
 // Endpoint: Create Service
-apiRouter.post('/services', async (req, res) => {
+apiRouter.post('/services', requireAuth, async (req, res) => {
     try {
         const { name, description, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
         // @ts-ignore
@@ -176,7 +199,7 @@ apiRouter.post('/services', async (req, res) => {
 });
 
 // Endpoint: Update Service
-apiRouter.put('/services/:id', async (req, res) => {
+apiRouter.put('/services/:id', requireAuth, async (req, res) => {
     try {
         const { name, description, duration_minutes, estimated_price, required_advance, category, image_url } = req.body;
         // @ts-ignore
@@ -194,13 +217,14 @@ apiRouter.put('/services/:id', async (req, res) => {
 });
 
 // Endpoint: Delete Service
-apiRouter.delete('/services/:id', async (req, res) => {
+apiRouter.delete('/services/:id', requireAuth, async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     const result = await query('DELETE FROM services WHERE id = $1 AND tenant_id = $2', [req.params.id, tenantId]);
     if (result.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
     res.json({ success: true });
 });
+
 
 // Endpoint: Get Staff
 apiRouter.get('/staff', async (req, res) => {
@@ -341,6 +365,14 @@ apiRouter.get('/availability', async (req, res) => {
             end: DateTime.fromJSDate(r.datetime_end).setZone('America/Mexico_City')
         }));
 
+        // Fetch active locks
+        const locksRes = await query(
+            `SELECT slot_time FROM slot_locks 
+             WHERE tenant_id = $1 AND staff_id = $2 AND expires_at > NOW()`,
+            [tenantId, staff_id]
+        );
+        const activeLocks = locksRes.rows.map(r => DateTime.fromJSDate(r.slot_time).setZone('America/Mexico_City'));
+
         const nowInCDMX = DateTime.now().setZone('America/Mexico_City');
         const bufferLimit = nowInCDMX.plus({ hours: 3 });
 
@@ -362,8 +394,9 @@ apiRouter.get('/availability', async (req, res) => {
             if (slotStart < bufferLimit) continue; // Buffer limit passed
 
             const hasOverlap = appointments.some(apt => slotStart < apt.end && slotEnd > apt.start);
+            const isLocked = activeLocks.some(l => l.hasSame(slotStart, 'minute'));
 
-            if (!hasOverlap) {
+            if (!hasOverlap && !isLocked) {
                 slots.push({
                     time: slotStart.toFormat('HH:mm'),
                     available: true
@@ -375,6 +408,52 @@ apiRouter.get('/availability', async (req, res) => {
     } catch (e) {
         console.error('Failed to fetch availability:', e);
         res.status(500).json({ error: 'Failed to fetch availability' });
+    }
+});
+
+// Endpoint: Hold Slot
+apiRouter.post('/availability/hold', async (req, res) => {
+    const { date, time, staff_id } = req.body;
+    // @ts-ignore
+    const tenantId = req.tenant.id;
+
+    if (!date || !time || !staff_id) return res.status(400).json({ error: 'Date, time, and staff_id are required' });
+
+    try {
+        const slot_time = DateTime.fromISO(`${date}T${time}:00`, { zone: 'America/Mexico_City' }).toJSDate();
+        const expires_at = DateTime.now().plus({ minutes: 10 }).toJSDate();
+
+        await query(
+            `INSERT INTO slot_locks (tenant_id, staff_id, slot_time, expires_at) 
+             VALUES ($1, $2, $3, $4) 
+             ON CONFLICT (tenant_id, staff_id, slot_time) DO UPDATE SET expires_at = EXCLUDED.expires_at`,
+            [tenantId, staff_id, slot_time, expires_at]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Failed to hold slot:', e);
+        res.status(500).json({ error: 'Failed to hold slot' });
+    }
+});
+
+// Endpoint: Release Slot
+apiRouter.delete('/availability/hold', async (req, res) => {
+    const { date, time, staff_id } = req.query;
+    // @ts-ignore
+    const tenantId = req.tenant.id;
+
+    if (!date || !time || !staff_id) return res.status(400).json({ error: 'Date, time, and staff_id are required' });
+
+    try {
+        const slot_time = DateTime.fromISO(`${date}T${time}:00`, { zone: 'America/Mexico_City' }).toJSDate();
+        await query(
+            'DELETE FROM slot_locks WHERE tenant_id = $1 AND staff_id = $2 AND slot_time = $3',
+            [tenantId, staff_id, slot_time]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Failed to release slot:', e);
+        res.status(500).json({ error: 'Failed to release slot' });
     }
 });
 
@@ -519,8 +598,8 @@ apiRouter.post('/webhooks/mercadopago', async (req, res) => {
     res.sendStatus(200);
 });
 
-// Endpoint: Update Tenant Branding
-apiRouter.put('/tenant', async (req, res) => {
+// Endpoint: Admin Update Tenant Branding
+apiRouter.put('/tenant', requireAuth, async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
     const { name, branding, settings } = req.body;
@@ -536,8 +615,8 @@ apiRouter.put('/tenant', async (req, res) => {
     }
 });
 
-// Endpoint: Complete Appointment
-apiRouter.post('/appointments/:id/complete', async (req, res) => {
+// Endpoint: Complete Booking Server Action (From UI logic when advancing status to paid)
+apiRouter.post('/appointments/:id/complete', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         // @ts-ignore
@@ -553,7 +632,7 @@ apiRouter.post('/appointments/:id/complete', async (req, res) => {
 });
 
 // Endpoint: Staff Management (POST)
-apiRouter.post('/staff', async (req, res) => {
+apiRouter.post('/staff', requireAuth, async (req, res) => {
     try {
         // @ts-ignore
         const tenantId = req.tenant.id;
@@ -588,7 +667,7 @@ apiRouter.post('/staff', async (req, res) => {
 });
 
 // Endpoint: Staff Management (PUT)
-apiRouter.put('/staff/:id', async (req, res) => {
+apiRouter.put('/staff/:id', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         // @ts-ignore

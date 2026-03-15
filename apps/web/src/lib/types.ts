@@ -128,6 +128,9 @@ export interface BookingData {
   image_url?: string;
   image_urls?: string[];
   notes?: string;
+  payment_method?: string;
 }
 
 export type BookingStep = 'personal' | 'service' | 'datetime' | 'inspiration' | 'summary' | 'payment' | 'confirmation';
+
+export type PaymentMethod = 'prueba' | 'card' | 'apple' | 'google' | 'stripe' | 'paypal' | 'mercado';

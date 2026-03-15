@@ -71,6 +71,14 @@ export async function initDb() {
       client_phone VARCHAR(255),
       PRIMARY KEY (tenant_id, client_phone)
     );
+
+    CREATE TABLE IF NOT EXISTS slot_locks (
+      tenant_id TEXT,
+      staff_id TEXT,
+      slot_time TIMESTAMP WITH TIME ZONE,
+      expires_at TIMESTAMP WITH TIME ZONE,
+      PRIMARY KEY (tenant_id, staff_id, slot_time)
+    );
   `);
 
   // Migrations: Ensure all columns exist

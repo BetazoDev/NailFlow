@@ -1,0 +1,9 @@
+﻿src/app/admin/profile/page.tsx(67,17): error TS2322: Type '{ logo_url: string; tagline: string; primary_color?: undefined; secondary_color?: undefined; } | { logo_url: string; tagline: string; primary_color: string; secondary_color: string; }' is not assignable to type '{ logo_url: string; primary_color: string; secondary_color: string; photo_url?: string | undefined; palette_id?: string | undefined; typography?: string | undefined; tagline?: string | undefined; } | undefined'.
+  Type '{ logo_url: string; tagline: string; primary_color?: undefined; secondary_color?: undefined; }' is not assignable to type '{ logo_url: string; primary_color: string; secondary_color: string; photo_url?: string | undefined; palette_id?: string | undefined; typography?: string | undefined; tagline?: string | undefined; }'.
+    Types of property 'primary_color' are incompatible.
+      Type 'undefined' is not assignable to type 'string'.
+src/components/booking/BookingWizardPage.tsx(195,29): error TS2322: Type '{ imageUrls: string[]; onImagesChange: Dispatch<SetStateAction<string[]>>; onNext: () => void; onBack: () => void; staffName: string; }' is not assignable to type 'IntrinsicAttributes & ImageUploadStepProps'.
+  Property 'imageUrls' does not exist on type 'IntrinsicAttributes & ImageUploadStepProps'.
+src/components/booking/BookingWizardPage.tsx(203,26): error TS2741: Property 'localPreviews' is missing in type '{ booking: BookingData; onNext: () => void; onBack: () => void; onAddImage: () => void; }' but required in type 'SummaryStepProps'.
+src/components/booking/BookingWizardPage.tsx(213,29): error TS2322: Type '{ booking: BookingData; onNext: () => void; onBack: () => void; }' is not assignable to type 'IntrinsicAttributes & PaymentStepProps'.
+  Property 'onNext' does not exist on type 'IntrinsicAttributes & PaymentStepProps'.

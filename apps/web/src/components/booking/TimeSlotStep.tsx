@@ -46,17 +46,17 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
     const handleSlotSelect = useCallback(async (time: string) => {
         // Release previous hold if any
         if (prevSlotRef.current && prevSlotRef.current !== time) {
-            api.releaseTimeSlot(selectedDate, prevSlotRef.current).catch(() => { });
+            api.releaseTimeSlot(selectedDate, prevSlotRef.current, staffId!).catch(() => { });
         }
         // Hold the new slot
         try {
-            await api.holdTimeSlot(selectedDate, time, holdIdRef.current);
+            await api.holdTimeSlot(selectedDate, time, staffId!);
         } catch (e) {
             console.error('Failed to hold slot:', e);
         }
         prevSlotRef.current = time;
         onSelect(time);
-    }, [tenantId, selectedDate, onSelect]);
+    }, [tenantId, selectedDate, staffId, onSelect]);
 
     const morningSlots = timeSlots.filter(s => parseInt(s.time.split(':')[0]) < 13);
     const afternoonSlots = timeSlots.filter(s => parseInt(s.time.split(':')[0]) >= 13);

@@ -5,6 +5,9 @@ import { Appointment, Service, Staff } from '@/lib/types';
 
 import { api } from '@/lib/api';
 import { useTenant } from '@/lib/tenant-context';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { MetricsGrid } from '@/components/admin/MetricsGrid';
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
     confirmed: { label: 'CONFIRMADA', color: 'var(--aesthetic-pink)', bg: 'var(--aesthetic-soft-pink)' },
@@ -353,29 +356,30 @@ export default function AdminDashboard() {
                 })}
             </div>
 
-            {/* Income card with period selector */}
-            <div className="mx-6 mt-6 p-8 bg-white/60 backdrop-blur-sm rounded-[2.5rem] border border-aesthetic-accent shadow-minimal flex flex-col items-center text-center">
-                {/* Period selector */}
-                <div className="flex gap-1 bg-aesthetic-cream rounded-full p-1 mb-6 self-stretch">
-                    {([['day', 'Hoy'], ['week', 'Semana'], ['month', 'Mes']] as [IncomePeriod, string][]).map(([id, label]) => (
-                        <button
-                            key={id}
-                            onClick={() => setIncomePeriod(id)}
-                            className={`flex-1 py-1.5 rounded-full text-[10px] font-bold tracking-[0.1em] uppercase transition-all duration-200 ${incomePeriod === id ? 'bg-white shadow-sm text-aesthetic-taupe' : 'text-aesthetic-muted/60'}`}
-                        >
-                            {label}
-                        </button>
-                    ))}
+            {/* Metrics Dashboard */}
+            <div className="px-6 mt-8">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="font-display text-xl italic text-aesthetic-taupe">Resumen de Negocio</h2>
+                    <div className="flex gap-1 bg-aesthetic-cream rounded-full p-1">
+                        {([['day', 'Hoy'], ['week', 'Semana'], ['month', 'Mes']] as [IncomePeriod, string][]).map(([id, label]) => (
+                            <button
+                                key={id}
+                                onClick={() => setIncomePeriod(id)}
+                                className={`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-[0.1em] uppercase transition-all duration-200 ${incomePeriod === id ? 'bg-white shadow-sm text-aesthetic-taupe' : 'text-aesthetic-muted/60'}`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                <p className="text-[10px] tracking-[0.3em] uppercase text-aesthetic-muted mb-4 font-display italic font-medium">
-                    Ingresos — {periodLabel}
-                </p>
-                <div className="flex flex-col items-center">
-                    <p className="font-display text-5xl font-light italic tracking-tight text-aesthetic-taupe mb-2">${displayIncome.toLocaleString()}</p>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-green-50 text-[#88C999] border border-green-100/50">
-                        {displayCompletedCount} cita{displayCompletedCount !== 1 ? 's' : ''} completada{displayCompletedCount !== 1 ? 's' : ''}
-                    </span>
-                </div>
+                
+                <MetricsGrid 
+                    income={displayIncome}
+                    completedCitations={displayCompletedCount}
+                    pendingCitations={pendingAppointments.length}
+                    newClients={Math.floor(appointments.length * 0.3)} // Mock stat for now
+                    periodLabel={periodLabel}
+                />
             </div>
 
             {/* Pending Appointments */}

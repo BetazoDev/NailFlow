@@ -1,8 +1,10 @@
 'use client';
 
-import { BookingData } from '@/lib/types';
+import { PaymentMethod, BookingData } from '@/lib/types';
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 
 interface PaymentStepProps {
     booking: BookingData;
@@ -14,7 +16,7 @@ interface PaymentStepProps {
     onBack: () => void;
 }
 
-type PaymentMethod = 'card' | 'apple' | 'mercado' | 'prueba' | 'stripe' | 'paypal' | 'google';
+
 
 export default function PaymentStep({ booking, pendingFiles, tenantId, onBookingConfirmed, onBack }: PaymentStepProps) {
     const [method, setMethod] = useState<PaymentMethod>('prueba');
@@ -73,7 +75,7 @@ export default function PaymentStep({ booking, pendingFiles, tenantId, onBooking
                     image_url: cdnUrls[0] || undefined,
                 };
 
-                const result = await api.createBooking(bookingPayload as any);
+                const result = await api.createBooking(bookingPayload);
                 if (result.init_point) {
                     window.location.href = result.init_point;
                 } else {
@@ -132,23 +134,25 @@ export default function PaymentStep({ booking, pendingFiles, tenantId, onBooking
 
                 {/* Payment method selector */}
                 <div>
-                    <p className="text-[11px] tracking-[0.15em] text-nf-gray uppercase mb-3">Método de Pago</p>
+                    <p className="text-[11px] tracking-[0.15em] text-nf-gray uppercase mb-3 font-bold opacity-60">Método de Pago</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                         {methods.map(m => (
                             <button
                                 key={m.id}
                                 onClick={() => setMethod(m.id)}
-                                className={`
-                                    flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200
-                                    ${method === m.id ? 'border-pink bg-white shadow-md' : 'border-cream-dark bg-white/60'}
-                                `}
+                                className="focus:outline-none"
                             >
-                                <div className={method === m.id ? 'text-pink' : 'text-aesthetic-muted/40'}>
-                                    <span className="material-symbol text-2xl font-light">{m.icon}</span>
-                                </div>
-                                <span className={`text-[8px] tracking-[0.1em] uppercase font-bold ${method === m.id ? 'text-pink' : 'text-aesthetic-muted/60'}`}>
-                                    {m.label}
-                                </span>
+                                <Card 
+                                    variant={method === m.id ? 'white' : 'white'} 
+                                    className={`flex flex-col items-center gap-2 p-4 border-2 transition-all duration-300 ${method === m.id ? 'border-pink ring-4 ring-pink/10 scale-[1.02]' : 'border-transparent opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}`}
+                                >
+                                    <div className={method === m.id ? 'text-pink' : 'text-aesthetic-muted/40'}>
+                                        <span className="material-symbol text-2xl font-light">{m.icon}</span>
+                                    </div>
+                                    <span className={`text-[8px] tracking-[0.1em] uppercase font-bold ${method === m.id ? 'text-pink' : 'text-aesthetic-muted/60'}`}>
+                                        {m.label}
+                                    </span>
+                                </Card>
                             </button>
                         ))}
                     </div>
@@ -179,25 +183,16 @@ export default function PaymentStep({ booking, pendingFiles, tenantId, onBooking
 
             {/* CTA */}
             <div className="px-6 pb-10 pt-4">
-                <button
+                <Button
                     onClick={handlePayment}
-                    disabled={loading}
-                    className="w-full py-4 rounded-full text-base font-serif flex items-center justify-center gap-2 transition-all duration-200 shadow-lg disabled:opacity-70"
-                    style={{ background: method === 'prueba' ? 'var(--charcoal)' : 'var(--coral)', color: 'white' }}
+                    isLoading={loading}
+                    variant={method === 'prueba' ? 'secondary' : 'primary'}
+                    className="w-full h-16 shadow-lg"
+                    leftIcon={<span className="material-symbol text-lg">lock</span>}
                 >
-                    {loading ? (
-                        <div className="flex items-center gap-3">
-                            <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                            <span className="text-sm">{loadingMsg || 'Procesando...'}</span>
-                        </div>
-                    ) : (
-                        <>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                            {method === 'prueba' ? 'Confirmar Reserva (Prueba)' : 'Confirmar Pago Seguro'}
-                        </>
-                    )}
-                </button>
-                <p className="text-center text-[10px] tracking-[0.18em] text-gray-light uppercase mt-4">
+                    {method === 'prueba' ? 'Confirmar Reserva (Prueba)' : 'Confirmar Pago Seguro'}
+                </Button>
+                <p className="text-center text-[10px] tracking-[0.18em] text-gray-light uppercase mt-6 opacity-60 font-bold">
                     Protección SSL de Grado Bancario
                 </p>
             </div>

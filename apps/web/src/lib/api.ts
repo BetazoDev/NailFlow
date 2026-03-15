@@ -1,4 +1,5 @@
 import { Tenant, Staff, Service, Appointment, BookingData, TimeSlot } from './types';
+import { auth } from './firebase';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://demo.diabolicalservices.tech';
 
@@ -8,6 +9,16 @@ const fetchApi = async (path: string, options: RequestInit = {}, domain?: string
 
     if (typeof window !== 'undefined') {
         headers.set('x-tenant-domain', window.location.hostname);
+        
+        // Add auth token if user is signed in
+        if (auth.currentUser) {
+            try {
+                const token = await auth.currentUser.getIdToken();
+                headers.set('Authorization', `Bearer ${token}`);
+            } catch (e) {
+                console.warn('Failed to get auth token', e);
+            }
+        }
     } else if (domain) {
         headers.set('x-tenant-domain', domain);
     }
@@ -151,13 +162,19 @@ export const api = {
         });
     },
 
-    // Unused or unimplemented functions are stubbed here
-    holdTimeSlot: async (_date: string, _time: string, _holdId: string) => {
-        return { success: true };
+    // Slot Locking
+    holdTimeSlot: async (date: string, time: string, staff_id: string): Promise<{ success: boolean }> => {
+        return fetchApi('/api/availability/hold', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, time, staff_id }),
+        });
     },
 
-    releaseTimeSlot: async (_date: string, _time: string) => {
-        return { success: true };
+    releaseTimeSlot: async (date: string, time: string, staff_id: string): Promise<{ success: boolean }> => {
+        return fetchApi(`/api/availability/hold?date=${date}&time=${time}&staff_id=${staff_id}`, {
+            method: 'DELETE',
+        });
     },
 
     // CRM / Favorites

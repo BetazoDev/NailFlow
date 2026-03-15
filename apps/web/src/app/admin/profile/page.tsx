@@ -9,6 +9,9 @@ import {
     reauthenticateWithCredential,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Card } from '@/components/ui/Card';
 
 export default function ProfilePage() {
     const { tenantId } = useTenant();
@@ -58,7 +61,7 @@ export default function ProfilePage() {
                 setLogoPreview(finalLogoUrl);
             }
 
-            const updatedBranding = currentBranding
+            const updatedBranding: any = currentBranding
                 ? { ...currentBranding, logo_url: finalLogoUrl, tagline }
                 : { logo_url: finalLogoUrl, tagline, primary_color: '#C97794', secondary_color: '#F8D2D8' };
 
@@ -128,7 +131,7 @@ export default function ProfilePage() {
 
             {/* Avatar section */}
             <div className="px-6 mb-8">
-                <div className="flex items-center gap-5 bg-white rounded-[2rem] p-6 border border-aesthetic-accent shadow-minimal">
+                <Card variant="white" className="flex items-center gap-5 p-6">
                     <div className="size-16 rounded-full bg-aesthetic-soft-pink border-2 border-aesthetic-pink/30 flex items-center justify-center text-aesthetic-taupe text-2xl font-display italic flex-shrink-0">
                         {user?.email?.charAt(0).toUpperCase() || '?'}
                     </div>
@@ -136,7 +139,7 @@ export default function ProfilePage() {
                         <p className="font-display text-lg italic text-aesthetic-taupe truncate">{user?.email || 'Sin sesión'}</p>
                         <p className="text-[10px] tracking-[0.15em] text-aesthetic-muted uppercase mt-1">Administrador</p>
                     </div>
-                </div>
+                </Card>
             </div>
 
             {/* Tabs */}
@@ -157,24 +160,24 @@ export default function ProfilePage() {
             {/* Tab Content */}
             <div className="px-6">
                 {tab === 'info' && (
-                    <div className="bg-white rounded-[2rem] p-8 border border-aesthetic-accent shadow-minimal space-y-6">
+                    <Card variant="white" className="p-8 space-y-6">
                         <div className="space-y-4">
                             <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Logotipo del negocio</label>
                             <div className="flex items-center gap-6">
-                                <div className="relative cursor-pointer" onClick={() => logoRef.current?.click()}>
-                                    <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-aesthetic-accent/50 flex items-center justify-center bg-aesthetic-cream/40">
+                                <div className="relative cursor-pointer group" onClick={() => logoRef.current?.click()}>
+                                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-aesthetic-accent/50 flex items-center justify-center bg-aesthetic-cream/40 transition-transform group-hover:scale-105 duration-500">
                                         {logoPreview ? (
                                             <img src={api.getPublicUrl(logoPreview)} alt="logo" className="w-full h-full object-cover" />
                                         ) : (
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--aesthetic-muted)" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                            <span className="material-symbol text-3xl text-aesthetic-muted">image</span>
                                         )}
                                     </div>
-                                    <div className="absolute -bottom-1 -right-1 size-7 bg-aesthetic-pink rounded-full flex items-center justify-center border-2 border-white shadow-soft text-white">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+                                    <div className="absolute -bottom-1 -right-1 size-8 bg-aesthetic-pink rounded-full flex items-center justify-center border-2 border-white shadow-soft text-white">
+                                        <span className="material-symbol text-sm">photo_camera</span>
                                     </div>
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs text-aesthetic-muted/80 leading-relaxed mb-1">
+                                    <p className="text-xs text-aesthetic-muted/80 leading-relaxed mb-2">
                                         Sube el logotipo de tu salón para que aparezca en tu agenda pública y en la página de reservas.
                                     </p>
                                     <p className="text-[9px] font-bold text-aesthetic-pink tracking-widest uppercase">
@@ -195,24 +198,22 @@ export default function ProfilePage() {
                                 }}
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Nombre del salón</label>
-                            <input
-                                value={salonName}
-                                onChange={e => setSalonName(e.target.value)}
-                                className="w-full bg-aesthetic-cream/40 border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/40 rounded-2xl p-4 font-display italic text-aesthetic-taupe"
-                                placeholder="Ej. Nails by Ana"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Tagline / Eslogan</label>
-                            <input
-                                value={tagline}
-                                onChange={e => setTagline(e.target.value)}
-                                className="w-full bg-aesthetic-cream/40 border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/40 rounded-2xl p-4 font-display italic text-aesthetic-taupe"
-                                placeholder="Ej. Tu belleza, nuestra pasión"
-                            />
-                        </div>
+
+                        <Input 
+                            label="Nombre del salón"
+                            value={salonName}
+                            onChange={e => setSalonName(e.target.value)}
+                            placeholder="Ej. Nails by Ana"
+                            leftIcon="storefront"
+                        />
+
+                        <Input 
+                            label="Tagline / Eslogan"
+                            value={tagline}
+                            onChange={e => setTagline(e.target.value)}
+                            placeholder="Ej. Tu belleza, nuestra pasión"
+                            leftIcon="auto_awesome"
+                        />
 
                         {saveMsg && (
                             <div className={`p-4 rounded-2xl text-sm text-center ${saveMsg.includes('Error') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-[#88C999]'}`}>
@@ -220,48 +221,42 @@ export default function ProfilePage() {
                             </div>
                         )}
 
-                        <button
+                        <Button
                             onClick={handleSaveInfo}
-                            disabled={saving}
-                            className="w-full bg-aesthetic-pink text-white py-4 rounded-2xl font-bold text-[11px] tracking-[0.2em] uppercase transition-all hover:bg-aesthetic-taupe active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                            isLoading={saving}
+                            className="w-full h-14"
                         >
-                            {saving ? <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Guardar Cambios'}
-                        </button>
-                    </div>
+                            Guardar Cambios
+                        </Button>
+                    </Card>
                 )}
 
                 {tab === 'password' && (
-                    <div className="bg-white rounded-[2rem] p-8 border border-aesthetic-accent shadow-minimal space-y-6">
-                        <div className="space-y-2">
-                            <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Contraseña actual</label>
-                            <input
-                                type="password"
-                                value={currentPassword}
-                                onChange={e => setCurrentPassword(e.target.value)}
-                                className="w-full bg-aesthetic-cream/40 border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/40 rounded-2xl p-4 font-display italic text-aesthetic-taupe"
-                                placeholder="••••••••"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Nueva contraseña</label>
-                            <input
-                                type="password"
-                                value={newPassword}
-                                onChange={e => setNewPassword(e.target.value)}
-                                className="w-full bg-aesthetic-cream/40 border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/40 rounded-2xl p-4 font-display italic text-aesthetic-taupe"
-                                placeholder="••••••••"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Confirmar nueva contraseña</label>
-                            <input
-                                type="password"
-                                value={confirmPassword}
-                                onChange={e => setConfirmPassword(e.target.value)}
-                                className="w-full bg-aesthetic-cream/40 border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/40 rounded-2xl p-4 font-display italic text-aesthetic-taupe"
-                                placeholder="••••••••"
-                            />
-                        </div>
+                    <Card variant="white" className="p-8 space-y-6">
+                        <Input 
+                            label="Contraseña actual"
+                            type="password"
+                            value={currentPassword}
+                            onChange={e => setCurrentPassword(e.target.value)}
+                            placeholder="••••••••"
+                            leftIcon="lock_open"
+                        />
+                        <Input 
+                            label="Nueva contraseña"
+                            type="password"
+                            value={newPassword}
+                            onChange={e => setNewPassword(e.target.value)}
+                            placeholder="••••••••"
+                            leftIcon="lock"
+                        />
+                        <Input 
+                            label="Confirmar nueva contraseña"
+                            type="password"
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            placeholder="••••••••"
+                            leftIcon="lock_reset"
+                        />
 
                         {pwError && (
                             <div className="p-4 rounded-2xl text-sm text-center bg-red-50 text-red-600">{pwError}</div>
@@ -270,14 +265,15 @@ export default function ProfilePage() {
                             <div className="p-4 rounded-2xl text-sm text-center bg-green-50 text-[#88C999]">{pwMsg}</div>
                         )}
 
-                        <button
+                        <Button
                             onClick={handleChangePassword}
-                            disabled={pwSaving}
-                            className="w-full bg-aesthetic-taupe text-white py-4 rounded-2xl font-bold text-[11px] tracking-[0.2em] uppercase transition-all hover:bg-black active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                            isLoading={pwSaving}
+                            variant="primary"
+                            className="w-full h-14"
                         >
-                            {pwSaving ? <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Cambiar Contraseña'}
-                        </button>
-                    </div>
+                            Cambiar Contraseña
+                        </Button>
+                    </Card>
                 )}
             </div>
         </div>

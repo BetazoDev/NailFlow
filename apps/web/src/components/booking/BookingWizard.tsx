@@ -10,9 +10,9 @@ import SummaryStep from './SummaryStep';
 import PaymentStep from './PaymentStep';
 import ConfirmationStep from './ConfirmationStep';
 
-const STEPS: BookingStep[] = ['personal', 'service', 'datetime', 'inspiration', 'summary', 'payment', 'confirmation'];
+import { BookingProvider, useBookingContext } from './BookingContext';
 
-interface BookingWizardProps {
+export interface BookingWizardProps {
     tenantId: string;
     staffId?: string;
     staffName?: string;
@@ -22,84 +22,22 @@ interface BookingWizardProps {
     initialStep?: BookingStep;
 }
 
-export default function BookingWizard({
-    tenantId,
-    staffId = 'staff-1',
-    staffName = 'Ana López',
-    staffPhoto,
-    salonName = 'Ana Nails Studio',
-    onStepChange,
-    initialStep = 'personal',
-}: BookingWizardProps) {
-    const [currentStep, setCurrentStep] = useState<BookingStep>(initialStep);
-
-    // Booking state
-    const [clientName, setClientName] = useState('');
-    const [clientPhone, setClientPhone] = useState('');
-    const [clientEmail, setClientEmail] = useState('');
-    const [selectedService, setSelectedService] = useState<Service | null>(null);
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [selectedTime, setSelectedTime] = useState<string | null>(null);
-
-    // Image state: local Files + blob URLs for preview
-    const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-    const [localPreviews, setLocalPreviews] = useState<string[]>([]);
-
-    // CDN-uploaded URLs — populated only after successful booking
-    const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
-    const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<string | null>(null);
-
-    const navigate = (step: BookingStep) => {
-        setCurrentStep(step);
-        onStepChange?.(step);
-    };
-
-    const goNext = () => {
-        const i = STEPS.indexOf(currentStep);
-        if (i < STEPS.length - 1) navigate(STEPS[i + 1]);
-    };
-    const goBack = () => {
-        const i = STEPS.indexOf(currentStep);
-        if (i > 0) navigate(STEPS[i - 1]);
-    };
-
-    const handleFilesChange = (files: File[], previews: string[]) => {
-        setPendingFiles(files);
-        setLocalPreviews(previews);
-    };
-
-    const handleBookingConfirmed = (appointmentId: string, cdnUrls?: string[]) => {
-        if (cdnUrls) setUploadedImageUrls(cdnUrls);
-        setConfirmedAppointmentId(appointmentId);
-        goNext();
-    };
-
-    const bookingData: BookingData = useMemo(() => {
-        const data: any = {
-            tenant_id: tenantId,
-            date: selectedDate || '',
-            time: selectedTime || '',
-            service_id: selectedService?.id || '',
-            service_name: selectedService?.name || '',
-            service_price: selectedService?.estimated_price || 0,
-            service_duration: selectedService?.duration_minutes || 0,
-            staff_id: staffId || 'staff-1',
-            staff_name: staffName,
-            client_name: clientName,
-            client_phone: clientPhone,
-        };
-
-        if (staffPhoto) data.staff_photo = staffPhoto;
-        if (clientEmail) data.client_email = clientEmail;
-
-        // After booking is confirmed, we have CDN URLs
-        if (uploadedImageUrls.length > 0) {
-            data.image_urls = uploadedImageUrls;
-            data.image_url = uploadedImageUrls[0];
-        }
-
-        return data as BookingData;
-    }, [tenantId, selectedDate, selectedTime, selectedService, staffId, staffName, staffPhoto, clientName, clientPhone, clientEmail, uploadedImageUrls]);
+function BookingSteps() {
+    const { 
+        currentStep, 
+        clientName, setClientName,
+        clientPhone, setClientPhone,
+        clientEmail, setClientEmail,
+        goNext, goBack, navigate,
+        staffName, staffPhoto,
+        selectedService, setSelectedService,
+        tenantId, staffId,
+        selectedDate, setSelectedDate,
+        selectedTime, setSelectedTime,
+        pendingFiles, localPreviews, handleFilesChange,
+        bookingData, handleBookingConfirmed,
+        confirmedAppointmentId, salonName
+    } = useBookingContext();
 
     return (
         <div className="flex flex-col h-full" style={{ background: 'var(--cream)' }}>
@@ -179,3 +117,12 @@ export default function BookingWizard({
         </div>
     );
 }
+
+export default function BookingWizard(props: BookingWizardProps) {
+    return (
+        <BookingProvider {...props}>
+            <BookingSteps />
+        </BookingProvider>
+    );
+}
+
