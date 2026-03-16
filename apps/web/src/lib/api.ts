@@ -230,27 +230,36 @@ export const api = {
         }
     },
 
-    getPublicUrl: (url: string | null | undefined, projectType: 'demo' | 'clients' = 'demo'): string => {
+    getPublicUrl: (url: string | null | undefined): string => {
         if (!url) return '';
-        // If it's a blob URL (local preview), return as is
+        // Blob URLs (local preview) — return as-is
         if (url.startsWith('blob:')) return url;
-        // If it's already a full URL and has a token, return as is
-        if (url.includes('api_key=') || url.includes('token=')) return url;
+        // Already proxied or external URL — return as-is
+        if (url.startsWith(`${API_URL}/api/img/`)) return url;
+        // External image not on our CDN — return as-is
+        if (url.startsWith('http') && !url.includes('cdn.diabolicalservices.tech')) return url;
 
-        const demoToken = process.env.NEXT_PUBLIC_CDN_DEMO_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
-        const clientsToken = process.env.NEXT_PUBLIC_CDN_CLIENTS_TOKEN || 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
-        const token = projectType === 'clients' ? clientsToken : demoToken;
-
-        if (url.startsWith('https://cdn.diabolicalservices.tech/')) {
-            const separator = url.includes('?') ? '&' : '?';
-            // According to the guide, 'api_key' is the standard param
-            return `${url}${separator}api_key=${token}`;
+        // Strip existing api_key param if someone saved the raw CDN URL to DB
+        let cleanUrl = url;
+        try {
+            const parsed = new URL(url.startsWith('http') ? url : `https://cdn.diabolicalservices.tech/${url}`);
+            parsed.searchParams.delete('api_key');
+            parsed.searchParams.delete('token');
+            cleanUrl = parsed.toString();
+        } catch {
+            cleanUrl = url;
         }
 
-        // Handle relative paths (legacy or simple names)
+        // Extract path after the CDN base: https://cdn.diabolicalservices.tech/SLUG/FILE
+        const CDN_BASE = 'https://cdn.diabolicalservices.tech/';
+        if (cleanUrl.startsWith(CDN_BASE)) {
+            const cdnPath = cleanUrl.slice(CDN_BASE.length); // e.g. "nailssalon/photo.jpg"
+            return `${API_URL}/api/img/${cdnPath}`;
+        }
+
+        // Legacy: relative path or just a filename
         if (!url.startsWith('http') && url.length > 3) {
-            const slug = 'nailssalon';
-            return `https://cdn.diabolicalservices.tech/${slug}/${url}?api_key=${token}`;
+            return `${API_URL}/api/img/nailssalon/${url}`;
         }
 
         return url;

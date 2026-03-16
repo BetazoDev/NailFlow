@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 
+// Server-side CDN token — NEVER sent to the browser
+const CDN_DEMO_TOKEN = process.env.CDN_DEMO_TOKEN || process.env.CDN_UPLOAD_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+const CDN_CLIENTS_TOKEN = process.env.CDN_CLIENTS_TOKEN || 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.diabolicalservices.tech';
+
 export async function POST(req: Request) {
     try {
         const formData = await req.formData();
@@ -17,9 +22,7 @@ export async function POST(req: Request) {
             outboundFormData.append('folder', folder);
         }
 
-        const token = projectType === 'clients'
-            ? process.env.CDN_CLIENTS_TOKEN || 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW' 
-            : process.env.CDN_DEMO_TOKEN || process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN || process.env.NEXT_PUBLIC_CDN_KEY || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+        const token = projectType === 'clients' ? CDN_CLIENTS_TOKEN : CDN_DEMO_TOKEN;
 
         const uploadUrl = 'https://api.diabolicalservices.tech/api/images/upload';
         
@@ -37,10 +40,31 @@ export async function POST(req: Request) {
         }
 
         const data = await response.json();
-        console.log(`CDN Upload Success for ${projectType}:`, data);
+
+        // ── Security: sanitize CDN URLs before returning to the browser ──────
+        // Replace direct CDN URLs (with api_key) → our image proxy URLs
+        const sanitize = (url: string | undefined) => {
+            if (!url) return url;
+            if (!url.includes('cdn.diabolicalservices.tech')) return url;
+            try {
+                const parsed = new URL(url);
+                parsed.searchParams.delete('api_key');
+                parsed.searchParams.delete('token');
+                // Convert to proxy URL
+                const cdnPath = parsed.pathname.replace(/^\//, ''); // "nailssalon/file.jpg"
+                return `${API_URL}/api/img/${cdnPath}`;
+            } catch {
+                return url;
+            }
+        };
+
+        if (data.uploaded) data.uploaded = data.uploaded.map((item: any) => ({ ...item, url: sanitize(item.url) }));
+        if (data.duplicates) data.duplicates = data.duplicates.map((item: any) => ({ ...item, url: sanitize(item.url) }));
+
+        console.log(`[Upload Proxy] Success for ${projectType}`);
         return NextResponse.json(data);
     } catch (e: any) {
-        console.error('Proxy upload error:', e);
+        console.error('[Upload Proxy] Error:', e);
         return NextResponse.json({ error: 'Internal Server Error', details: e.message }, { status: 500 });
     }
 }

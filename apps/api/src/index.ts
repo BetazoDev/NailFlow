@@ -109,6 +109,41 @@ app.use(async (req, res, next) => {
     }
 });
 
+// ─── Image Proxy (Security: API key never exposed to browser) ────────────────
+// Route: GET /api/img/:slug/:...filename
+// The client uses clean URLs like /api/img/nailssalon/photo.jpg
+// The server adds the CDN API key before fetching and pipes the response back.
+app.get('/api/img/:slug/*', async (req, res) => {
+    const slug = req.params.slug;
+    const filename = (req.params as any)[0]; // everything after :slug/
+
+    const CDN_TOKEN = process.env.CDN_UPLOAD_TOKEN
+        || process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN
+        || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+
+    const cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${filename}?api_key=${CDN_TOKEN}`;
+
+    try {
+        const cdnRes = await fetch(cdnUrl);
+        if (!cdnRes.ok) {
+            return res.status(cdnRes.status).json({ error: 'Image not found on CDN' });
+        }
+
+        // Pipe content-type and cache headers
+        const contentType = cdnRes.headers.get('content-type') || 'image/jpeg';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        // Security: no API key in any response header
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+
+        const buffer = await cdnRes.arrayBuffer();
+        res.send(Buffer.from(buffer));
+    } catch (e: any) {
+        console.error('[Image Proxy] Error:', e.message);
+        res.status(502).json({ error: 'Failed to fetch image from CDN' });
+    }
+});
+
 // Create API Router to handle both cases (/api or direct)
 const apiRouter = express.Router();
 
