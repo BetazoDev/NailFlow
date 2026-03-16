@@ -2,6 +2,7 @@ import React from 'react';
 import BookingWizard from '@/components/booking/BookingWizard';
 import { api } from '@/lib/api';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { PALETTES, TYPOGRAPHY } from '@/lib/constants';
 
 interface Props {
@@ -10,9 +11,6 @@ interface Props {
     }
 }
 
-import { headers } from 'next/headers';
-
-// Fallback tenant domain for the primary root application
 const getDefaultDomain = () => {
     const headersList = headers();
     const domain = headersList.get('host') || 'demo.diabolicalservices.tech';
