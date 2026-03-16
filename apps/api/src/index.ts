@@ -63,8 +63,8 @@ app.use(async (req, res, next) => {
         tenantId: req.headers['x-tenant-id']
     });
 
-    // Skip tenant domain resolution for webhooks and health
-    const skipPaths = ['/health', '/api/webhooks', '/api/health'];
+    // Skip tenant domain resolution for webhooks, health checks, and image proxy
+    const skipPaths = ['/health', '/api/webhooks', '/api/health', '/api/img'];
     if (skipPaths.some(p => req.path.startsWith(p))) {
         return next();
     }
