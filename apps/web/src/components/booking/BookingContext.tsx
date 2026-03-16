@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useMemo, ReactNode } from 'react';
 import { BookingStep, BookingData, Service } from '@/lib/types';
 
-const STEPS: BookingStep[] = ['personal', 'service', 'datetime', 'summary', 'payment', 'inspiration', 'confirmation'];
+const STEPS: BookingStep[] = ['personal', 'service', 'datetime', 'inspiration', 'summary', 'payment', 'confirmation'];
 
 interface BookingContextType {
     currentStep: BookingStep;

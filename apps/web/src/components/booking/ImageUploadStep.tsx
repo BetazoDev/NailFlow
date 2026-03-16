@@ -1,49 +1,32 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { api } from '@/lib/api';
-import { Button } from '@/components/ui/Button';
 
 interface ImageUploadStepProps {
-    /** Local blob URLs for preview (created from File objects) */
     localPreviews: string[];
-    /** The actual File objects to be uploaded later */
     pendingFiles: File[];
     onFilesChange: (files: File[], previews: string[]) => void;
     onNext: () => void;
     onBack: () => void;
     staffName?: string;
-    tenantId?: string;
-    appointmentId?: string | null;
 }
 
 export default function ImageUploadStep({
-    localPreviews,
-    pendingFiles,
-    onFilesChange,
-    onNext,
-    onBack,
-    staffName = 'Ana',
-    tenantId,
-    appointmentId
+    localPreviews, pendingFiles, onFilesChange, onNext, onBack, staffName = 'Ana'
 }: ImageUploadStepProps) {
     const fileRef = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState('');
 
     const addFiles = (fileList: FileList | null) => {
         if (!fileList) return;
         const newFiles: File[] = [];
         const newPreviews: string[] = [];
-
         for (const file of Array.from(fileList)) {
             if (!file.type.startsWith('image/')) continue;
             newFiles.push(file);
             newPreviews.push(URL.createObjectURL(file));
         }
-
-        // Limit to 3 files as per specification
+        // Max 3 files per spec
         const combined = [...pendingFiles, ...newFiles].slice(0, 3);
         const combinedPreviews = [...localPreviews, ...newPreviews].slice(0, 3);
         onFilesChange(combined, combinedPreviews);
@@ -51,48 +34,14 @@ export default function ImageUploadStep({
 
     const removeImage = (idx: number) => {
         URL.revokeObjectURL(localPreviews[idx]);
-        const newFiles = pendingFiles.filter((_, i) => i !== idx);
-        const newPreviews = localPreviews.filter((_, i) => i !== idx);
-        onFilesChange(newFiles, newPreviews);
-    };
-
-    const handleFinalize = async () => {
-        if (pendingFiles.length === 0) {
-            onNext();
-            return;
-        }
-
-        setIsUploading(true);
-        setUploadProgress('Subiendo imágenes de referencia...');
-
-        try {
-            const urls: string[] = [];
-            for (let i = 0; i < pendingFiles.length; i++) {
-                setUploadProgress(`Subiendo imagen ${i + 1} de ${pendingFiles.length}...`);
-                const url = await api.uploadImage(tenantId || '', 'bookings', pendingFiles[i], 'clients');
-                urls.push(url);
-            }
-
-            if (appointmentId) {
-                setUploadProgress('Vinculando con tu reserva...');
-                await api.updateAppointmentImages(appointmentId, urls);
-            }
-
-            onNext();
-        } catch (error) {
-            console.error('Error uploading images:', error);
-            alert('Hubo un error al subir las imágenes. Por favor intenta de nuevo.');
-        } finally {
-            setIsUploading(false);
-            setUploadProgress('');
-        }
+        onFilesChange(pendingFiles.filter((_, i) => i !== idx), localPreviews.filter((_, i) => i !== idx));
     };
 
     return (
         <div className="flex flex-col min-h-full animate-fade-in-up" style={{ background: 'var(--cream)' }}>
             {/* Header */}
             <div className="px-6 pt-6 pb-2">
-                <button onClick={onBack} disabled={isUploading} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest mb-4 hover:text-pink transition-colors group">
+                <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest mb-4 hover:text-pink transition-colors group">
                     <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                     </div>
@@ -100,31 +49,27 @@ export default function ImageUploadStep({
 
                 <div className="flex gap-1 mb-6">
                     {[...Array(6)].map((_, i) => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-pink" style={{ opacity: i < 5 ? 0.4 : 1 }} />
+                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-pink" style={{ opacity: i < 3 ? 0.4 : i === 3 ? 1 : 0.15 }} />
                     ))}
                 </div>
 
-                <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 6: Inspiración</p>
+                <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 4: Inspiración</p>
                 <h1 className="font-serif text-3xl text-charcoal leading-tight">
                     Tu <span className="text-pink">visión</span> creativa
                 </h1>
                 <div className="w-8 h-px bg-pink mt-3" />
             </div>
 
-            {/* Upload zone */}
+            {/* Upload Zone */}
             <div className="px-6 pt-8 stagger-children">
                 <div
-                    className={`
-                        border-[3px] border-dashed rounded-[2.5rem] flex flex-col items-center justify-center py-16 cursor-pointer transition-all duration-500 transform
-                        ${dragging
-                            ? 'border-pink bg-pink-pale shadow-2xl scale-[1.02]'
-                            : 'border-pink-light/30 hover:border-pink/40 bg-white/80 hover:bg-white shadow-xl hover:shadow-2xl'}
-                        ${isUploading ? 'opacity-50 pointer-events-none' : ''}
+                    className={`border-[3px] border-dashed rounded-[2.5rem] flex flex-col items-center justify-center py-16 cursor-pointer transition-all duration-500 transform
+                        ${dragging ? 'border-pink bg-pink-pale shadow-2xl scale-[1.02]' : 'border-pink-light/30 hover:border-pink/40 bg-white/80 hover:bg-white shadow-xl hover:shadow-2xl'}
                     `}
                     onClick={() => fileRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                    onDragOver={e => { e.preventDefault(); setDragging(true); }}
                     onDragLeave={() => setDragging(false)}
-                    onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
+                    onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
                 >
                     <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-inner animate-pulse-subtle" style={{ background: 'var(--pink-pale)' }}>
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--pink)" strokeWidth="1.5">
@@ -134,28 +79,20 @@ export default function ImageUploadStep({
                     </div>
                     <p className="text-charcoal font-serif text-xl font-bold">Añadir referencias</p>
                     <p className="text-nf-gray text-[10px] font-bold uppercase tracking-widest mt-2 opacity-60">JPG, PNG • Máximo 3 fotos</p>
-                    <input
-                        ref={fileRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={e => addFiles(e.target.files)}
-                    />
+                    <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => addFiles(e.target.files)} />
                 </div>
 
-                {/* Info Box */}
                 <div className="mt-8 p-6 rounded-[2rem] bg-charcoal/5 border border-charcoal/5 flex gap-4 items-start">
                     <span className="text-2xl">💡</span>
                     <p className="text-[11px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider">
-                        Sube fotos de diseños que te gusten para que {staffName} pueda prepararse mejor para tu cita.
+                        Sube fotos de diseños que te gusten para que {staffName} pueda prepararse mejor para tu cita. Las fotos se enviarán junto con tu reserva.
                     </p>
                 </div>
             </div>
 
-            {/* Selected photos */}
+            {/* Selected Photos */}
             {localPreviews.length > 0 && (
-                <div className="px-6 pt-10 pb-10 animate-fade-in">
+                <div className="px-6 pt-10 pb-4 animate-fade-in">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-serif text-lg text-charcoal">Seleccionadas</h3>
                         <span className="text-[10px] font-bold text-pink uppercase tracking-[0.2em] bg-pink-pale px-3 py-1 rounded-full border border-pink-light/20">
@@ -163,15 +100,14 @@ export default function ImageUploadStep({
                         </span>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                        {localPreviews.map((url: string, idx: number) => (
+                        {localPreviews.map((url, idx) => (
                             <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden shadow-lg group hover:scale-105 transition-transform">
                                 <img src={url} alt={`ref ${idx + 1}`} className="w-full h-full object-cover" />
                                 <button
                                     onClick={() => removeImage(idx)}
-                                    disabled={isUploading}
                                     className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-white text-charcoal flex items-center justify-center shadow-lg transform scale-75 group-hover:scale-100 transition-transform">
+                                    <div className="w-10 h-10 rounded-full bg-white text-charcoal flex items-center justify-center shadow-lg">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                                     </div>
                                 </button>
@@ -183,16 +119,15 @@ export default function ImageUploadStep({
 
             {/* CTA */}
             <div className="px-6 pb-12 mt-auto pt-6">
-                <Button
-                    onClick={handleFinalize}
-                    isLoading={isUploading}
-                    className="w-full h-16 shadow-lg rounded-full"
-                    rightIcon={!isUploading && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>}
+                <button
+                    onClick={onNext}
+                    className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
-                    {isUploading ? uploadProgress : localPreviews.length > 0 ? 'Subir y Finalizar' : 'Finalizar sin fotos'}
-                </Button>
+                    {localPreviews.length > 0 ? 'Ver Resumen' : 'Continuar sin fotos'}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                </button>
                 <p className="text-center text-[10px] tracking-[0.2em] text-gray-light uppercase font-bold mt-6">
-                    PASO 6 DE 6
+                    PASO 4 DE 6
                 </p>
             </div>
         </div>

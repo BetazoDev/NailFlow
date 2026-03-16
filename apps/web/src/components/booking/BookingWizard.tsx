@@ -35,7 +35,7 @@ function BookingSteps() {
         selectedDate, setSelectedDate,
         selectedTime, setSelectedTime,
         pendingFiles, localPreviews, handleFilesChange,
-        bookingData, handleBookingConfirmed,
+        bookingData, handleBookingConfirmed, setUploadedImageUrls,
         confirmedAppointmentId, salonName
     } = useBookingContext();
 
@@ -84,15 +84,18 @@ function BookingSteps() {
                     onNext={goNext}
                     onBack={goBack}
                     staffName={staffName}
-                    tenantId={tenantId}
-                    appointmentId={confirmedAppointmentId}
                 />
             )}
             {currentStep === 'summary' && (
                 <SummaryStep
                     booking={bookingData}
                     localPreviews={localPreviews}
-                    onNext={goNext}
+                    pendingFiles={pendingFiles}
+                    tenantId={tenantId}
+                    onNext={(cdnUrls) => {
+                        if (cdnUrls && cdnUrls.length > 0) setUploadedImageUrls(cdnUrls);
+                        goNext();
+                    }}
                     onBack={goBack}
                     onAddImage={() => navigate('inspiration')}
                 />
@@ -100,7 +103,7 @@ function BookingSteps() {
             {currentStep === 'payment' && (
                 <PaymentStep
                     booking={bookingData}
-                    pendingFiles={pendingFiles}
+                    pendingFiles={[]}
                     tenantId={tenantId}
                     onBookingConfirmed={handleBookingConfirmed}
                     onBack={goBack}
@@ -110,7 +113,7 @@ function BookingSteps() {
                 <ConfirmationStep
                     booking={bookingData}
                     appointmentId={confirmedAppointmentId}
-                    pendingFiles={pendingFiles}
+                    pendingFiles={[]}
                     tenantId={tenantId}
                     salonName={salonName}
                 />

@@ -1,12 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import { BookingData } from '@/lib/types';
+import { api } from '@/lib/api';
 
 interface SummaryStepProps {
     booking: BookingData;
     /** Local blob URLs for previewing selected images (not yet uploaded) */
     localPreviews: string[];
-    onNext: () => void;
+    /** Actual File objects waiting to be uploaded */
+    pendingFiles: File[];
+    tenantId: string;
+    onNext: (cdnUrls?: string[]) => void;
     onBack: () => void;
     onAddImage: () => void;
 }
@@ -17,27 +22,50 @@ function formatFullDate(dateStr: string) {
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-export default function SummaryStep({ booking, localPreviews, onNext, onBack, onAddImage }: SummaryStepProps) {
+export default function SummaryStep({ booking, localPreviews, pendingFiles, tenantId, onNext, onBack, onAddImage }: SummaryStepProps) {
     const price = Number(booking.service_price) || 0;
     const advance = Number(booking.service_required_advance) || 0;
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState('');
+
+    const handleConfirm = async () => {
+        let cdnUrls: string[] = [];
+
+        if (pendingFiles.length > 0) {
+            setIsUploading(true);
+            try {
+                for (let i = 0; i < pendingFiles.length; i++) {
+                    setUploadStatus(`Subiendo foto ${i + 1} de ${pendingFiles.length}...`);
+                    const url = await api.uploadImage(tenantId, 'bookings', pendingFiles[i], 'clients');
+                    cdnUrls.push(url);
+                }
+            } catch (e) {
+                console.error('Image upload failed:', e);
+                // Continue without images rather than blocking booking
+                cdnUrls = [];
+            } finally {
+                setIsUploading(false);
+                setUploadStatus('');
+            }
+        }
+
+        onNext(cdnUrls);
+    };
 
     return (
         <div className="flex flex-col min-h-full animate-fade-in-up" style={{ background: 'var(--cream)' }}>
             {/* Header */}
             <div className="px-6 pt-6 pb-2">
-                <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest mb-6 hover:text-pink transition-colors group">
+                <button onClick={onBack} disabled={isUploading} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest mb-6 hover:text-pink transition-colors group">
                     <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                     </div>
                 </button>
 
                 <div className="flex gap-1 mb-6">
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink opacity-40" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-cream-dark opacity-30" />
+                    {[...Array(6)].map((_, i) => (
+                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-pink" style={{ opacity: i < 4 ? 0.4 : i === 4 ? 1 : 0.15 }} />
+                    ))}
                 </div>
 
                 <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 5: Resumen</p>
@@ -54,9 +82,7 @@ export default function SummaryStep({ booking, localPreviews, onNext, onBack, on
 
                     <div className="relative z-10">
                         <div className="flex items-center gap-4 mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-pink-pale flex items-center justify-center text-xl shadow-inner">
-                                ✨
-                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-pink-pale flex items-center justify-center text-xl shadow-inner">✨</div>
                             <div>
                                 <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest mb-0.5">Servicio Seleccionado</p>
                                 <h2 className="font-serif text-xl text-charcoal font-bold">{booking.service_name || '—'}</h2>
@@ -83,9 +109,7 @@ export default function SummaryStep({ booking, localPreviews, onNext, onBack, on
                         {booking.staff_name && (
                             <div className="pt-6 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-cream-dark/30 flex items-center justify-center text-sm ring-4 ring-cream/50">
-                                        👩‍🎨
-                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-cream-dark/30 flex items-center justify-center text-sm ring-4 ring-cream/50">👩‍🎨</div>
                                     <span className="text-xs font-bold text-charcoal uppercase tracking-widest">{booking.staff_name}</span>
                                 </div>
                                 <span className="text-[10px] font-bold text-pink uppercase tracking-widest">Profesional</span>
@@ -98,24 +122,35 @@ export default function SummaryStep({ booking, localPreviews, onNext, onBack, on
                 <div className="mb-10 px-2">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-serif text-lg text-charcoal">Fotos de <span className="italic">referencia</span></h3>
-                        <span className="text-[10px] font-bold text-nf-gray uppercase tracking-widest bg-white px-3 py-1 rounded-full border border-cream-dark/30">
-                            {localPreviews.length} fotos
-                        </span>
-                    </div>
-                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                        {localPreviews.map((url, idx) => (
-                            <div key={idx} className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 shadow-md border-2 border-white transform rotate-2 hover:rotate-0 transition-all">
-                                {/* blob:// URL — no CDN needed yet */}
-                                <img src={url} alt={`ref-${idx}`} className="w-full h-full object-cover" />
-                            </div>
-                        ))}
                         <button
                             onClick={onAddImage}
-                            className="w-16 h-16 rounded-2xl border-2 border-dashed border-pink/30 flex items-center justify-center flex-shrink-0 bg-white hover:bg-pink-pale hover:border-pink transition-all group"
+                            disabled={isUploading}
+                            className="text-[10px] font-bold text-pink uppercase tracking-widest bg-pink-pale px-3 py-1.5 rounded-full border border-pink-light/30 hover:bg-pink hover:text-white transition-all"
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-pink/50 group-hover:text-pink transition-colors"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                            {localPreviews.length > 0 ? 'Editar fotos' : '+ Añadir fotos'}
                         </button>
                     </div>
+
+                    {localPreviews.length > 0 ? (
+                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                            {localPreviews.map((url, idx) => (
+                                <div key={idx} className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 shadow-md border-2 border-white transform rotate-1 hover:rotate-0 transition-all">
+                                    <img src={url} alt={`ref-${idx}`} className="w-full h-full object-cover" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <button
+                            onClick={onAddImage}
+                            disabled={isUploading}
+                            className="w-full py-4 rounded-2xl border-2 border-dashed border-pink/20 flex items-center justify-center gap-3 bg-white hover:bg-pink-pale hover:border-pink/40 transition-all group"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-pink/40 group-hover:text-pink transition-colors">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
+                            </svg>
+                            <span className="text-[11px] text-nf-gray font-bold uppercase tracking-widest">Añadir fotos de inspiración</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Pricing Table */}
@@ -151,12 +186,21 @@ export default function SummaryStep({ booking, localPreviews, onNext, onBack, on
             {/* CTA */}
             <div className="px-6 pb-12 pt-4">
                 <button
-                    onClick={onNext}
-                    disabled={!booking.date || !booking.time || !booking.service_id}
+                    onClick={handleConfirm}
+                    disabled={!booking.date || !booking.time || !booking.service_id || isUploading}
                     className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                    Continuar al Pago
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                    {isUploading ? (
+                        <>
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            {uploadStatus || 'Subiendo imágenes...'}
+                        </>
+                    ) : (
+                        <>
+                            Confirmar Reserva
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                        </>
+                    )}
                 </button>
                 <p className="text-center text-[10px] tracking-[0.2em] text-gray-light uppercase font-bold mt-6">
                     PASO 5 DE 6

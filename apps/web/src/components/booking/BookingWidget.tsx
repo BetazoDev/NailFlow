@@ -20,9 +20,9 @@ const STEPS: { id: BookingStep; label: string; desc: string }[] = [
     { id: 'personal', label: 'Tus datos', desc: 'Nombre y contacto' },
     { id: 'service', label: 'Servicio', desc: 'Elige tu tratamiento' },
     { id: 'datetime', label: 'Fecha y hora', desc: 'Encuentra tu turno' },
+    { id: 'inspiration', label: 'Inspiración', desc: 'Sube referencias' },
     { id: 'summary', label: 'Resumen', desc: 'Confirma tu reserva' },
     { id: 'payment', label: 'Pago', desc: 'Anticipo seguro' },
-    { id: 'inspiration', label: 'Inspiración', desc: 'Sube referencias' },
     { id: 'confirmation', label: 'Confirmación', desc: '¡Todo listo!' },
 ];
 
