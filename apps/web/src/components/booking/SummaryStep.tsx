@@ -19,7 +19,7 @@ function formatFullDate(dateStr: string) {
 
 export default function SummaryStep({ booking, localPreviews, onNext, onBack, onAddImage }: SummaryStepProps) {
     const price = Number(booking.service_price) || 0;
-    const advance = Math.round(price * 0.4);
+    const advance = Number(booking.service_required_advance) || 0;
 
     return (
         <div className="flex flex-col min-h-full animate-fade-in-up" style={{ background: 'var(--cream)' }}>

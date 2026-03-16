@@ -7,6 +7,7 @@ import { query } from './lib/db';
 import { DateTime } from 'luxon';
 import { initDb } from './init-db';
 import crypto from 'crypto';
+import cron from 'node-cron';
 
 // Initialize MP Client 
 const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN || 'TEST-TOKEN-MOCK' });
@@ -28,6 +29,28 @@ const getUUID = () => {
         return crypto.randomUUID();
     } catch (e) {
         return crypto.randomBytes(16).toString('hex');
+    }
+};
+
+const triggerN8nWebhook = async (tenantId: string, event: string, data: any) => {
+    // URL should ideally come from tenant settings in DB
+    const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+    if (!N8N_WEBHOOK_URL) return;
+
+    try {
+        await fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tenant_id: tenantId,
+                event,
+                ...data,
+                timestamp: new Date().toISOString()
+            })
+        });
+        console.log(`[n8n] Event ${event} triggered for tenant ${tenantId}`);
+    } catch (e) {
+        console.error('[n8n] Webhook failed:', e);
     }
 };
 
@@ -396,7 +419,7 @@ apiRouter.get('/availability', async (req, res) => {
         const activeLocks = locksRes.rows.map(r => DateTime.fromJSDate(r.slot_time).setZone('America/Mexico_City'));
 
         const nowInCDMX = DateTime.now().setZone('America/Mexico_City');
-        const bufferLimit = nowInCDMX.plus({ hours: 3 });
+        const bufferLimit = nowInCDMX.plus({ days: 7 });
 
         const slots = [];
         const dtBase = DateTime.fromISO(date as string, { zone: 'America/Mexico_City' });
@@ -487,8 +510,13 @@ apiRouter.post('/bookings/test', async (req, res) => {
 
     console.log('Received test booking request:', { tenantId, client_name, date, time });
 
-    if (!client_name || !date || !time) {
-        return res.status(400).json({ error: 'client_name, date, and time are required' });
+    if (!client_name || !date || !time || !client_phone) {
+        return res.status(400).json({ error: 'client_name, date, time, and client_phone are required' });
+    }
+
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(client_phone)) {
+        return res.status(400).json({ error: 'Invalid phone number format. Use international format (e.g. +521234567890)' });
     }
 
     try {
@@ -525,6 +553,15 @@ apiRouter.post('/bookings', async (req, res) => {
     const { service_id, staff_id, date, time, client_name, client_phone, client_email, notes, image_urls, image_url } = req.body;
     // @ts-ignore
     const tenantId = req.tenant.id;
+
+    if (!client_name || !date || !time || !client_phone) {
+        return res.status(400).json({ error: 'client_name, date, time, and client_phone are required' });
+    }
+
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(client_phone)) {
+        return res.status(400).json({ error: 'Invalid phone number format. Use international format (e.g. +521234567890)' });
+    }
 
     try {
         const svcRes = await query('SELECT * FROM services WHERE id = $1', [service_id]);
@@ -586,6 +623,14 @@ apiRouter.post('/bookings', async (req, res) => {
                 }
             });
 
+            await triggerN8nWebhook(tenantId, 'booking.initiated', {
+                appointment_id: appointment.id,
+                client_name,
+                client_phone,
+                service_id,
+                amount: advanceAmount
+            });
+
             return res.json({
                 appointmentId: appointment.id,
                 init_point: response.init_point
@@ -634,6 +679,17 @@ apiRouter.post('/webhooks/mercadopago', async (req, res) => {
                     console.warn(`[MP Webhook] Appointment ${appointmentId} not found in database.`);
                 } else {
                     console.log(`[MP Webhook] Success: Appointment ${appointmentId} confirmed.`);
+                    // Get tenant info to trigger specific webhook
+                    const apptRes = await query('SELECT tenant_id, client_name, client_phone FROM appointments WHERE id = $1', [appointmentId]);
+                    if (apptRes && apptRes.rows && apptRes.rows.length > 0) {
+                        const { tenant_id, client_name, client_phone } = apptRes.rows[0];
+                        await triggerN8nWebhook(tenant_id, 'booking.paid', {
+                            appointment_id: appointmentId,
+                            client_name,
+                            client_phone,
+                            payment_id: paymentId
+                        });
+                    }
                 }
             }
         } catch (e: any) {
@@ -810,6 +866,64 @@ app.use((req, res) => {
         method: req.method,
         path: req.path
     });
+});
+
+// ─── Daily Reference Image Cleanup (Spec § 10) ───────────────────────────────
+// Runs every day at 02:00 AM UTC.
+// Deletes reference image columns from appointments older than 14 days.
+cron.schedule('0 2 * * *', async () => {
+    console.log('[Cron] Starting 14-day reference image cleanup...');
+    try {
+        const cutoffDate = DateTime.now().minus({ days: 14 }).toISO();
+
+        // Fetch appointments older than 14 days that still have image data
+        const staleRes = await query(
+            `SELECT id, image_urls FROM appointments
+             WHERE created_at < $1
+               AND image_urls IS NOT NULL
+               AND jsonb_array_length(COALESCE(image_urls, '[]'::jsonb)) > 0`,
+            [cutoffDate]
+        );
+
+        if (!staleRes || staleRes.rows.length === 0) {
+            console.log('[Cron] No stale images found.');
+            return;
+        }
+
+        console.log(`[Cron] Found ${staleRes.rows.length} appointments with stale images.`);
+
+        const CDN_DELETE_TOKEN = process.env.CDN_UPLOAD_TOKEN || process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN;
+
+        for (const row of staleRes.rows) {
+            // Attempt to call CDN delete for each URL (best effort)
+            if (CDN_DELETE_TOKEN && Array.isArray(row.image_urls)) {
+                for (const url of row.image_urls) {
+                    try {
+                        // Extract filename from URL
+                        const filename = url.split('/').pop()?.split('?')[0];
+                        if (filename) {
+                            await fetch(`https://api.diabolicalservices.tech/api/images/${filename}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${CDN_DELETE_TOKEN}` }
+                            });
+                        }
+                    } catch (e) {
+                        console.warn(`[Cron] Failed to delete CDN image: ${url}`, e);
+                    }
+                }
+            }
+
+            // Clear image references in the database regardless
+            await query(
+                `UPDATE appointments SET image_urls = null, image_url = null WHERE id = $1`,
+                [row.id]
+            );
+        }
+
+        console.log(`[Cron] Cleanup complete. Processed ${staleRes.rows.length} appointments.`);
+    } catch (e) {
+        console.error('[Cron] Cleanup failed:', e);
+    }
 });
 
 app.listen(port, () => {

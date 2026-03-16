@@ -1,10 +1,17 @@
 import { api } from '@/lib/api';
 import BookingWidget from '@/components/booking/BookingWidget';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 
 export default async function RootPage() {
   // Determine domain from headers or use default
-  const domain = 'demo.diabolicalservices.tech';
+  const headersList = headers();
+  let domain = headersList.get('host') || 'demo.diabolicalservices.tech';
+  
+  if (domain.includes('localhost') || domain.includes('127.0.0.1')) {
+    domain = 'demo.diabolicalservices.tech';
+  }
+
   const tenant = await api.getTenant(domain);
 
   if (!tenant) {

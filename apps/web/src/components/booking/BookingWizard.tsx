@@ -85,6 +85,7 @@ function BookingSteps() {
                     onBack={goBack}
                     staffName={staffName}
                     tenantId={tenantId}
+                    appointmentId={confirmedAppointmentId}
                 />
             )}
             {currentStep === 'summary' && (

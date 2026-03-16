@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useMemo, ReactNode } from 'react';
 import { BookingStep, BookingData, Service } from '@/lib/types';
 
-const STEPS: BookingStep[] = ['personal', 'service', 'datetime', 'inspiration', 'summary', 'payment', 'confirmation'];
+const STEPS: BookingStep[] = ['personal', 'service', 'datetime', 'summary', 'payment', 'inspiration', 'confirmation'];
 
 interface BookingContextType {
     currentStep: BookingStep;
@@ -111,6 +111,7 @@ export function BookingProvider({
             service_name: selectedService?.name || '',
             service_price: selectedService?.estimated_price || 0,
             service_duration: selectedService?.duration_minutes || 0,
+            service_required_advance: selectedService?.required_advance || 0,
             staff_id: staffId || 'staff-1',
             staff_name: staffName,
             client_name: clientName,

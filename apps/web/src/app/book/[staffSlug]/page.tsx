@@ -10,13 +10,23 @@ interface Props {
     }
 }
 
+import { headers } from 'next/headers';
+
 // Fallback tenant domain for the primary root application
-const TENANT_DOMAIN = 'demo.diabolicalservices.tech';
+const getDefaultDomain = () => {
+    const headersList = headers();
+    const domain = headersList.get('host') || 'demo.diabolicalservices.tech';
+    if (domain.includes('localhost') || domain.includes('127.0.0.1')) {
+        return 'demo.diabolicalservices.tech';
+    }
+    return domain;
+};
 
 export const dynamic = 'force-dynamic';
 
 export default async function StaffBookingPage({ params }: Props) {
-    const tenant = await api.getTenant(TENANT_DOMAIN);
+    const domain = getDefaultDomain();
+    const tenant = await api.getTenant(domain);
 
     if (!tenant) {
         notFound();

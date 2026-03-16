@@ -32,7 +32,7 @@ function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDet
     const dateStr = startDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
     const timeStr = startDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
     const duration = service?.duration_minutes || 60;
-    const advance = service ? Math.round(service.estimated_price * 0.4) : 0;
+    const advance = service?.required_advance || 0;
     const total = service?.estimated_price || 0;
     const balance = total - advance;
 

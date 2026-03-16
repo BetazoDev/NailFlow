@@ -119,6 +119,7 @@ export interface BookingData {
   service_name: string;
   service_price: number;
   service_duration: number;
+  service_required_advance?: number;
   staff_id?: string;
   staff_name?: string;
   staff_photo?: string;

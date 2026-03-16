@@ -237,8 +237,8 @@ export const api = {
         // If it's already a full URL and has a token, return as is
         if (url.includes('api_key=') || url.includes('token=')) return url;
 
-        const demoToken = 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
-        const clientsToken = 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
+        const demoToken = process.env.NEXT_PUBLIC_CDN_DEMO_TOKEN || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+        const clientsToken = process.env.NEXT_PUBLIC_CDN_CLIENTS_TOKEN || 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
         const token = projectType === 'clients' ? clientsToken : demoToken;
 
         if (url.startsWith('https://cdn.diabolicalservices.tech/')) {
