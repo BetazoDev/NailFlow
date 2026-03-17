@@ -1,7 +1,12 @@
 import { Tenant, Staff, Service, Appointment, BookingData, TimeSlot } from './types';
 import { auth } from './firebase';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.diabolicalservices.tech';
+// Server-side: real backend URL (not exposed to browser)
+const BACKEND_URL = process.env.BACKEND_API_URL || 'https://api.diabolicalservices.tech';
+
+// Client-side: use '' (empty = relative) so Next.js rewrites handle the proxy
+const getApiBase = () => (typeof window === 'undefined' ? BACKEND_URL : '');
+
 
 const fetchApi = async (path: string, options: RequestInit = {}, domain?: string) => {
     // Add tenant domain header for resolution
@@ -23,7 +28,8 @@ const fetchApi = async (path: string, options: RequestInit = {}, domain?: string
         headers.set('x-tenant-domain', domain);
     }
 
-    const response = await fetch(`${API_URL}${path}`, {
+    const base = getApiBase();
+    const response = await fetch(`${base}${path}`, {
         ...options,
         headers,
     });
