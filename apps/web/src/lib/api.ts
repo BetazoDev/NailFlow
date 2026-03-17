@@ -234,15 +234,17 @@ export const api = {
         if (!url) return '';
         // Blob URLs (local preview) — return as-is
         if (url.startsWith('blob:')) return url;
-        // Already proxied or external URL — return as-is
-        if (url.startsWith(`${API_URL}/api/img/`)) return url;
+        // Already going through our proxy — return as-is
+        if (url.startsWith('/api/img/')) return url;
         // External image not on our CDN — return as-is
         if (url.startsWith('http') && !url.includes('cdn.diabolicalservices.tech')) return url;
 
-        // Strip existing api_key param if someone saved the raw CDN URL to DB
+        // Strip any existing api_key param that might have been saved raw in DB
         let cleanUrl = url;
         try {
-            const parsed = new URL(url.startsWith('http') ? url : `https://cdn.diabolicalservices.tech/${url}`);
+            const parsed = new URL(
+                url.startsWith('http') ? url : `https://cdn.diabolicalservices.tech/${url}`
+            );
             parsed.searchParams.delete('api_key');
             parsed.searchParams.delete('token');
             cleanUrl = parsed.toString();
@@ -250,16 +252,17 @@ export const api = {
             cleanUrl = url;
         }
 
-        // Extract path after the CDN base: https://cdn.diabolicalservices.tech/SLUG/FILE
+        // Convert full CDN URL → relative proxy path
+        // https://cdn.diabolicalservices.tech/nailssalon/photo.jpg → /api/img/nailssalon/photo.jpg
         const CDN_BASE = 'https://cdn.diabolicalservices.tech/';
         if (cleanUrl.startsWith(CDN_BASE)) {
-            const cdnPath = cleanUrl.slice(CDN_BASE.length); // e.g. "nailssalon/photo.jpg"
-            return `${API_URL}/api/img/${cdnPath}`;
+            const cdnPath = cleanUrl.slice(CDN_BASE.length);
+            return `/api/img/${cdnPath}`;
         }
 
-        // Legacy: relative path or just a filename
+        // Legacy: bare filename or relative path
         if (!url.startsWith('http') && url.length > 3) {
-            return `${API_URL}/api/img/nailssalon/${url}`;
+            return `/api/img/nailssalon/${url}`;
         }
 
         return url;
