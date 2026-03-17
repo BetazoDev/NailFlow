@@ -1,12 +1,13 @@
 import { Tenant, Staff, Service, Appointment, BookingData, TimeSlot } from './types';
 import { auth } from './firebase';
 
-// Server-side: real backend URL (not exposed to browser)
-const BACKEND_URL = process.env.BACKEND_API_URL || 'https://api.diabolicalservices.tech';
+let API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.diabolicalservices.tech';
 
-// Client-side: use '' (empty = relative) so Next.js rewrites handle the proxy
-const getApiBase = () => (typeof window === 'undefined' ? BACKEND_URL : '');
-
+// HACK: Fix Dokploy misconfiguration. If the API URL points to the frontend (demo),
+// force it to the real backend (api) to prevent infinite loops and 404s.
+if (API_URL === 'https://demo.diabolicalservices.tech' || !API_URL.includes('api.')) {
+    API_URL = 'https://api.diabolicalservices.tech';
+}
 
 const fetchApi = async (path: string, options: RequestInit = {}, domain?: string) => {
     // Add tenant domain header for resolution
@@ -28,8 +29,7 @@ const fetchApi = async (path: string, options: RequestInit = {}, domain?: string
         headers.set('x-tenant-domain', domain);
     }
 
-    const base = getApiBase();
-    const response = await fetch(`${base}${path}`, {
+    const response = await fetch(`${API_URL}${path}`, {
         ...options,
         headers,
     });
@@ -258,17 +258,16 @@ export const api = {
             cleanUrl = url;
         }
 
-        // Convert full CDN URL → relative proxy path
-        // https://cdn.diabolicalservices.tech/nailssalon/photo.jpg → /api/img/nailssalon/photo.jpg
+        // Convert full CDN URL → proxy path pointing to backend API
         const CDN_BASE = 'https://cdn.diabolicalservices.tech/';
         if (cleanUrl.startsWith(CDN_BASE)) {
             const cdnPath = cleanUrl.slice(CDN_BASE.length);
-            return `/api/img/${cdnPath}`;
+            return `${API_URL}/api/img/${cdnPath}`;
         }
 
         // Legacy: bare filename or relative path
         if (!url.startsWith('http') && url.length > 3) {
-            return `/api/img/nailssalon/${url}`;
+            return `${API_URL}/api/img/nailssalon/${url}`;
         }
 
         return url;
