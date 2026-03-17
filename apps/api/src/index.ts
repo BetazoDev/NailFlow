@@ -15,7 +15,11 @@ const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKE
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-domain', 'x-tenant-id']
+}));
 app.use(express.json());
 
 let tenantBranding: Record<string, any> = {};
@@ -54,6 +58,57 @@ const triggerN8nWebhook = async (tenantId: string, event: string, data: any) => 
     }
 };
 
+// ─── Image Proxy (Security: API key never exposed to browser) ────────────────
+// MUST be before tenant middleware to avoid missing x-tenant headers in img tags
+
+// Image Proxy Handler 
+const imageProxyHandler = async (req: express.Request, res: express.Response) => {
+    const { slug } = req.params;
+    const filename = req.params.filename || (req.params as any)[0]; // Captured by * or filename(*)
+    
+    if (!slug || !filename) {
+        return res.status(400).json({ error: 'Slug and filename are required' });
+    }
+
+    const CDN_TOKEN = process.env.CDN_UPLOAD_TOKEN
+        || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+
+    // Clean up filename (remove leading slash if matched by *)
+    const cleanFilename = filename.startsWith('/') ? filename.substring(1) : filename;
+    const cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${CDN_TOKEN}`;
+    
+    console.log(`[Proxy] Request: ${req.url} -> Fetching: ${slug}/${cleanFilename}`);
+
+    try {
+        const cdnRes = await fetch(cdnUrl);
+        if (!cdnRes.ok) {
+            console.warn(`[Proxy] CDN Error ${cdnRes.status} for ${slug}/${cleanFilename}`);
+            return res.status(cdnRes.status).json({ 
+                error: 'Image not found on CDN', 
+                status: cdnRes.status,
+                path: `${slug}/${cleanFilename}`
+            });
+        }
+
+        const contentType = cdnRes.headers.get('content-type') || 'image/jpeg';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+
+        const buffer = await cdnRes.arrayBuffer();
+        res.send(Buffer.from(buffer));
+    } catch (e: any) {
+        console.error(`[Proxy] Critical Error:`, e.message);
+        res.status(502).json({ error: 'Failed to fetch image from CDN', details: e.message });
+    }
+};
+
+
+// Image Proxy (Security: API key never exposed to browser)
+// MUST be before tenant middleware to avoid missing x-tenant headers in img tags
+app.get('/api/img/:slug/:filename(*)', imageProxyHandler);
+app.get('/img/:slug/:filename(*)', imageProxyHandler);
+
 // Middleware to extract tenant from request
 app.use(async (req, res, next) => {
     // Basic request logging
@@ -63,8 +118,8 @@ app.use(async (req, res, next) => {
         tenantId: req.headers['x-tenant-id']
     });
 
-    // Skip tenant domain resolution for webhooks, health checks, and image proxy
-    const skipPaths = ['/health', '/api/webhooks', '/api/health', '/api/img'];
+    // Skip tenant domain resolution for webhooks and health checks
+    const skipPaths = ['/health', '/api/webhooks', '/api/health'];
     if (skipPaths.some(p => req.path.startsWith(p))) {
         return next();
     }
@@ -109,48 +164,11 @@ app.use(async (req, res, next) => {
     }
 });
 
-// ─── Image Proxy (Security: API key never exposed to browser) ────────────────
-// Route: GET /api/img/:slug/:...filename
-// The client uses clean URLs like /api/img/nailssalon/photo.jpg
-// The server adds the CDN API key before fetching and pipes the response back.
-app.get('/api/img/:slug/*', async (req, res) => {
-    const slug = req.params.slug;
-    const filename = (req.params as any)[0]; // everything after :slug/
-
-    const CDN_TOKEN = process.env.CDN_UPLOAD_TOKEN
-        || process.env.NEXT_PUBLIC_CDN_UPLOAD_TOKEN
-        || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
-
-    const cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${filename}?api_key=${CDN_TOKEN}`;
-
-    try {
-        const cdnRes = await fetch(cdnUrl);
-        if (!cdnRes.ok) {
-            return res.status(cdnRes.status).json({ error: 'Image not found on CDN' });
-        }
-
-        // Pipe content-type and cache headers
-        const contentType = cdnRes.headers.get('content-type') || 'image/jpeg';
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        // Security: no API key in any response header
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-
-        const buffer = await cdnRes.arrayBuffer();
-        res.send(Buffer.from(buffer));
-    } catch (e: any) {
-        console.error('[Image Proxy] Error:', e.message);
-        res.status(502).json({ error: 'Failed to fetch image from CDN' });
-    }
-});
-
-// Create API Router to handle both cases (/api or direct)
+// ─── API Router ─────────────────────────────────────────────────────────────
 const apiRouter = express.Router();
 
-// Auth Middleware
+// ─── Auth Middleware ────────────────────────────────────────────────────────
 const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // In test mode without token or for local dev without enforcing
-    // Note: To secure production fully, you would want to remove this bypass
     if (process.env.NODE_ENV === 'test') return next();
 
     const authHeader = req.headers.authorization;
@@ -170,8 +188,10 @@ const requireAuth = async (req: express.Request, res: express.Response, next: ex
     }
 };
 
-// Health check inside router too
+
+// Health check
 apiRouter.get('/health', (req, res) => res.send('OK'));
+
 
 // Endpoint: Admin Cleanup (wipe services, staff, appointments for tenant)
 // Protected by secret key - only for demo reset
@@ -886,6 +906,7 @@ apiRouter.post('/favorites/:phone', async (req, res) => {
         res.status(500).json({ error: 'Failed to update favorite' });
     }
 });
+
 
 // Mount the router at both root and /api for maximum compatibility
 app.use('/api', apiRouter);

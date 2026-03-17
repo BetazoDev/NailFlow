@@ -235,19 +235,27 @@ export const api = {
             throw error;
         }
     },
-
     getPublicUrl: (url: string | null | undefined): string => {
         if (!url) return '';
         // Blob URLs (local preview) — return as-is
         if (url.startsWith('blob:')) return url;
-        // Already going through our proxy — return as-is
-        if (url.startsWith('/api/img/')) return url;
+        
         // External image not on our CDN — return as-is
-        if (url.startsWith('http') && !url.includes('cdn.diabolicalservices.tech')) return url;
+        if (url.startsWith('http') && !url.includes('cdn.diabolicalservices.tech') && !url.includes('api.diabolicalservices.tech')) {
+            return url;
+        }
 
         // Strip any existing api_key param that might have been saved raw in DB
         let cleanUrl = url;
         try {
+            // Check if it's the old proxy format `/api/img/...` or `http.../api/img/...`
+            if (url.includes('/api/img/')) {
+                const parts = url.split('/api/img/');
+                if (parts.length === 2) {
+                    url = `https://cdn.diabolicalservices.tech/${parts[1]}`;
+                }
+            }
+            
             const parsed = new URL(
                 url.startsWith('http') ? url : `https://cdn.diabolicalservices.tech/${url}`
             );
@@ -258,18 +266,20 @@ export const api = {
             cleanUrl = url;
         }
 
-        // Convert full CDN URL → proxy path pointing to backend API
         const CDN_BASE = 'https://cdn.diabolicalservices.tech/';
+        
+        // Already a clean CDN URL
         if (cleanUrl.startsWith(CDN_BASE)) {
-            const cdnPath = cleanUrl.slice(CDN_BASE.length);
-            return `${API_URL}/api/img/${cdnPath}`;
+            return cleanUrl;
         }
 
         // Legacy: bare filename or relative path
-        if (!url.startsWith('http') && url.length > 3) {
-            return `${API_URL}/api/img/nailssalon/${url}`;
+        if (!cleanUrl.startsWith('http') && cleanUrl.length > 3) {
+            // Remove leading slash if present
+            const safePath = cleanUrl.startsWith('/') ? cleanUrl.substring(1) : cleanUrl;
+            return `${CDN_BASE}nailssalon/${safePath}`;
         }
 
-        return url;
+        return cleanUrl;
     },
 };

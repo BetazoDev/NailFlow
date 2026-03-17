@@ -42,7 +42,7 @@ export async function POST(req: Request) {
         const data = await response.json();
 
         // ── Security: sanitize CDN URLs before returning to the browser ──────
-        // Replace direct CDN URLs (with api_key) → our image proxy URLs
+        // Remove api_key from direct CDN URLs and use them directly since CDN is publicly readable
         const sanitize = (url: string | undefined) => {
             if (!url) return url;
             if (!url.includes('cdn.diabolicalservices.tech')) return url;
@@ -50,9 +50,7 @@ export async function POST(req: Request) {
                 const parsed = new URL(url);
                 parsed.searchParams.delete('api_key');
                 parsed.searchParams.delete('token');
-                // Convert to proxy URL
-                const cdnPath = parsed.pathname.replace(/^\//, ''); // "nailssalon/file.jpg"
-                return `${API_URL}/api/img/${cdnPath}`;
+                return parsed.toString();
             } catch {
                 return url;
             }
