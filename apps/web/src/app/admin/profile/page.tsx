@@ -15,14 +15,15 @@ import { Card } from '@/components/ui/Card';
 
 export default function ProfilePage() {
     const { tenantId } = useTenant();
-    const [tab, setTab] = useState<'info' | 'password'>('info');
+    const [tab, setTab] = useState<'info' | 'password' | 'horarios'>('info');
 
-    // Tenant Info
     const [salonName, setSalonName] = useState('');
     const [tagline, setTagline] = useState('');
-    const [currentBranding, setCurrentBranding] = useState<Record<string, unknown> | null>(null);
+    const [currentBranding, setCurrentBranding] = useState<any>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [weeklySchedule, setWeeklySchedule] = useState<{ day: number; active: boolean; start: string; end: string }[]>([]);
+    const [currentSettings, setCurrentSettings] = useState<any>(null);
     const [saving, setSaving] = useState(false);
     const [saveMsg, setSaveMsg] = useState('');
     const logoRef = useRef<HTMLInputElement>(null);
@@ -46,6 +47,19 @@ export default function ProfilePage() {
                 setTagline(tenant.branding?.tagline || '');
                 setLogoPreview(tenant.branding?.logo_url || null);
                 setCurrentBranding(tenant.branding);
+                setCurrentSettings(tenant.settings);
+                
+                // Initialize schedule
+                const defaultSchedule = [
+                    { day: 1, active: true, start: '09:00', end: '20:00' },
+                    { day: 2, active: true, start: '09:00', end: '20:00' },
+                    { day: 3, active: true, start: '09:00', end: '20:00' },
+                    { day: 4, active: true, start: '09:00', end: '20:00' },
+                    { day: 5, active: true, start: '09:00', end: '20:00' },
+                    { day: 6, active: true, start: '09:00', end: '15:00' },
+                    { day: 0, active: false, start: '09:00', end: '09:00' },
+                ];
+                setWeeklySchedule(tenant.settings?.weekly_schedule || defaultSchedule);
             }
         });
     }, [tenantId]);
@@ -65,11 +79,19 @@ export default function ProfilePage() {
                 ? { ...currentBranding, logo_url: finalLogoUrl, tagline }
                 : { logo_url: finalLogoUrl, tagline, primary_color: '#C97794', secondary_color: '#F8D2D8' };
 
+            const updatedSettings: any = {
+                ...(currentSettings || { currency: 'MXN', timezone: 'America/Mexico_City' }),
+                weekly_schedule: weeklySchedule
+            };
+
             await api.updateTenant(tenantId, {
                 name: salonName,
-                branding: updatedBranding
+                branding: updatedBranding,
+                settings: updatedSettings
             });
+            
             setCurrentBranding(updatedBranding);
+            setCurrentSettings(updatedSettings);
 
             setSaveMsg('¡Información actualizada con éxito!');
         } catch (e: unknown) {
@@ -143,137 +165,232 @@ export default function ProfilePage() {
             </div>
 
             {/* Tabs */}
-            <div className="px-6 mb-6">
-                <div className="flex gap-1 bg-aesthetic-cream rounded-full p-1">
-                    {([['info', 'Información del Negocio'], ['password', 'Cambiar Contraseña']] as const).map(([id, label]) => (
+            <div className="px-6 mb-8">
+                <div className="flex gap-2 bg-aesthetic-cream/60 backdrop-blur-sm rounded-[2rem] p-1.5 border border-white/50 shadow-inner overflow-x-auto scrollbar-hide">
+                    {( [['info', 'Negocio', 'storefront'], ['horarios', 'Horarios', 'schedule'], ['password', 'Seguridad', 'shield']] as const).map(([id, label, icon]) => (
                         <button
                             key={id}
                             onClick={() => setTab(id)}
-                            className={`flex-1 py-2 rounded-full text-[10px] font-bold tracking-[0.1em] uppercase transition-all duration-200 ${tab === id ? 'bg-white shadow-sm text-aesthetic-taupe' : 'text-aesthetic-muted/60'}`}
+                            className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-6 rounded-[1.5rem] text-[10px] tracking-[0.2em] uppercase font-bold transition-all whitespace-nowrap ${tab === id ? 'bg-white text-aesthetic-pink shadow-md' : 'text-aesthetic-muted hover:text-aesthetic-taupe hover:bg-white/30'}`}
                         >
+                            <span className="material-symbol text-base">{icon}</span>
                             {label}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* Tab Content */}
+            {/* Content Tabs */}
             <div className="px-6">
                 {tab === 'info' && (
-                    <Card variant="white" className="p-8 space-y-6">
-                        <div className="space-y-4">
-                            <label className="font-display text-xs italic text-aesthetic-muted tracking-wider ml-1">Logotipo del negocio</label>
-                            <div className="flex items-center gap-6">
-                                <div className="relative cursor-pointer group" onClick={() => logoRef.current?.click()}>
-                                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-aesthetic-accent/50 flex items-center justify-center bg-aesthetic-cream/40 transition-transform group-hover:scale-105 duration-500">
-                                        {logoPreview ? (
-                                            <img src={api.getPublicUrl(logoPreview)} alt="logo" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <span className="material-symbol text-3xl text-aesthetic-muted">image</span>
-                                        )}
+                    <div className="space-y-6 animate-fade-in">
+                        <Card variant="white" className="p-8 border-none shadow-soft overflow-hidden">
+                            <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-8">Información del Salón</h3>
+                            
+                            <div className="space-y-8">
+                                <div className="flex flex-col items-center">
+                                    <div className="relative cursor-pointer group mb-4" onClick={() => logoRef.current?.click()}>
+                                        <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-soft flex items-center justify-center bg-aesthetic-cream/40 transition-transform group-hover:scale-105 duration-500 ring-2 ring-aesthetic-pink/20">
+                                            {logoPreview ? (
+                                                <img src={api.getPublicUrl(logoPreview)} alt="logo" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="material-symbol text-4xl text-aesthetic-accent/40">add_photo_alternate</span>
+                                            )}
+                                        </div>
+                                        <div className="absolute -bottom-1 -right-1 size-9 rounded-full bg-aesthetic-pink text-white flex items-center justify-center shadow-lg border-2 border-white group-hover:scale-110 transition-transform">
+                                            <span className="material-symbol text-lg">edit</span>
+                                        </div>
+                                        <input
+                                            type="file"
+                                            ref={logoRef}
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    setLogoFile(file);
+                                                    setLogoPreview(URL.createObjectURL(file));
+                                                }
+                                            }}
+                                        />
                                     </div>
-                                    <div className="absolute -bottom-1 -right-1 size-8 bg-aesthetic-pink rounded-full flex items-center justify-center border-2 border-white shadow-soft text-white">
-                                        <span className="material-symbol text-sm">photo_camera</span>
-                                    </div>
+                                    <p className="text-[10px] tracking-[0.2em] text-aesthetic-muted uppercase font-bold">Logotipo Principal</p>
                                 </div>
-                                <div className="flex-1">
-                                    <p className="text-xs text-aesthetic-muted/80 leading-relaxed mb-2">
-                                        Sube el logotipo de tu salón para que aparezca en tu agenda pública y en la página de reservas.
+
+                                <Input
+                                    label="Nombre del Salón"
+                                    value={salonName}
+                                    onChange={(e) => setSalonName(e.target.value)}
+                                    placeholder="Ej: Studio Estética"
+                                    leftIcon="storefront"
+                                />
+
+                                <Input
+                                    label="Nota de Bienvenida"
+                                    value={tagline}
+                                    onChange={(e) => setTagline(e.target.value)}
+                                    placeholder="Ej: Lo mejor en nailart para ti"
+                                    leftIcon="auto_awesome"
+                                />
+
+                                <Button
+                                    variant="primary"
+                                    className="w-full h-14 mt-4"
+                                    onClick={handleSaveInfo}
+                                    isLoading={saving}
+                                >
+                                    Guardar Configuración
+                                </Button>
+
+                                {saveMsg && (
+                                    <p className={`text-center text-[10px] font-bold uppercase tracking-widest animate-fade-in ${saveMsg.includes('éxito') ? 'text-green-500' : 'text-red-500'}`}>
+                                        {saveMsg}
                                     </p>
-                                    <p className="text-[9px] font-bold text-aesthetic-pink tracking-widest uppercase">
-                                        JPG, PNG. max 2MB.
-                                    </p>
-                                </div>
+                                )}
                             </div>
-                            <input
-                                type="file"
-                                ref={logoRef}
-                                className="hidden"
-                                accept="image/*"
-                                onChange={(e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                        setLogoFile(e.target.files[0]);
-                                        setLogoPreview(URL.createObjectURL(e.target.files[0]));
-                                    }
-                                }}
-                            />
-                        </div>
+                        </Card>
+                    </div>
+                )}
 
-                        <Input 
-                            label="Nombre del salón"
-                            value={salonName}
-                            onChange={e => setSalonName(e.target.value)}
-                            placeholder="Ej. Nails by Ana"
-                            leftIcon="storefront"
-                        />
+                {tab === 'horarios' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <Card variant="white" className="p-8 border-none shadow-soft">
+                            <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-2">Horarios de Atención</h3>
+                            <p className="text-[11px] text-aesthetic-muted mb-8 leading-relaxed uppercase tracking-[0.15em] font-bold italic opacity-70">
+                                Define tus horas de operación para el booking dinámico.
+                            </p>
 
-                        <Input 
-                            label="Tagline / Eslogan"
-                            value={tagline}
-                            onChange={e => setTagline(e.target.value)}
-                            placeholder="Ej. Tu belleza, nuestra pasión"
-                            leftIcon="auto_awesome"
-                        />
+                            <div className="space-y-3">
+                                {['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map((dayName, idx) => {
+                                    const sched = weeklySchedule.find(s => s.day === idx) || { day: idx, active: false, start: '09:00', end: '18:00' };
+                                    return (
+                                        <div key={idx} className={`p-5 rounded-[2rem] border-2 transition-all duration-500 ${sched.active ? 'bg-aesthetic-cream/30 border-aesthetic-pink/20 shadow-sm' : 'bg-gray-50/50 border-gray-100/50 opacity-40 grayscale-[0.5]'}`}>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center gap-4">
+                                                    <button 
+                                                        onClick={() => {
+                                                            const newSched = [...weeklySchedule];
+                                                            const i = newSched.findIndex(s => s.day === idx);
+                                                            if (i >= 0) newSched[i].active = !newSched[i].active;
+                                                            else newSched.push({ day: idx, active: true, start: '09:00', end: '18:00' });
+                                                            setWeeklySchedule(newSched);
+                                                        }}
+                                                        className={`size-7 rounded-full flex items-center justify-center transition-all duration-300 ${sched.active ? 'bg-aesthetic-pink text-white shadow-mid' : 'bg-gray-200 text-gray-400'}`}
+                                                    >
+                                                        {sched.active ? <span className="material-symbol text-base font-bold">check</span> : <span className="material-symbol text-base font-bold">close</span>}
+                                                    </button>
+                                                    <span className={`text-xs font-bold uppercase tracking-widest ${sched.active ? 'text-aesthetic-taupe' : 'text-gray-400'}`}>{dayName}</span>
+                                                </div>
+                                                {sched.active && (
+                                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 rounded-full">
+                                                        <div className="size-1.5 rounded-full bg-green-500 animate-pulse" />
+                                                        <span className="text-[9px] text-green-600 font-bold uppercase tracking-widest">Activo</span>
+                                                    </div>
+                                                )}
+                                            </div>
 
-                        {saveMsg && (
-                            <div className={`p-4 rounded-2xl text-sm text-center ${saveMsg.includes('Error') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-[#88C999]'}`}>
-                                {saveMsg}
+                                            {sched.active && (
+                                                <div className="flex items-center gap-4 pl-11 animate-fade-in">
+                                                    <div className="flex-1 relative">
+                                                        <span className="absolute -top-6 left-1 text-[8px] uppercase tracking-widest text-aesthetic-muted font-bold">Inicio</span>
+                                                        <input 
+                                                            type="time" 
+                                                            value={sched.start}
+                                                            onChange={(e) => {
+                                                                const newSched = [...weeklySchedule];
+                                                                const i = newSched.findIndex(s => s.day === idx);
+                                                                newSched[i].start = e.target.value;
+                                                                setWeeklySchedule(newSched);
+                                                            }}
+                                                            className="w-full bg-white border-none rounded-2xl px-4 py-3 text-xs font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 outline-none" 
+                                                        />
+                                                    </div>
+                                                    <div className="pt-2 text-aesthetic-muted opacity-30">
+                                                        <span className="material-symbol text-lg">arrow_forward</span>
+                                                    </div>
+                                                    <div className="flex-1 relative">
+                                                        <span className="absolute -top-6 left-1 text-[8px] uppercase tracking-widest text-aesthetic-muted font-bold">Cierre</span>
+                                                        <input 
+                                                            type="time" 
+                                                            value={sched.end}
+                                                            onChange={(e) => {
+                                                                const newSched = [...weeklySchedule];
+                                                                const i = newSched.findIndex(s => s.day === idx);
+                                                                newSched[i].end = e.target.value;
+                                                                setWeeklySchedule(newSched);
+                                                            }}
+                                                            className="w-full bg-white border-none rounded-2xl px-4 py-3 text-xs font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 outline-none" 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        )}
 
-                        <Button
-                            onClick={handleSaveInfo}
-                            isLoading={saving}
-                            className="w-full h-14"
-                        >
-                            Guardar Cambios
-                        </Button>
-                    </Card>
+                            <Button variant="primary" className="w-full h-14 mt-10" onClick={handleSaveInfo} isLoading={saving}>
+                                Actualizar Todos los Horarios
+                            </Button>
+                        </Card>
+                    </div>
                 )}
 
                 {tab === 'password' && (
-                    <Card variant="white" className="p-8 space-y-6">
-                        <Input 
-                            label="Contraseña actual"
-                            type="password"
-                            value={currentPassword}
-                            onChange={e => setCurrentPassword(e.target.value)}
-                            placeholder="••••••••"
-                            leftIcon="lock_open"
-                        />
-                        <Input 
-                            label="Nueva contraseña"
-                            type="password"
-                            value={newPassword}
-                            onChange={e => setNewPassword(e.target.value)}
-                            placeholder="••••••••"
-                            leftIcon="lock"
-                        />
-                        <Input 
-                            label="Confirmar nueva contraseña"
-                            type="password"
-                            value={confirmPassword}
-                            onChange={e => setConfirmPassword(e.target.value)}
-                            placeholder="••••••••"
-                            leftIcon="lock_reset"
-                        />
+                    <div className="space-y-6 animate-fade-in">
+                        <Card variant="white" className="p-8 border-none shadow-soft">
+                            <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-8">Cambiar Contraseña</h3>
+                            
+                            <div className="space-y-6">
+                                <Input
+                                    label="Contraseña Actual"
+                                    type="password"
+                                    value={currentPassword}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
+                                    leftIcon="lock_open"
+                                    placeholder="••••••••"
+                                />
 
-                        {pwError && (
-                            <div className="p-4 rounded-2xl text-sm text-center bg-red-50 text-red-600">{pwError}</div>
-                        )}
-                        {pwMsg && (
-                            <div className="p-4 rounded-2xl text-sm text-center bg-green-50 text-[#88C999]">{pwMsg}</div>
-                        )}
+                                <Input
+                                    label="Nueva Contraseña"
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    leftIcon="lock"
+                                    placeholder="••••••••"
+                                />
 
-                        <Button
-                            onClick={handleChangePassword}
-                            isLoading={pwSaving}
-                            variant="primary"
-                            className="w-full h-14"
-                        >
-                            Cambiar Contraseña
-                        </Button>
-                    </Card>
+                                <Input
+                                    label="Confirmar Nueva Contraseña"
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    leftIcon="lock_reset"
+                                    placeholder="••••••••"
+                                />
+
+                                <Button
+                                    variant="primary"
+                                    className="w-full h-14 mt-4"
+                                    onClick={handleChangePassword}
+                                    isLoading={pwSaving}
+                                >
+                                    Guardar Nueva Contraseña
+                                </Button>
+
+                                {pwMsg && (
+                                    <p className="text-center text-[10px] font-bold uppercase tracking-widest animate-fade-in text-green-500">
+                                        {pwMsg}
+                                    </p>
+                                )}
+                                {pwError && (
+                                    <p className="text-center text-[10px] font-bold uppercase tracking-widest animate-fade-in text-red-500">
+                                        {pwError}
+                                    </p>
+                                )}
+                            </div>
+                        </Card>
+                    </div>
                 )}
             </div>
         </div>

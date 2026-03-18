@@ -1,20 +1,30 @@
-'use client';
-
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { api } from '@/lib/api';
 
 interface CalendarStepProps {
     selectedDate: string | null;
     onSelect: (date: string) => void;
     onNext?: () => void;
+    tenantId?: string;
 }
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAY_NAMES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 
-export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext }: CalendarStepProps) {
+export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext, tenantId }: CalendarStepProps) {
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today.getMonth());
     const [currentYear, setCurrentYear] = useState(today.getFullYear());
+    const [schedule, setSchedule] = useState<{ day: number; active: boolean }[]>([]);
+
+    useEffect(() => {
+        if (!tenantId) return;
+        api.getTenant(tenantId).then(t => {
+            if (t?.settings?.weekly_schedule) {
+                setSchedule(t.settings.weekly_schedule);
+            }
+        });
+    }, [tenantId]);
 
     const daysInMonth = useMemo(() => {
         const firstDay = new Date(currentYear, currentMonth, 1).getDay(); // 0=Sun..6=Sat
@@ -41,7 +51,19 @@ export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext }
         return d < t;
     };
 
-    const isSunday = (day: number) => new Date(currentYear, currentMonth, day).getDay() === 0;
+    const isDayDisabled = (day: number) => {
+        const d = new Date(currentYear, currentMonth, day);
+        const dayOfWeek = d.getDay(); // 0=Sun
+        
+        // If we have a schedule, check it
+        if (schedule.length > 0) {
+            const dayInfo = schedule.find(s => s.day === dayOfWeek);
+            return dayInfo ? !dayInfo.active : false;
+        }
+
+        // Fallback: Default to Sunday closed if no schedule
+        return dayOfWeek === 0;
+    };
 
     const isSelected = (day: number) => {
         const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -52,7 +74,7 @@ export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext }
         day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
 
     const handleSelectDay = (day: number) => {
-        if (isPastDate(day) || isSunday(day)) return;
+        if (isPastDate(day) || isDayDisabled(day)) return;
         const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         onSelect(dateStr);
     };
@@ -94,8 +116,7 @@ export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext }
                 {daysInMonth.map((day, i) => {
                     if (day === null) return <div key={`empty-${i}`} className="aspect-square" />;
                     const past = isPastDate(day);
-                    const sunday = isSunday(day);
-                    const disabled = past || sunday;
+                    const disabled = past || isDayDisabled(day);
                     const selected = isSelected(day);
                     const todayDay = isToday(day);
 

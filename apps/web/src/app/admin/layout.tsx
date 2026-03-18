@@ -17,7 +17,7 @@ const NAV_ITEMS = [
     { href: '/admin/services', label: 'Servicios', icon: 'content_cut', roles: ['owner'] },
     { href: '/admin/clients', label: 'Clientas', icon: 'group', roles: ['owner'] },
     { href: '/admin/team', label: 'Equipo', icon: 'badge', roles: ['owner'] },
-    { href: '/admin/settings', label: 'Perfil', icon: 'person', roles: ['owner'] },
+    { href: '/admin/profile', label: 'Perfil', icon: 'person', roles: ['owner'] },
 ];
 
 const MaterialSymbol = ({ name, active }: { name: string; active?: boolean }) => (

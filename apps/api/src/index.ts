@@ -455,43 +455,66 @@ apiRouter.get('/availability', async (req, res) => {
             }
         }
         
-        let workingHours = { start: '09:00', end: '21:00' };
+        // --- 1. Get Salon-Wide Working Hours ---
+        // @ts-ignore
+        const tenantSettings = req.tenant.settings || {};
+        const salonSchedule = tenantSettings.weekly_schedule || [];
+        
+        const dt = DateTime.fromISO(date as string, { zone: 'America/Mexico_City' });
+        const dayIndex = dt.weekday % 7; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        const dayName = dt.setLocale('en').toFormat('EEEE').toLowerCase(); // e.g., 'monday'
+        
+        // Find salon's schedule for this day
+        let salonDaySchedule = Array.isArray(salonSchedule) 
+            ? salonSchedule.find((s: any) => s.day === dayIndex || s.day_of_week === dayIndex)
+            : null;
 
+        // Default: 09:00 - 21:00, but closed if specified
+        let workingHours = { 
+            active: salonDaySchedule ? salonDaySchedule.active : true, // Default to true if not set
+            start: salonDaySchedule?.start || '09:00', 
+            end: salonDaySchedule?.end || '21:00' 
+        };
+
+        // If salon is closed, nobody is available
+        if (!workingHours.active) {
+            return res.json([]);
+        }
+
+        // --- 2. Intersect with Staff Hours if staff_id is provided ---
         if (staff_id) {
             const staffRes = await query(`SELECT weekly_schedule FROM staff WHERE id = $1 AND tenant_id = $2`, [staff_id, tenantId]);
             if (staffRes.rowCount && staffRes.rowCount > 0 && staffRes.rows[0].weekly_schedule) {
                 const schedule = staffRes.rows[0].weekly_schedule;
-                const dt = DateTime.fromISO(date as string, { zone: 'America/Mexico_City' });
-                const dayIndex = dt.weekday % 7; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-                const dayName = dt.setLocale('en').toFormat('EEEE').toLowerCase(); // e.g., 'monday'
-                
-                let daySchedule = null;
+                let staffDaySchedule = null;
                 
                 // Handle both object-based and array-based schedules
                 if (Array.isArray(schedule)) {
-                    daySchedule = schedule.find((s: any) => 
+                    staffDaySchedule = schedule.find((s: any) => 
                         s.day_of_week === dayIndex || 
                         s.day === dayIndex || 
                         s.dayName?.toLowerCase() === dayName
                     );
-                    // Map array format to our internal structure
-                    if (daySchedule) {
-                        daySchedule = {
-                            active: daySchedule.active !== false,
-                            start: daySchedule.start_time || daySchedule.start || '09:00',
-                            end: daySchedule.end_time || daySchedule.end || '18:00'
+                    if (staffDaySchedule) {
+                        staffDaySchedule = {
+                            active: staffDaySchedule.active !== false,
+                            start: staffDaySchedule.start_time || staffDaySchedule.start || '09:00',
+                            end: staffDaySchedule.end_time || staffDaySchedule.end || '18:00'
                         };
                     }
                 } else if (schedule[dayName]) {
-                    daySchedule = schedule[dayName];
+                    staffDaySchedule = schedule[dayName];
                 }
 
-                if (daySchedule) {
-                    if (!daySchedule.active) {
-                        return res.json([]); // Staff is out
-                    }
-                    if (daySchedule.start && daySchedule.end) {
-                        workingHours = { start: daySchedule.start, end: daySchedule.end };
+                if (staffDaySchedule) {
+                    if (!staffDaySchedule.active) return res.json([]); // Staff is out
+                    
+                    // Intersect with salon hours (pick latest start and earliest end)
+                    workingHours.start = [workingHours.start, staffDaySchedule.start].sort().reverse()[0];
+                    workingHours.end = [workingHours.end, staffDaySchedule.end].sort()[0];
+                    
+                    if (workingHours.start >= workingHours.end) {
+                        return res.json([]); // No overlap between staff and salon
                     }
                 }
             }

@@ -53,6 +53,7 @@ export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect,
                         <CalendarStep
                             selectedDate={selectedDate}
                             onSelect={onDateSelect}
+                            tenantId={tenantId}
                         />
                         <div className="mt-8 p-6 rounded-[2rem] bg-pink-pale/30 border border-pink-light/20 flex gap-4 items-start">
                             <span className="text-2xl">⏳</span>

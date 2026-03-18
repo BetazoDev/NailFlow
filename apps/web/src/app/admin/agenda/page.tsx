@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Appointment, Service } from '@/lib/types';
-
 import { api } from '@/lib/api';
 import { useTenant } from '@/lib/tenant-context';
+import Lightbox from '@/components/ui/Lightbox';
+import type { Appointment, Service, Staff } from '@/lib/types';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAY_SHORT = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
@@ -19,12 +19,15 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
 interface AppointmentDetailProps {
     apt: Appointment;
     service?: Service;
+    staff?: Staff;
     onClose: () => void;
     onComplete: () => Promise<void>;
 }
 
-function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDetailProps) {
+function AppointmentDetail({ apt, service, staff, onClose, onComplete }: AppointmentDetailProps) {
     const [completing, setCompleting] = useState(false);
+    const [lbIndex, setLbIndex] = useState<number | null>(null);
+
     const s = STATUS_LABELS[apt.status] || STATUS_LABELS.pending_payment;
     const startDate = new Date(apt.datetime_start);
     const dateStr = startDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -76,8 +79,12 @@ function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDet
                             <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">{duration} min</p>
                         </div>
                         <div>
-                            <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Estudio</p>
-                            <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">Main Salon</p>
+                            <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Especialista</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">{staff?.name || 'Por asignar'}</p>
+                        </div>
+                        <div className="col-span-2">
+                             <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Estudio</p>
+                             <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">Main Salon</p>
                         </div>
                     </div>
                 </div>
@@ -86,13 +93,25 @@ function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDet
                 {(apt.image_url || (apt.image_urls && apt.image_urls.length > 0)) && (
                     <div className="px-6 mb-5">
                         <p className="text-[10px] tracking-[0.15em] text-nf-gray uppercase mb-3">Fotos de Referencia</p>
-                        <div className="flex gap-3 overflow-x-auto pb-2">
-                            {(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map((url, idx) => (
-                                <div key={idx} className="w-28 h-28 rounded-2xl overflow-hidden flex-shrink-0">
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                            {(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map((url, idx, all) => (
+                                <div 
+                                    key={idx} 
+                                    className="w-28 h-28 rounded-2xl overflow-hidden flex-shrink-0 cursor-zoom-in hover:scale-105 active:scale-95 transition-all"
+                                    onClick={() => setLbIndex(idx)}
+                                >
                                     <img src={api.getPublicUrl(url)} alt={`ref-${idx}`} className="w-full h-full object-cover" />
                                 </div>
                             ))}
                         </div>
+                        
+                        {lbIndex !== null && (
+                            <Lightbox
+                                images={(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map(u => api.getPublicUrl(u))}
+                                initialIndex={lbIndex}
+                                onClose={() => setLbIndex(null)}
+                            />
+                        )}
                     </div>
                 )}
 
@@ -183,6 +202,7 @@ function isSameDay(a: Date, b: Date) {
 export default function AgendaPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [services, setServices] = useState<Service[]>([]);
+    const [staffList, setStaffList] = useState<Staff[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
@@ -194,9 +214,11 @@ export default function AgendaPage() {
         Promise.all([
             api.getAppointments(),
             api.getServices(),
-        ]).then(([apts, svcs]) => {
+            api.getStaff(),
+        ]).then(([apts, svcs, sl]) => {
             setAppointments(apts);
             setServices(svcs);
+            setStaffList(sl);
         }).finally(() => setLoading(false));
     }, [tenantId]);
 
@@ -389,16 +411,12 @@ export default function AgendaPage() {
             {selectedApt && (
                 <AppointmentDetail
                     apt={selectedApt}
-                    service={getService(selectedApt.service_id)}
+                    service={services.find(s => s.id === selectedApt.service_id)}
+                    staff={staffList.find(s => s.id === selectedApt.staff_id)}
                     onClose={() => setSelectedApt(null)}
                     onComplete={() => handleComplete(selectedApt)}
                 />
             )}
-
-            {/* FAB */}
-            <button className="fixed bottom-10 right-8 size-16 rounded-full bg-aesthetic-taupe text-white shadow-soft flex items-center justify-center group active:scale-95 transition-all z-40">
-                <span className="material-symbol text-3xl group-hover:rotate-90 transition-transform duration-500">add</span>
-            </button>
         </div>
     );
 }

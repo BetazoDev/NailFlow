@@ -18,6 +18,12 @@ export interface Tenant {
   settings: {
     currency: string;
     timezone: string;
+    weekly_schedule?: {
+        day: number; // 0=Sun, 1=Mon, ..., 6=Sat
+        active: boolean;
+        start: string;
+        end: string;
+    }[];
   };
   owner_id: string;
   subscription: {
