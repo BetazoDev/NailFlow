@@ -135,7 +135,7 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                         <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
                             {localPreviews.map((url, idx) => (
                                 <div key={idx} className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 shadow-md border-2 border-white transform rotate-1 hover:rotate-0 transition-all">
-                                    <img src={url} alt={`ref-${idx}`} className="w-full h-full object-cover" />
+                                    <img src={api.getPublicUrl(url)} alt={`ref-${idx}`} className="w-full h-full object-cover" />
                                 </div>
                             ))}
                         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { BookingData } from '@/lib/types';
+import { api } from '@/lib/api';
 
 interface ConfirmationStepProps {
     booking: BookingData;
@@ -148,7 +149,7 @@ export default function ConfirmationStep({ booking, salonName = 'Ana Nails Studi
                                 </p>
                                 <div className="flex gap-2 overflow-x-auto pb-1">
                                     {booking.image_urls.map((url, i) => (
-                                        <img key={i} src={url} alt="" className="w-12 h-12 rounded-xl object-cover border border-cream-dark shadow-sm" />
+                                        <img key={i} src={api.getPublicUrl(url)} alt="" className="w-12 h-12 rounded-xl object-cover border border-cream-dark shadow-sm" />
                                     ))}
                                 </div>
                             </div>

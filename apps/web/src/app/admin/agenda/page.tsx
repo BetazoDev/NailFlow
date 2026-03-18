@@ -89,7 +89,7 @@ function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDet
                         <div className="flex gap-3 overflow-x-auto pb-2">
                             {(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map((url, idx) => (
                                 <div key={idx} className="w-28 h-28 rounded-2xl overflow-hidden flex-shrink-0">
-                                    <img src={url} alt={`ref-${idx}`} className="w-full h-full object-cover" />
+                                    <img src={api.getPublicUrl(url)} alt={`ref-${idx}`} className="w-full h-full object-cover" />
                                 </div>
                             ))}
                         </div>

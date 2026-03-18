@@ -40,13 +40,19 @@ async function imageProxyHandler(req: express.Request, res: express.Response) {
     // Clean up filename (remove leading slash if matched by *)
     const cleanFilename = filename.startsWith('/') ? filename.substring(1) : filename;
     
-    // Determine which token to try first based on folder
-    const isClientPhoto = cleanFilename.includes('clientas/') || cleanFilename.includes('bookings/');
-    const primaryToken = isClientPhoto ? CDN_TOKEN_REF : CDN_TOKEN;
-    const secondaryToken = isClientPhoto ? CDN_TOKEN : CDN_TOKEN_REF;
+    // Determine which token to use based on folder
+    // System folders use the main token, everything else (like clientas, bookings, or root) uses the reference token
+    const isSystemFolder = cleanFilename.includes('services/') || 
+                          cleanFilename.includes('team/') || 
+                          cleanFilename.includes('staff/') || 
+                          cleanFilename.includes('branding/') || 
+                          cleanFilename.includes('profile/');
+    
+    const primaryToken = isSystemFolder ? CDN_TOKEN : CDN_TOKEN_REF;
+    const secondaryToken = isSystemFolder ? CDN_TOKEN_REF : CDN_TOKEN;
 
     console.log(`[Proxy DEBUG] Request URL: ${req.url}`);
-    console.log(`[Proxy DEBUG] slug: ${slug}, cleanFilename: ${cleanFilename}, isClientPhoto: ${isClientPhoto}`);
+    console.log(`[Proxy DEBUG] slug: ${slug}, cleanFilename: ${cleanFilename}, isSystemFolder: ${isSystemFolder}`);
     
     // Attempt with the most likely token first
     let cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${primaryToken}`;

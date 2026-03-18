@@ -142,7 +142,7 @@ function NewServiceContent() {
                             onClick={() => fileRef.current?.click()}
                         >
                             {imagePreview ? (
-                                <img src={imagePreview} alt="preview" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                                <img src={api.getPublicUrl(imagePreview)} alt="preview" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                             ) : (
                                 <div className="flex flex-col items-center gap-3 text-aesthetic-pink/40 group-hover:text-aesthetic-pink transition-colors">
                                     <span className="material-symbol text-4xl font-light">photo_camera</span>

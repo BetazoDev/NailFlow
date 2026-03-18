@@ -229,15 +229,17 @@ export const api = {
             }
 
             const data = await response.json();
-
-            const clientSlug = 'nailssalon'; // Current slug for NailFlow project resources
+            const clientSlug = 'nailssalon'; 
 
             if (data.uploaded && data.uploaded.length > 0) {
                 const item = data.uploaded[0];
-                return item.url || item.cdnUrl || `https://cdn.diabolicalservices.tech/${clientSlug}/${item.filename}`;
+                // Clean any tokens from URLs returned by the CDN
+                const rawUrl = item.url || item.cdnUrl || `https://cdn.diabolicalservices.tech/${clientSlug}/${item.filename}`;
+                return rawUrl.split('?')[0]; 
             } else if (data.duplicates && data.duplicates.length > 0) {
                 const item = data.duplicates[0];
-                return item.url || item.cdnUrl || `https://cdn.diabolicalservices.tech/${clientSlug}/${item.filename}`;
+                const rawUrl = item.url || item.cdnUrl || `https://cdn.diabolicalservices.tech/${clientSlug}/${item.filename}`;
+                return rawUrl.split('?')[0];
             } else {
                 console.error('CDN Response missing data:', data);
                 throw new Error('Error CDN: No se retornó información de la imagen subida.');
@@ -249,59 +251,40 @@ export const api = {
     },
     getPublicUrl: (url: string | null | undefined): string => {
         if (!url) return '';
-        // Blob URLs (local preview) — return as-is
-        if (url.startsWith('blob:')) return url;
-        
-        // External image not on our CDN — return as-is
-        if (url.startsWith('http') && !url.includes('cdn.diabolicalservices.tech') && !url.includes('api.diabolicalservices.tech') && !url.includes('api-nailflow.diabolicalservices.tech')) {
-            return url;
-        }
+        if (url.startsWith('data:') || url.startsWith('blob:')) return url;
 
         const CDN_BASE = 'https://cdn.diabolicalservices.tech';
-        const clientSlug = 'nailssalon';
-        
-        // Tokens as requested by user
-        const SYSTEM_TOKEN = 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
-        const CLIENTS_TOKEN = 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
 
-        // Extract path (remove potential domain prefixes)
-        let path = url;
-        if (url.includes('/img/')) {
-            path = url.split('/img/')[1];
-        } else if (url.startsWith('http')) {
-            try {
-                const parsed = new URL(url);
-                const pathParts = parsed.pathname.split('/').filter(Boolean);
-                
-                // If it's already a CDN URL: domain/slug/path
-                if (url.includes('cdn.diabolicalservices.tech')) {
-                    if (pathParts.length >= 2 && pathParts[0] === clientSlug) {
-                        path = pathParts.slice(1).join('/');
-                    } else {
-                        path = pathParts.join('/');
-                    }
-                } else {
-                    path = pathParts.join('/');
-                }
-            } catch {
-                path = url;
-            }
+        // Extract the clean path
+        let cleanPath = url
+            .split('?')[0] // Strictly exclude any api_key query param
+            .replace('https://', '')
+            .replace('http://', '')
+            .replace('cdn.diabolicalservices.tech/', '')
+            .replace('api.diabolicalservices.tech/api/img/', '')
+            .replace('api-nailflow.diabolicalservices.tech/api/img/', '')
+            .replace('api.diabolicalservices.tech/img/', '')
+            .replace('api-nailflow.diabolicalservices.tech/img/', '');
+
+        // If it was a proxy URL like /api/img/nailssalon/image.jpg, we need the path after /img/
+        if (url.includes('/api/img/') || url.includes('/img/')) {
+             const parts = url.split(url.includes('/api/img/') ? '/api/img/' : '/img/');
+             if (parts.length > 1) {
+                 cleanPath = parts[1].split('?')[0];
+             }
         }
 
-        // Clean path and ensure slug prefix if missing
-        const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+        // Standardize leading slashes
+        cleanPath = cleanPath.replace(/^\/+/, '');
+
+        // Ensure the root project slug is always present
+        const clientSlug = 'nailssalon';
+        const pathParts = cleanPath.split('/').filter(Boolean);
+        if (pathParts[0] !== clientSlug) {
+            pathParts.unshift(clientSlug);
+        }
         
-        // Detect if it's a client reference photo (specifically in 'clientas' folder)
-        const isClientPhoto = cleanPath.includes('clientas/') || cleanPath.includes('bookings/');
-        const token = isClientPhoto ? CLIENTS_TOKEN : SYSTEM_TOKEN;
-        
-        // Correct base path: ensure slug is present once
-        const pathPart = cleanPath.startsWith(clientSlug) ? cleanPath : `${clientSlug}/${cleanPath}`;
-        
-        // Build final URL with token
-        const finalUrl = new URL(`${CDN_BASE}/${pathPart}`);
-        finalUrl.searchParams.set('api_key', token);
-        
-        return finalUrl.toString();
+        // Return THE clean direct CDN URL as requested by the user
+        return `${CDN_BASE}/${pathParts.join('/')}`;
     },
 };
