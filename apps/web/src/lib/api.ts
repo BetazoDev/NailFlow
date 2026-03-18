@@ -257,36 +257,51 @@ export const api = {
             return url;
         }
 
-        // If it's already a full URL to our API proxy, just return it (or update base if needed)
-        if (url.includes('/img/')) {
-            const parts = url.split('/img/');
-            return `${API_URL}/img/${parts[1]}`;
-        }
+        const CDN_BASE = 'https://cdn.diabolicalservices.tech';
+        const clientSlug = 'nailssalon';
+        
+        // Tokens as requested by user
+        const SYSTEM_TOKEN = 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+        const CLIENTS_TOKEN = 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
 
-        // Handle path-only strings or full CDN strings
+        // Extract path (remove potential domain prefixes)
         let path = url;
-        if (url.startsWith('http')) {
+        if (url.includes('/img/')) {
+            path = url.split('/img/')[1];
+        } else if (url.startsWith('http')) {
             try {
                 const parsed = new URL(url);
-                // Extract path after domain/slug
                 const pathParts = parsed.pathname.split('/').filter(Boolean);
-                if (pathParts.length >= 2) {
-                    // Assuming format domain/slug/filename
-                    path = pathParts.join('/');
+                
+                // If it's already a CDN URL: domain/slug/path
+                if (url.includes('cdn.diabolicalservices.tech')) {
+                    if (pathParts.length >= 2 && pathParts[0] === clientSlug) {
+                        path = pathParts.slice(1).join('/');
+                    } else {
+                        path = pathParts.join('/');
+                    }
                 } else {
-                    path = parsed.pathname.substring(1);
+                    path = pathParts.join('/');
                 }
             } catch {
                 path = url;
             }
         }
 
-        // Clean path
+        // Clean path and ensure slug prefix if missing
         const cleanPath = path.startsWith('/') ? path.substring(1) : path;
         
-        // Ensure slug prefix if missing
-        const finalPath = cleanPath.includes('/') ? cleanPath : `nailssalon/${cleanPath}`;
-
-        return `${API_URL}/img/${finalPath}`;
+        // Detect if it's a client reference photo (specifically in 'clientas' folder)
+        const isClientPhoto = cleanPath.includes('clientas/') || cleanPath.includes('bookings/');
+        const token = isClientPhoto ? CLIENTS_TOKEN : SYSTEM_TOKEN;
+        
+        // Correct base path: ensure slug is present once
+        const pathPart = cleanPath.startsWith(clientSlug) ? cleanPath : `${clientSlug}/${cleanPath}`;
+        
+        // Build final URL with token
+        const finalUrl = new URL(`${CDN_BASE}/${pathPart}`);
+        finalUrl.searchParams.set('api_key', token);
+        
+        return finalUrl.toString();
     },
 };

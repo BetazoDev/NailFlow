@@ -36,7 +36,7 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
             try {
                 for (let i = 0; i < pendingFiles.length; i++) {
                     setUploadStatus(`Subiendo foto ${i + 1} de ${pendingFiles.length}...`);
-                    const url = await api.uploadImage(tenantId, 'bookings', pendingFiles[i], 'clients');
+                    const url = await api.uploadImage(tenantId, 'clientas', pendingFiles[i], 'clients');
                     cdnUrls.push(url);
                 }
             } catch (e) {

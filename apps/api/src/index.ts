@@ -20,6 +20,92 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-domain', 'x-tenant-id']
 }));
+
+// Image Proxy Handler (Security: API key never exposed to browser)
+async function imageProxyHandler(req: express.Request, res: express.Response) {
+    const { slug } = req.params;
+    // @ts-ignore
+    const filename = req.params.filename || (req.params as any)[1] || (req.params as any)[0]; 
+    
+    if (!slug || !filename) {
+        return res.status(400).json({ error: 'Slug and filename are required' });
+    }
+
+    const CDN_TOKEN = process.env.CDN_UPLOAD_TOKEN
+        || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+    
+    const CDN_TOKEN_REF = process.env.CDN_API_KEY_REFERENCES
+        || 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
+
+    // Clean up filename (remove leading slash if matched by *)
+    const cleanFilename = filename.startsWith('/') ? filename.substring(1) : filename;
+    
+    // Determine which token to try first based on folder
+    const isClientPhoto = cleanFilename.includes('clientas/') || cleanFilename.includes('bookings/');
+    const primaryToken = isClientPhoto ? CDN_TOKEN_REF : CDN_TOKEN;
+    const secondaryToken = isClientPhoto ? CDN_TOKEN : CDN_TOKEN_REF;
+
+    console.log(`[Proxy DEBUG] Request URL: ${req.url}`);
+    console.log(`[Proxy DEBUG] slug: ${slug}, cleanFilename: ${cleanFilename}, isClientPhoto: ${isClientPhoto}`);
+    
+    // Attempt with the most likely token first
+    let cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${primaryToken}`;
+    console.log(`[Proxy DEBUG] Attempting Primary Fetch: ${cdnUrl.replace(/api_key=([^&]+)/, 'api_key=HIDDEN')}`);
+
+    try {
+        let cdnRes = await fetch(cdnUrl);
+        console.log(`[Proxy DEBUG] Primary Response Status: ${cdnRes.status}`);
+        
+        // If failed, try with the other token as fallback
+        if (!cdnRes.ok && (cdnRes.status === 404 || cdnRes.status === 401 || cdnRes.status === 403)) {
+            console.log(`[Proxy DEBUG] Primary failed, trying Secondary Token...`);
+            cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${secondaryToken}`;
+            console.log(`[Proxy DEBUG] Attempting Secondary Fetch: ${cdnUrl.replace(/api_key=([^&]+)/, 'api_key=HIDDEN')}`);
+            cdnRes = await fetch(cdnUrl);
+            console.log(`[Proxy DEBUG] Secondary Response Status: ${cdnRes.status}`);
+        }
+
+        if (!cdnRes.ok) {
+            console.warn(`[Proxy] CDN Error ${cdnRes.status} for ${slug}/${cleanFilename}`);
+            return res.status(cdnRes.status).json({ 
+                error: 'Image not found on CDN', 
+                status: cdnRes.status,
+                path: `${slug}/${cleanFilename}`,
+                attemptedUrl: cdnUrl
+            });
+        }
+
+        const contentType = cdnRes.headers.get('content-type') || 'image/jpeg';
+        console.log(`[Proxy DEBUG] Successful fetch, Content-Type: ${contentType}`);
+        
+        // Add CORS for browser safety
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+
+        const buffer = await cdnRes.arrayBuffer();
+        res.send(Buffer.from(buffer));
+    } catch (e: any) {
+        console.error(`[Proxy] Critical Error:`, e.message);
+        res.status(502).json({ error: 'Failed to fetch image from CDN', details: e.message });
+    }
+}
+
+// FORCE Image Proxy Match at top level before anything else
+app.get('/api/proxy-test', (req, res) => res.send('API PROXY SYSTEM REACHABLE'));
+app.get(/^\/api\/img\/([^\/]+)\/(.+)$/, (req, res, next) => {
+    req.params.slug = req.params[0];
+    next();
+}, imageProxyHandler);
+app.get(/^\/img\/([^\/]+)\/(.+)$/, (req, res, next) => {
+    req.params.slug = req.params[0];
+    next();
+}, imageProxyHandler);
+
 app.use(express.json());
 
 let tenantBranding: Record<string, any> = {};
@@ -58,84 +144,26 @@ const triggerN8nWebhook = async (tenantId: string, event: string, data: any) => 
     }
 };
 
-// ─── Image Proxy (Security: API key never exposed to browser) ────────────────
-// MUST be before tenant middleware to avoid missing x-tenant headers in img tags
+// (imageProxyHandler moved to top near app initialization)
 
-// Image Proxy Handler 
-const imageProxyHandler = async (req: express.Request, res: express.Response) => {
-    const { slug } = req.params;
-    const filename = req.params.filename || (req.params as any)[0]; // Captured by * or filename(*)
-    
-    if (!slug || !filename) {
-        return res.status(400).json({ error: 'Slug and filename are required' });
-    }
-
-    const CDN_TOKEN = process.env.CDN_UPLOAD_TOKEN
-        || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
-    
-    const CDN_TOKEN_REF = process.env.CDN_API_KEY_REFERENCES
-        || 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
-
-    // Clean up filename (remove leading slash if matched by *)
-    const cleanFilename = filename.startsWith('/') ? filename.substring(1) : filename;
-    
-    // First try with the primary token
-    let cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${CDN_TOKEN}`;
-    
-    console.log(`[Proxy] Request: ${req.url} -> Fetching Primary: ${slug}/${cleanFilename}`);
-
-    try {
-        let cdnRes = await fetch(cdnUrl);
-        
-        // If not found or unauthorized, try with the reference token
-        if (!cdnRes.ok && (cdnRes.status === 404 || cdnRes.status === 401 || cdnRes.status === 403)) {
-            console.log(`[Proxy] Failed with primary, trying reference token for ${slug}/${cleanFilename}`);
-            cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${CDN_TOKEN_REF}`;
-            cdnRes = await fetch(cdnUrl);
-        }
-
-        if (!cdnRes.ok) {
-            console.warn(`[Proxy] CDN Error ${cdnRes.status} for ${slug}/${cleanFilename}`);
-            return res.status(cdnRes.status).json({ 
-                error: 'Image not found on CDN', 
-                status: cdnRes.status,
-                path: `${slug}/${cleanFilename}`
-            });
-        }
-
-        const contentType = cdnRes.headers.get('content-type') || 'image/jpeg';
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-
-        const buffer = await cdnRes.arrayBuffer();
-        res.send(Buffer.from(buffer));
-    } catch (e: any) {
-        console.error(`[Proxy] Critical Error:`, e.message);
-        res.status(502).json({ error: 'Failed to fetch image from CDN', details: e.message });
-    }
-};
 
 
 // Image Proxy (Security: API key never exposed to browser)
 // MUST be before tenant middleware to avoid missing x-tenant headers in img tags
-app.get('/api/img/:slug/:filename(*)', imageProxyHandler);
-app.get('/img/:slug/:filename(*)', imageProxyHandler);
+// Routes moved inside apiRouter below to ensure consistent /api prefix matching
 
-// Middleware to extract tenant from request
+// ─── Tenant Resolution Middleware ───────────────────────────────────────────
 app.use(async (req, res, next) => {
-    // Basic request logging
-    console.log(`[API Request] ${req.method} ${req.url}`, {
-        host: req.headers.host,
-        tenantDomain: req.headers['x-tenant-domain'],
-        tenantId: req.headers['x-tenant-id']
-    });
-
-    // Skip tenant domain resolution for webhooks and health checks
-    const skipPaths = ['/health', '/api/webhooks', '/api/health'];
+    // Skip resolution for health checks and webhooks
+    const skipPaths = ['/health', '/api/webhooks', '/api/health', '/api/proxy-test', '/api/img'];
     if (skipPaths.some(p => req.path.startsWith(p))) {
         return next();
     }
+
+    console.log(`[API Request] ${req.method} ${req.url}`, {
+        host: req.headers.host,
+        tenantDomain: req.headers['x-tenant-domain']
+    });
 
     const tenantDomain = (req.headers['x-tenant-domain'] || req.query.domain || req.headers.host) as string;
     const tenantId = (req.headers['x-tenant-id'] || req.query.id) as string;
@@ -177,7 +205,6 @@ app.use(async (req, res, next) => {
     }
 });
 
-// ─── API Router ─────────────────────────────────────────────────────────────
 const apiRouter = express.Router();
 
 // ─── Auth Middleware ────────────────────────────────────────────────────────
