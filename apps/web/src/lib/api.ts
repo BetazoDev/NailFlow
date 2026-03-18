@@ -1,15 +1,27 @@
 import { Tenant, Staff, Service, Appointment, BookingData, TimeSlot } from './types';
 import { auth } from './firebase';
 
-let API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.diabolicalservices.tech';
+let API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-nailflow.diabolicalservices.tech/api';
 
 // HACK: Fix Dokploy misconfiguration. If the API URL points to the frontend (demo),
 // force it to the real backend (api) to prevent infinite loops and 404s.
-if (API_URL === 'https://demo.diabolicalservices.tech' || !API_URL.includes('api.')) {
-    API_URL = 'https://api.diabolicalservices.tech';
+if (API_URL.includes('demo.diabolicalservices.tech') || (!API_URL.includes('api-') && !API_URL.includes('api.'))) {
+    API_URL = 'https://api-nailflow.diabolicalservices.tech/api';
+}
+
+if (API_URL.endsWith('/')) {
+    API_URL = API_URL.slice(0, -1);
 }
 
 const fetchApi = async (path: string, options: RequestInit = {}, domain?: string) => {
+    // Ensure path starts with /
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    
+    // Avoid double /api in the final URL if path already includes it
+    const finalUrl = cleanPath.startsWith('/api') 
+        ? `${API_URL.replace(/\/api$/, '')}${cleanPath}`
+        : `${API_URL}${cleanPath}`;
+    
     // Add tenant domain header for resolution
     const headers = new Headers(options.headers || {});
 
@@ -29,7 +41,7 @@ const fetchApi = async (path: string, options: RequestInit = {}, domain?: string
         headers.set('x-tenant-domain', domain);
     }
 
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(finalUrl, {
         ...options,
         headers,
     });
@@ -241,45 +253,40 @@ export const api = {
         if (url.startsWith('blob:')) return url;
         
         // External image not on our CDN — return as-is
-        if (url.startsWith('http') && !url.includes('cdn.diabolicalservices.tech') && !url.includes('api.diabolicalservices.tech')) {
+        if (url.startsWith('http') && !url.includes('cdn.diabolicalservices.tech') && !url.includes('api.diabolicalservices.tech') && !url.includes('api-nailflow.diabolicalservices.tech')) {
             return url;
         }
 
-        // Strip any existing api_key param that might have been saved raw in DB
-        let cleanUrl = url;
-        try {
-            // Check if it's the old proxy format `/api/img/...` or `http.../api/img/...`
-            if (url.includes('/api/img/')) {
-                const parts = url.split('/api/img/');
-                if (parts.length === 2) {
-                    url = `https://cdn.diabolicalservices.tech/${parts[1]}`;
+        // If it's already a full URL to our API proxy, just return it (or update base if needed)
+        if (url.includes('/img/')) {
+            const parts = url.split('/img/');
+            return `${API_URL}/img/${parts[1]}`;
+        }
+
+        // Handle path-only strings or full CDN strings
+        let path = url;
+        if (url.startsWith('http')) {
+            try {
+                const parsed = new URL(url);
+                // Extract path after domain/slug
+                const pathParts = parsed.pathname.split('/').filter(Boolean);
+                if (pathParts.length >= 2) {
+                    // Assuming format domain/slug/filename
+                    path = pathParts.join('/');
+                } else {
+                    path = parsed.pathname.substring(1);
                 }
+            } catch {
+                path = url;
             }
-            
-            const parsed = new URL(
-                url.startsWith('http') ? url : `https://cdn.diabolicalservices.tech/${url}`
-            );
-            parsed.searchParams.delete('api_key');
-            parsed.searchParams.delete('token');
-            cleanUrl = parsed.toString();
-        } catch {
-            cleanUrl = url;
         }
 
-        const CDN_BASE = 'https://cdn.diabolicalservices.tech/';
+        // Clean path
+        const cleanPath = path.startsWith('/') ? path.substring(1) : path;
         
-        // Already a clean CDN URL
-        if (cleanUrl.startsWith(CDN_BASE)) {
-            return cleanUrl;
-        }
+        // Ensure slug prefix if missing
+        const finalPath = cleanPath.includes('/') ? cleanPath : `nailssalon/${cleanPath}`;
 
-        // Legacy: bare filename or relative path
-        if (!cleanUrl.startsWith('http') && cleanUrl.length > 3) {
-            // Remove leading slash if present
-            const safePath = cleanUrl.startsWith('/') ? cleanUrl.substring(1) : cleanUrl;
-            return `${CDN_BASE}nailssalon/${safePath}`;
-        }
-
-        return cleanUrl;
+        return `${API_URL}/img/${finalPath}`;
     },
 };

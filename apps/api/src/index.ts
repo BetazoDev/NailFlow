@@ -72,15 +72,28 @@ const imageProxyHandler = async (req: express.Request, res: express.Response) =>
 
     const CDN_TOKEN = process.env.CDN_UPLOAD_TOKEN
         || 'dmm_7tpONlAMTNtIMLjpr4gMSNqw9LGbgX6X';
+    
+    const CDN_TOKEN_REF = process.env.CDN_API_KEY_REFERENCES
+        || 'dmm_XKnnaMPrgRWaRHQ21deaQ3Krz2B6iBW';
 
     // Clean up filename (remove leading slash if matched by *)
     const cleanFilename = filename.startsWith('/') ? filename.substring(1) : filename;
-    const cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${CDN_TOKEN}`;
     
-    console.log(`[Proxy] Request: ${req.url} -> Fetching: ${slug}/${cleanFilename}`);
+    // First try with the primary token
+    let cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${CDN_TOKEN}`;
+    
+    console.log(`[Proxy] Request: ${req.url} -> Fetching Primary: ${slug}/${cleanFilename}`);
 
     try {
-        const cdnRes = await fetch(cdnUrl);
+        let cdnRes = await fetch(cdnUrl);
+        
+        // If not found or unauthorized, try with the reference token
+        if (!cdnRes.ok && (cdnRes.status === 404 || cdnRes.status === 401 || cdnRes.status === 403)) {
+            console.log(`[Proxy] Failed with primary, trying reference token for ${slug}/${cleanFilename}`);
+            cdnUrl = `https://cdn.diabolicalservices.tech/${slug}/${cleanFilename}?api_key=${CDN_TOKEN_REF}`;
+            cdnRes = await fetch(cdnUrl);
+        }
+
         if (!cdnRes.ok) {
             console.warn(`[Proxy] CDN Error ${cdnRes.status} for ${slug}/${cleanFilename}`);
             return res.status(cdnRes.status).json({ 
