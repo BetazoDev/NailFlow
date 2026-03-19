@@ -26,13 +26,38 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
         return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
     };
 
+    const timeToMinutes = (t: string) => {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + (m || 0);
+    };
+
     useEffect(() => {
-        if (!selectedDate) return;
+        if (!selectedDate || !tenantId) return;
         async function loadAvailability() {
             setLoading(true);
             try {
-                const slots = await api.getAvailability(staffId, selectedDate, serviceId);
-                setTimeSlots(slots);
+                const [slots, tenant] = await Promise.all([
+                    api.getAvailability(staffId, selectedDate, serviceId),
+                    api.getTenant(tenantId)
+                ]);
+
+                // Filter by business hours
+                const dateObj = new Date(selectedDate + 'T12:00:00');
+                const dayNum = dateObj.getDay();
+                const daySched = tenant?.settings?.weekly_schedule?.find((s: any) => s.day === dayNum);
+
+                if (daySched && daySched.active) {
+                    const startMin = timeToMinutes(daySched.start);
+                    const endMin = timeToMinutes(daySched.end);
+                    
+                    const filtered = slots.filter(slot => {
+                        const slotMin = timeToMinutes(slot.time);
+                        return slotMin >= startMin && slotMin < endMin;
+                    });
+                    setTimeSlots(filtered);
+                } else {
+                    setTimeSlots(slots);
+                }
             } catch (err) {
                 console.error('Failed to load availability:', err);
                 setTimeSlots([]);

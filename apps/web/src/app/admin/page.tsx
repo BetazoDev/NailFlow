@@ -8,6 +8,7 @@ import { useTenant } from '@/lib/tenant-context';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { MetricsGrid } from '@/components/admin/MetricsGrid';
+import Lightbox from '@/components/ui/Lightbox';
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
     confirmed: { label: 'CONFIRMADA', color: 'var(--aesthetic-pink)', bg: 'var(--aesthetic-soft-pink)' },
@@ -23,10 +24,12 @@ interface AppointmentDetailProps {
     service?: Service;
     onClose: () => void;
     onComplete: () => Promise<void>;
+    staff: Staff[];
 }
 
-function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDetailProps) {
+function AppointmentDetail({ apt, service, onClose, onComplete, staff }: AppointmentDetailProps) {
     const [completing, setCompleting] = useState(false);
+    const [lbIndex, setLbIndex] = useState<number | null>(null);
     const s = STATUS_LABELS[apt.status] || STATUS_LABELS.pending_payment;
     const startDate = new Date(apt.datetime_start);
     const dateStr = startDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -78,8 +81,10 @@ function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDet
                             <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">{duration} min</p>
                         </div>
                         <div>
-                            <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Estudio</p>
-                            <p className="font-display text-lg italic text-aesthetic-taupe leading-tight">Main Salon</p>
+                            <p className="text-[9px] tracking-[0.2em] text-aesthetic-muted/60 uppercase font-bold mb-1">Especialista</p>
+                            <p className="font-display text-lg italic text-aesthetic-taupe leading-tight capitalize">
+                                {staff.find(s => s.id === apt.staff_id)?.name || 'Sin asignar'}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -88,13 +93,25 @@ function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDet
                 {(apt.image_url || (apt.image_urls && apt.image_urls.length > 0)) && (
                     <div className="px-6 mb-5">
                         <p className="text-[10px] tracking-[0.15em] text-nf-gray uppercase mb-3">Fotos de Referencia</p>
-                        <div className="flex gap-3 overflow-x-auto">
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                             {(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map((url, idx) => (
-                                <div key={idx} className="w-28 h-28 rounded-2xl overflow-hidden flex-shrink-0">
+                                <div 
+                                    key={idx} 
+                                    className="w-28 h-28 rounded-2xl overflow-hidden flex-shrink-0 cursor-zoom-in hover:scale-105 active:scale-95 transition-all"
+                                    onClick={() => setLbIndex(idx)}
+                                >
                                     <img src={api.getPublicUrl(url)} alt={`ref-${idx}`} className="w-full h-full object-cover" />
                                 </div>
                             ))}
                         </div>
+
+                        {lbIndex !== null && (
+                            <Lightbox
+                                images={(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map(u => api.getPublicUrl(u))}
+                                initialIndex={lbIndex}
+                                onClose={() => setLbIndex(null)}
+                            />
+                        )}
                     </div>
                 )}
 
@@ -152,18 +169,23 @@ function AppointmentDetail({ apt, service, onClose, onComplete }: AppointmentDet
                                 await onComplete();
                                 setCompleting(false);
                             }}
-                            disabled={completing}
-                            className="w-full py-5 rounded-full font-display italic text-lg tracking-wide bg-aesthetic-taupe text-white flex items-center justify-center gap-3 transition-all duration-300 hover:bg-black active:scale-[0.98] disabled:opacity-50"
+                            disabled={completing || new Date() < new Date(apt.datetime_start)}
+                            className="w-full py-5 rounded-full font-display italic text-lg tracking-wide bg-aesthetic-taupe text-white flex items-center justify-center gap-3 transition-all duration-300 hover:bg-black active:scale-[0.98] disabled:opacity-50 disabled:grayscale"
                         >
                             {completing ? (
                                 <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
                                 <>
                                     <span className="material-symbol text-xl text-[#88C999]">check_circle</span>
-                                    Completar Cita
+                                    {new Date() < new Date(apt.datetime_start) ? 'Próximamente' : 'Completar Cita'}
                                 </>
                             )}
                         </button>
+                        {new Date() < new Date(apt.datetime_start) && (
+                            <p className="text-[9px] text-center mt-2 text-aesthetic-muted uppercase tracking-widest font-bold">
+                                Solo disponible al iniciar la cita
+                            </p>
+                        )}
                     </div>
                 )}
                 <div className="px-6 pb-12 text-center">
@@ -488,9 +510,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* FAB */}
-            <button className="fixed bottom-32 right-6 size-14 bg-aesthetic-pink text-white rounded-full shadow-soft flex items-center justify-center transition-all active:scale-95 z-30">
-                <span className="material-symbol text-3xl font-light">add</span>
-            </button>
+
 
             {/* Appointment detail drawer */}
             {selectedApt && (
@@ -499,6 +519,7 @@ export default function AdminDashboard() {
                     service={getService(selectedApt.service_id)}
                     onClose={() => setSelectedApt(null)}
                     onComplete={() => handleComplete(selectedApt)}
+                    staff={staff}
                 />
             )}
         </div>

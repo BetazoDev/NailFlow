@@ -63,19 +63,19 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
                     </h1>
                 </div>
 
-                {/* Categories filter - Centered and with better spacing */}
+                {/* Categories filter */}
                 {!loading && services.length > 0 && (
-                    <div className="flex justify-center w-full pb-4">
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 max-w-full">
+                    <div className="w-full pb-5">
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 relative">
                             {categories.map((cat) => (
                                 <button
                                     key={cat}
                                     onClick={() => setCategory(cat)}
                                     className={`
-                                        whitespace-nowrap px-5 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all
+                                        whitespace-nowrap px-6 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-300
                                         ${category === cat
-                                            ? 'bg-charcoal text-white shadow-lg scale-105'
-                                            : 'bg-white text-nf-gray border border-cream-dark/30 hover:bg-cream-dark'}
+                                            ? 'bg-aesthetic-taupe text-white shadow-md scale-105'
+                                            : 'bg-white text-aesthetic-muted border border-aesthetic-accent/50 hover:bg-aesthetic-cream/40'}
                                     `}
                                 >
                                     {cat}

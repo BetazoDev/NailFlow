@@ -159,8 +159,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <span className="text-sm font-medium">Cerrar sesión</span>
                     </button>
                     <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-aesthetic-soft-pink flex items-center justify-center overflow-hidden border border-aesthetic-accent shadow-minimal">
-                            {photoUrl ? (
+                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-aesthetic-accent shadow-minimal p-1">
+                            {logoUrl ? (
+                                <img src={api.getPublicUrl(logoUrl)} alt="Salon Logo" className="w-full h-full object-contain" />
+                            ) : photoUrl ? (
                                 <img src={api.getPublicUrl(photoUrl)} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
                                 <span className="font-display italic text-aesthetic-taupe text-lg">{salonName[0]}</span>
@@ -170,18 +172,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             <p className="text-xs font-semibold text-aesthetic-taupe leading-tight truncate">{salonName}</p>
                             <p className="text-[10px] text-aesthetic-muted uppercase tracking-wider">{userRole === 'owner' ? 'Propietario' : 'Staff'}</p>
                         </div>
-                        {logoUrl && (
-                            <div className="size-8 rounded-lg overflow-hidden border border-cream-dark shadow-sm bg-white p-1">
-                                <img src={api.getPublicUrl(logoUrl)} alt="Brand Logo" className="w-full h-full object-contain" />
-                            </div>
-                        )}
                     </div>
                 </div>
             </aside>
 
             {/* Mobile constraints structure for the main content */}
             <main className="flex-1 flex justify-center lg:justify-start lg:p-10 h-full overflow-hidden">
-                <div className="w-full h-full lg:max-w-6xl relative flex flex-col bg-cream lg:bg-transparent lg:rounded-none">
+                <div className="w-full h-full lg:max-w-[98%] relative flex flex-col bg-cream lg:bg-transparent lg:rounded-none">
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-y-auto pb-24 lg:pb-10 lg:bg-white lg:rounded-3xl lg:shadow-[0_8px_32px_rgba(0,0,0,0.03)] lg:border lg:border-cream-dark/50 p-0 lg:overflow-hidden relative">

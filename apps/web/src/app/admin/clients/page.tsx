@@ -180,13 +180,9 @@ export default function ClientsPage() {
             {/* Header */}
             <div className="px-6 pt-8 pb-0">
                 <div className="flex items-center justify-between mb-4">
-                    <button className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 transition-colors">
-                        <span className="material-symbol text-aesthetic-muted font-light">menu</span>
-                    </button>
-                    <h1 className="font-display text-2xl font-light italic tracking-tight text-aesthetic-taupe">Mis Clientas</h1>
-                    <button className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 transition-colors">
-                        <span className="material-symbol text-aesthetic-muted font-light">settings</span>
-                    </button>
+                    <div className="size-10" /> {/* Spacer */}
+                    <h1 className="font-display text-2xl font-light italic tracking-tight text-aesthetic-taupe text-center flex-1">Mis Clientas</h1>
+                    <div className="size-10" /> {/* Spacer */}
                 </div>
             </div>
 
@@ -341,9 +337,7 @@ export default function ClientsPage() {
             </div>
 
             {/* FAB */}
-            <button className="fixed bottom-32 right-6 size-14 bg-aesthetic-pink text-white rounded-full shadow-soft flex items-center justify-center transition-all active:scale-95 z-30">
-                <span className="material-symbol text-3xl font-light">person_add</span>
-            </button>
+
 
             {/* History Modal */}
             {historyClient && (
