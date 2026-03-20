@@ -5,14 +5,14 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 
 interface ServiceStepProps {
-    selectedServiceId: string | null;
-    onSelect: (service: Service) => void;
+    selectedServiceIds: string[];
+    onToggle: (service: Service) => void;
     onNext: () => void;
     onBack: () => void;
     tenantId?: string;
 }
 
-export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBack, tenantId = 'demo' }: ServiceStepProps) {
+export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBack, tenantId = 'demo' }: ServiceStepProps) {
     const [services, setServices] = useState<Service[]>([]);
     const [category, setCategory] = useState<string>('All');
     const [loading, setLoading] = useState(true);
@@ -36,6 +36,11 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
     const filteredServices = category === 'All'
         ? services
         : services.filter(s => (s.category || 'Otros') === category);
+
+    const totalSelected = selectedServiceIds.length;
+    const totalPrice = services
+        .filter(s => selectedServiceIds.includes(s.id))
+        .reduce((sum, s) => sum + s.estimated_price, 0);
 
     return (
         <div className="flex flex-col h-full relative" style={{ background: 'var(--cream)' }}>
@@ -66,7 +71,7 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
                 {/* Categories filter */}
                 {!loading && services.length > 0 && (
                     <div className="w-full pb-3">
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 py-2 relative after:content-[''] after:pr-6">
+                        <div className="flex gap-2 overflow-x-auto thin-scrollbar px-6 py-2 relative after:content-[''] after:pr-6">
                             {categories.map((cat) => (
                                 <button
                                     key={cat}
@@ -87,7 +92,7 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
             </div>
 
             {/* Service list: Only this area scrolls */}
-            <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-6 pb-32">
+            <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-6 pb-40">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-4">
                         <div className="w-10 h-10 border-3 border-pink-pale border-t-pink rounded-full animate-spin" />
@@ -101,11 +106,11 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
                 ) : (
                     <div className="grid grid-cols-1 gap-5 stagger-children">
                         {filteredServices.map((service) => {
-                            const isSelected = selectedServiceId === service.id;
+                            const isSelected = selectedServiceIds.includes(service.id);
                             return (
                                 <button
                                     key={service.id}
-                                    onClick={() => onSelect(service)}
+                                    onClick={() => onToggle(service)}
                                     className={`
                                         group relative flex flex-col w-full text-left rounded-[2rem] overflow-hidden transition-all duration-300
                                         ${isSelected ? 'shadow-2xl -translate-y-1' : 'shadow-md hover:shadow-xl hover:-translate-y-0.5'}
@@ -170,13 +175,15 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
             {/* Bottom Panel: Fixed at the bottom of THIS step's container */}
             <div className={`
                 absolute bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 transition-all duration-500 transform z-40
-                ${selectedServiceId ? 'translate-y-0 opacity-100 shadow-up' : 'translate-y-full opacity-0 pointer-events-none'}
+                ${totalSelected > 0 ? 'translate-y-0 opacity-100 shadow-up' : 'translate-y-full opacity-0 pointer-events-none'}
             `}>
                 <div className="max-w-lg mx-auto flex items-center justify-between gap-4">
-                    <div className="hidden sm:block min-w-0">
-                        <p className="text-[10px] font-bold text-pink uppercase tracking-widest mb-0.5">Seleccionado</p>
-                        <p className="font-serif text-charcoal text-sm truncate">
-                            {services.find(s => s.id === selectedServiceId)?.name}
+                    <div className="min-w-0">
+                        <p className="text-[10px] font-bold text-pink uppercase tracking-widest mb-0.5">
+                            {totalSelected} {totalSelected === 1 ? 'Servicio' : 'Servicios'}
+                        </p>
+                        <p className="font-serif text-charcoal text-xl">
+                            ${totalPrice}
                         </p>
                     </div>
                     <button

@@ -31,6 +31,7 @@ function BookingSteps() {
         goNext, goBack, navigate,
         staffName, staffPhoto,
         selectedService, setSelectedService,
+        selectedServices, setSelectedServices, toggleService,
         tenantId, staffId,
         selectedDate, setSelectedDate,
         selectedTime, setSelectedTime,
@@ -56,8 +57,8 @@ function BookingSteps() {
             )}
             {currentStep === 'service' && (
                 <ServiceStep
-                    selectedServiceId={selectedService?.id || null}
-                    onSelect={(svc) => setSelectedService(svc)}
+                    selectedServiceIds={selectedServices.map(s => s.id)}
+                    onToggle={toggleService}
                     onNext={goNext}
                     onBack={goBack}
                     tenantId={tenantId}
@@ -74,6 +75,7 @@ function BookingSteps() {
                     tenantId={tenantId}
                     staffId={staffId}
                     serviceId={selectedService?.id}
+                    totalDuration={bookingData.total_duration}
                 />
             )}
             {currentStep === 'inspiration' && (

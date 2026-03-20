@@ -16,6 +16,9 @@ interface BookingContextType {
     setClientEmail: (email: string) => void;
     selectedService: Service | null;
     setSelectedService: (service: Service | null) => void;
+    selectedServices: Service[];
+    setSelectedServices: (services: Service[]) => void;
+    toggleService: (service: Service) => void;
     selectedDate: string | null;
     setSelectedDate: (date: string | null) => void;
     selectedTime: string | null;
@@ -67,6 +70,7 @@ export function BookingProvider({
     const [clientPhone, setClientPhone] = useState('');
     const [clientEmail, setClientEmail] = useState('');
     const [selectedService, setSelectedService] = useState<Service | null>(null);
+    const [selectedServices, setSelectedServices] = useState<Service[]>([]);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
@@ -102,16 +106,39 @@ export function BookingProvider({
         goNext();
     };
 
+    const toggleService = (svc: Service) => {
+        setSelectedServices(prev => {
+            const exists = prev.find(s => s.id === svc.id);
+            if (exists) {
+                return prev.filter(s => s.id !== svc.id);
+            } else {
+                return [...prev, svc];
+            }
+        });
+    };
+
     const bookingData: BookingData = useMemo(() => {
+        const total_price = selectedServices.reduce((acc, s) => acc + (s.estimated_price || 0), 0);
+        const total_duration = selectedServices.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
+        const total_required_advance = selectedServices.reduce((acc, s) => acc + (s.required_advance || 0), 0);
+
         const data: any = {
             tenant_id: tenantId,
             date: selectedDate || '',
             time: selectedTime || '',
-            service_id: selectedService?.id || '',
-            service_name: selectedService?.name || '',
-            service_price: selectedService?.estimated_price || 0,
-            service_duration: selectedService?.duration_minutes || 0,
-            service_required_advance: selectedService?.required_advance || 0,
+            // Maintain compatibility with single service endpoints
+            service_id: selectedServices[0]?.id || '',
+            service_name: selectedServices[0]?.name || '',
+            service_price: selectedServices[0]?.estimated_price || 0,
+            service_duration: selectedServices[0]?.duration_minutes || 0,
+            service_required_advance: selectedServices[0]?.required_advance || 0,
+            
+            // New multi-service fields
+            selected_services: selectedServices,
+            total_price,
+            total_duration,
+            total_required_advance: total_required_advance,
+            
             staff_id: staffId || 'staff-1',
             staff_name: staffName,
             client_name: clientName,
@@ -127,7 +154,7 @@ export function BookingProvider({
         }
 
         return data as BookingData;
-    }, [tenantId, selectedDate, selectedTime, selectedService, staffId, staffName, staffPhoto, clientName, clientPhone, clientEmail, uploadedImageUrls]);
+    }, [tenantId, selectedDate, selectedTime, selectedServices, staffId, staffName, staffPhoto, clientName, clientPhone, clientEmail, uploadedImageUrls]);
 
     const value = {
         currentStep, setCurrentStep,
@@ -135,6 +162,7 @@ export function BookingProvider({
         clientPhone, setClientPhone,
         clientEmail, setClientEmail,
         selectedService, setSelectedService,
+        selectedServices, setSelectedServices, toggleService,
         selectedDate, setSelectedDate,
         selectedTime, setSelectedTime,
         pendingFiles, localPreviews, handleFilesChange,

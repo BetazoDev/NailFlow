@@ -53,33 +53,56 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
     };
 
     return (
-        <div className="flex flex-col min-h-full animate-fade-in-up" style={{ background: 'var(--cream)' }}>
-            {/* Header */}
-            <div className="px-6 pt-6 pb-2">
-                <button onClick={onBack} disabled={isUploading} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest mb-6 hover:text-pink transition-colors group">
-                    <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        <div className="flex flex-col h-full relative" style={{ background: 'var(--cream)' }}>
+            {/* Header: Sticky at the top */}
+            <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-cream-dark/30 shadow-sm">
+                <div className="flex items-center justify-between px-6 pt-6 pb-2">
+                    <button onClick={onBack} disabled={isUploading} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-pink transition-colors group">
+                        <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                        </div>
+                    </button>
+                    <div className="flex gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-pink opacity-20" />
+                        <div className="w-2 h-2 rounded-full bg-pink opacity-20" />
+                        <div className="w-2 h-2 rounded-full bg-pink opacity-20" />
+                        <div className="w-2 h-2 rounded-full bg-pink opacity-20" />
+                        <div className="w-2 h-2 rounded-full bg-pink" />
+                        {[...Array(2)].map((_, i) => (
+                            <div key={i} className="w-2 h-2 rounded-full bg-cream-dark opacity-30" />
+                        ))}
                     </div>
-                </button>
+                </div>
 
-                <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 5: Resumen</p>
-                <h1 className="font-serif text-3xl text-charcoal leading-tight">
-                    Confirma tu <span className="text-pink">cita</span>
-                </h1>
-                <div className="w-8 h-px bg-pink mt-3" />
+                <div className="px-6 pt-4 pb-4">
+                    <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 5: Resumen</p>
+                    <h1 className="font-serif text-3xl text-charcoal leading-tight">
+                        Confirma tu <span className="text-pink">cita</span>
+                    </h1>
+                </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-8 stagger-children">
+            {/* Scrollable content areas */}
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-32 px-6 py-8">
                 {/* Main Card */}
                 <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-cream-dark/30 mb-8 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-pink-pale/20 rounded-full -mr-16 -mt-16 blur-2xl" />
 
                     <div className="relative z-10">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-pink-pale flex items-center justify-center text-xl shadow-inner">✨</div>
-                            <div>
-                                <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest mb-0.5">Servicio Seleccionado</p>
-                                <h2 className="font-serif text-xl text-charcoal font-bold">{booking.service_name || '—'}</h2>
+                        <div className="flex items-start gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-2xl bg-pink-pale flex items-center justify-center text-xl shadow-inner flex-shrink-0">✨</div>
+                            <div className="flex-1">
+                                <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest mb-2">Servicios Seleccionados</p>
+                                <div className="space-y-2">
+                                    {booking.selected_services?.map((svc, i) => (
+                                        <div key={svc.id} className="flex justify-between items-center group">
+                                            <h2 className="font-serif text-lg text-charcoal font-bold">{svc.name}</h2>
+                                            <span className="text-sm font-bold text-pink opacity-70">${svc.estimated_price}</span>
+                                        </div>
+                                    )) || (
+                                        <h2 className="font-serif text-xl text-charcoal font-bold">{booking.service_name || '—'}</h2>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -116,13 +139,6 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                 <div className="mb-10 px-2">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-serif text-lg text-charcoal">Fotos de <span className="italic">referencia</span></h3>
-                        <button
-                            onClick={onAddImage}
-                            disabled={isUploading}
-                            className="text-[10px] font-bold text-pink uppercase tracking-widest bg-pink-pale px-3 py-1.5 rounded-full border border-pink-light/30 hover:bg-pink hover:text-white transition-all"
-                        >
-                            {localPreviews.length > 0 ? 'Editar fotos' : '+ Añadir fotos'}
-                        </button>
                     </div>
 
                     {localPreviews.length > 0 ? (
@@ -150,12 +166,12 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                 {/* Pricing Table */}
                 <div className="bg-charcoal text-white rounded-[2.5rem] p-8 shadow-2xl mb-12">
                     <div className="flex justify-between items-center mb-6">
-                        <span className="text-xs font-bold uppercase tracking-[0.2em] opacity-60">Total Servicio</span>
+                        <span className="text-xs font-bold uppercase tracking-[0.2em] opacity-60">Total Servicios</span>
                         <div className="h-px flex-1 mx-4 bg-white/10" />
-                        <span className="font-serif text-2xl font-bold">${price.toFixed(2)}</span>
+                        <span className="font-serif text-2xl font-bold">${(booking.total_price || price).toFixed(2)}</span>
                     </div>
 
-                    {advance > 0 && (
+                    {(booking.total_required_advance || advance) > 0 && (
                         <>
                             <div className="flex justify-between items-center mb-10">
                                 <div className="flex flex-col">
@@ -163,7 +179,7 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                                     <span className="text-[9px] opacity-40 uppercase tracking-widest mt-0.5">Confirmación inmediata</span>
                                 </div>
                                 <div className="h-px flex-1 mx-4 bg-white/10" />
-                                <span className="font-serif text-2xl font-bold text-pink">${advance.toFixed(2)}</span>
+                                <span className="font-serif text-2xl font-bold text-pink">${(booking.total_required_advance || advance).toFixed(2)}</span>
                             </div>
 
                             <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex gap-3 items-center">
@@ -177,11 +193,11 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                 </div>
             </div>
 
-            {/* CTA */}
-            <div className="px-6 pb-12 pt-4">
+            {/* CTA: Fixed at the bottom */}
+            <div className={`absolute bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40 transition-all duration-500 ${isUploading ? 'opacity-80' : ''}`}>
                 <button
                     onClick={handleConfirm}
-                    disabled={!booking.date || !booking.time || !booking.service_id || isUploading}
+                    disabled={!booking.date || !booking.time || (!booking.service_id && !booking.selected_services?.length) || isUploading}
                     className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                     {isUploading ? (
@@ -196,9 +212,6 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                         </>
                     )}
                 </button>
-                <p className="text-center text-[10px] tracking-[0.2em] text-gray-light uppercase font-bold mt-6">
-                    PASO 5 DE 6
-                </p>
             </div>
         </div>
     );

@@ -13,9 +13,10 @@ interface TimeSlotStepProps {
     tenantId?: string;
     staffId?: string;
     serviceId?: string;
+    totalDuration?: number;
 }
 
-export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onNext, onBack, tenantId = 'demo', staffId = 'staff-1', serviceId }: TimeSlotStepProps) {
+export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onNext, onBack, tenantId = 'demo', staffId = 'staff-1', serviceId, totalDuration = 0 }: TimeSlotStepProps) {
     const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
     const [loading, setLoading] = useState(false);
     const holdIdRef = useRef(`hold_${Date.now()}_${Math.random().toString(36).slice(2)}`);
@@ -52,10 +53,13 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
                     
                     const filtered = slots.filter(slot => {
                         const slotMin = timeToMinutes(slot.time);
-                        return slotMin >= startMin && slotMin < endMin;
+                        // Filter by business hours AND ensure total duration fits before closing
+                        return slotMin >= startMin && (slotMin + (totalDuration || 0)) <= endMin;
                     });
                     setTimeSlots(filtered);
                 } else {
+                    // Even if no specific schedule, respect duration if endMin were known. 
+                    // But usually there's a daySched. If not, we just show all.
                     setTimeSlots(slots);
                 }
             } catch (err) {

@@ -123,7 +123,7 @@ export async function initDb() {
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       ON CONFLICT (id) DO UPDATE SET
         domain = EXCLUDED.domain,
-        name = EXCLUDED.name,
+        name = COALESCE(tenants.name, EXCLUDED.name),
         branding = COALESCE(tenants.branding, EXCLUDED.branding),
         settings = COALESCE(tenants.settings, EXCLUDED.settings),
         subscription = COALESCE(tenants.subscription, EXCLUDED.subscription),

@@ -128,6 +128,10 @@ export interface BookingData {
   service_price: number;
   service_duration: number;
   service_required_advance?: number;
+  selected_services?: Service[];
+  total_price?: number;
+  total_duration?: number;
+  total_required_advance?: number;
   staff_id?: string;
   staff_name?: string;
   staff_photo?: string;

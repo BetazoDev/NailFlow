@@ -150,19 +150,19 @@ function AppointmentDetail({ apt, service, onClose, onComplete, staff }: Appoint
             </div>
 
             {/* Sticky Action Footer */}
-            <div className="sticky bottom-0 left-0 right-0 px-6 pt-4 pb-12 bg-cream border-t border-aesthetic-accent/20 space-y-3 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-20">
-                <a
-                    href={`https://wa.me/${apt.client_phone.replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-4 rounded-full font-display italic text-lg tracking-wide border border-aesthetic-pink/20 bg-aesthetic-soft-pink text-aesthetic-taupe flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-minimal active:scale-[0.98]"
-                >
-                    <span className="material-symbol text-xl text-[#25D366]">chat</span>
-                    Contactar por WhatsApp
-                </a>
+            <div className="sticky bottom-0 left-0 right-0 px-6 pt-4 pb-12 bg-cream border-t border-aesthetic-accent/20 flex flex-col gap-3 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-20">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <a
+                        href={`https://wa.me/${apt.client_phone.replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3.5 rounded-full font-display italic text-lg tracking-wide border border-aesthetic-pink/20 bg-aesthetic-soft-pink text-aesthetic-taupe flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-minimal active:scale-[0.98]"
+                    >
+                        <span className="material-symbol text-xl text-[#25D366]">chat</span>
+                        WhatsApp
+                    </a>
 
-                {apt.status !== 'completed' && apt.status !== 'cancelled' && (
-                    <div className="w-full relative">
+                    {apt.status !== 'completed' && apt.status !== 'cancelled' && (
                         <button
                             onClick={async () => {
                                 setCompleting(true);
@@ -170,24 +170,26 @@ function AppointmentDetail({ apt, service, onClose, onComplete, staff }: Appoint
                                 setCompleting(false);
                             }}
                             disabled={completing || new Date() < new Date(apt.datetime_start)}
-                            className="w-full py-4 rounded-full font-display italic text-lg tracking-wide bg-aesthetic-taupe text-white flex items-center justify-center gap-3 transition-all duration-300 hover:bg-black active:scale-[0.98] disabled:opacity-50 disabled:grayscale shadow-lg"
+                            className="w-full py-3.5 rounded-full font-display italic text-lg tracking-wide bg-aesthetic-taupe text-white flex items-center justify-center gap-3 transition-all duration-300 hover:bg-black active:scale-[0.98] disabled:opacity-50 disabled:grayscale shadow-lg"
                         >
                             {completing ? (
                                 <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
                                 <>
                                     <span className="material-symbol text-xl text-[#88C999]">check_circle</span>
-                                    {new Date() < new Date(apt.datetime_start) ? 'Se habilitará al pasar el horario' : 'Completar Cita'}
+                                    {new Date() < new Date(apt.datetime_start) ? 'Próxima' : 'Completar'}
                                 </>
                             )}
                         </button>
-                        {new Date() < new Date(apt.datetime_start) && (
-                            <p className="text-[9px] text-center mt-2 text-aesthetic-muted uppercase tracking-widest font-bold">
-                                Se habilitará automáticamente al iniciar el turno
-                            </p>
-                        )}
-                    </div>
+                    )}
+                </div>
+                
+                {apt.status !== 'completed' && apt.status !== 'cancelled' && new Date() < new Date(apt.datetime_start) && (
+                    <p className="text-[9px] text-center text-aesthetic-muted uppercase tracking-widest font-bold">
+                        Habilitado al iniciar el turno
+                    </p>
                 )}
+                
                 <div className="pt-2 text-center">
                     <button className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase hover:text-red-400 transition-colors font-display italic font-medium">
                         Cancelar Cita

@@ -111,9 +111,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const getIsActive = (href: string) => pathname === href || (href !== '/admin' && pathname.startsWith(href));
 
     const SidebarContent = () => (
-        <div className="flex flex-col h-full bg-white">
-            <div className="p-8">
-                <div className="flex items-center gap-3 mb-10">
+        <div className="flex flex-col h-full bg-white relative overflow-hidden">
+            {/* Sidebar Header: Fixed at top */}
+            <div className="p-8 pb-4 flex-shrink-0">
+                <div className="flex items-center gap-3 mb-6">
                     <div className="size-10 rounded-xl flex items-center justify-center shadow-soft bg-aesthetic-accent overflow-hidden">
                         {logoUrl ? (
                             <img src={api.getPublicUrl(logoUrl)} alt="Logo" className="w-full h-full object-cover" />
@@ -126,29 +127,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <p className="text-[9px] uppercase tracking-[0.2em] font-bold text-aesthetic-muted/60 leading-none mt-0.5">Dashboard</p>
                     </div>
                 </div>
-
-                <nav className="flex flex-col gap-2">
-                    {NAV_ITEMS.filter(item => item.roles.includes(userRole || 'owner')).map((item) => {
-                        const isActive = getIsActive(item.href);
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={() => setIsSidebarOpen(false)}
-                                className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 ${isActive
-                                    ? 'bg-aesthetic-taupe text-white shadow-soft'
-                                    : 'text-aesthetic-muted/60 hover:text-aesthetic-pink hover:bg-aesthetic-soft-pink/20'
-                                    }`}
-                            >
-                                <MaterialSymbol name={item.icon} active={isActive} />
-                                <span className={`text-[11px] uppercase tracking-[0.15em] font-bold ${isActive ? 'text-white' : ''}`}>{item.label}</span>
-                            </Link>
-                        );
-                    })}
-                </nav>
             </div>
 
-            <div className="mt-auto p-8 border-t border-cream-dark/50">
+            {/* Main Nav: Scrollable */}
+            <nav className="flex-1 overflow-y-auto px-8 no-scrollbar flex flex-col gap-2 pb-6">
+                {NAV_ITEMS.filter(item => item.roles.includes(userRole || 'owner')).map((item) => {
+                    const isActive = getIsActive(item.href);
+                    return (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setIsSidebarOpen(false)}
+                            className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 ${isActive
+                                ? 'bg-aesthetic-taupe text-white shadow-soft'
+                                : 'text-aesthetic-muted/60 hover:text-aesthetic-pink hover:bg-aesthetic-soft-pink/20'
+                                }`}
+                        >
+                            <MaterialSymbol name={item.icon} active={isActive} />
+                            <span className={`text-[11px] uppercase tracking-[0.15em] font-bold ${isActive ? 'text-white' : ''}`}>{item.label}</span>
+                        </Link>
+                    );
+                })}
+            </nav>
+
+            {/* Sidebar Footer: Fixed at bottom */}
+            <div className="p-8 border-t border-cream-dark/50 bg-white flex-shrink-0">
                 <button onClick={handleLogout} className="flex items-center gap-3 text-nf-gray hover:text-charcoal transition-colors w-full group">
                     <span className="material-symbol text-xl transition-transform group-hover:scale-110">logout</span>
                     <span className="text-sm font-medium">Cerrar sesión</span>
@@ -199,8 +202,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-                <div className="flex-1 overflow-y-auto lg:p-10 relative">
-                    <div className="mx-auto w-full h-full max-w-[1800px] lg:bg-white lg:rounded-3xl lg:shadow-minimal lg:border lg:border-cream-dark/50 p-0 relative">
+                <div className="flex-1 overflow-y-auto lg:p-8 relative">
+                    <div className="mx-auto w-full min-h-full max-w-[1240px] lg:bg-white lg:rounded-[2.5rem] lg:shadow-minimal lg:border lg:border-cream-dark/50 p-0 relative">
                         <div className="lg:p-8">
                             <TenantContext.Provider value={{ tenantId, domain }}>
                                 {children}

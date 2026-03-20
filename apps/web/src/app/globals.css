@@ -112,6 +112,20 @@ body {
   border-radius: 4px;
 }
 
+.thin-scrollbar::-webkit-scrollbar {
+  height: 1px;
+  width: 1px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--pink-light);
+  border-radius: 10px;
+}
+
 /* ===== ANIMATIONS ===== */
 @keyframes fadeInUp {
   from {
