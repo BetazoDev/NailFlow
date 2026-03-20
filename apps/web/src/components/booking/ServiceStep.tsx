@@ -65,8 +65,8 @@ export default function ServiceStep({ selectedServiceId, onSelect, onNext, onBac
 
                 {/* Categories filter */}
                 {!loading && services.length > 0 && (
-                    <div className="w-full pb-5">
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 relative">
+                    <div className="w-full pb-3">
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 py-2 relative after:content-[''] after:pr-6">
                             {categories.map((cat) => (
                                 <button
                                     key={cat}

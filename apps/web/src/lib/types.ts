@@ -70,6 +70,8 @@ export interface Service {
   category?: string;
   description?: string;
   image_url?: string;
+  is_package?: boolean;
+  included_service_ids?: string[];
 }
 
 export interface Appointment {

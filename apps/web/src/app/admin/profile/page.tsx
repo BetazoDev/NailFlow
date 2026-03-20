@@ -154,8 +154,12 @@ export default function ProfilePage() {
             {/* Avatar section */}
             <div className="px-6 mb-8">
                 <Card variant="white" className="flex items-center gap-5 p-6">
-                    <div className="size-16 rounded-full bg-aesthetic-soft-pink border-2 border-aesthetic-pink/30 flex items-center justify-center text-aesthetic-taupe text-2xl font-display italic flex-shrink-0">
-                        {user?.email?.charAt(0).toUpperCase() || '?'}
+                    <div className="size-24 rounded-full bg-aesthetic-soft-pink border-4 border-white shadow-soft flex items-center justify-center text-aesthetic-taupe text-4xl font-display italic flex-shrink-0 overflow-hidden ring-1 ring-aesthetic-accent/50">
+                        {logoPreview ? (
+                            <img src={api.getPublicUrl(logoPreview)} alt="Logo" className="w-full h-full object-cover" />
+                        ) : (
+                            user?.email?.charAt(0).toUpperCase() || '✨'
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="font-display text-lg italic text-aesthetic-taupe truncate">{user?.email || 'Sin sesión'}</p>
@@ -221,7 +225,6 @@ export default function ProfilePage() {
                                     label="Nombre del Salón"
                                     value={salonName}
                                     onChange={(e) => setSalonName(e.target.value)}
-                                    placeholder="Ej: Studio Estética"
                                     leftIcon="storefront"
                                 />
 
@@ -229,7 +232,6 @@ export default function ProfilePage() {
                                     label="Nota de Bienvenida"
                                     value={tagline}
                                     onChange={(e) => setTagline(e.target.value)}
-                                    placeholder="Ej: Lo mejor en nailart para ti"
                                     leftIcon="auto_awesome"
                                 />
 
@@ -348,7 +350,6 @@ export default function ProfilePage() {
                                     value={currentPassword}
                                     onChange={(e) => setCurrentPassword(e.target.value)}
                                     leftIcon="lock_open"
-                                    placeholder="••••••••"
                                 />
 
                                 <Input
@@ -357,7 +358,6 @@ export default function ProfilePage() {
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
                                     leftIcon="lock"
-                                    placeholder="••••••••"
                                 />
 
                                 <Input
@@ -366,12 +366,11 @@ export default function ProfilePage() {
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     leftIcon="lock_reset"
-                                    placeholder="••••••••"
                                 />
 
                                 <Button
                                     variant="primary"
-                                    className="w-full h-14 mt-4"
+                                    className="w-full h-14 mt-4 py-5 font-display italic text-lg"
                                     onClick={handleChangePassword}
                                     isLoading={pwSaving}
                                 >

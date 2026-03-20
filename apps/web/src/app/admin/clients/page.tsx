@@ -179,10 +179,8 @@ export default function ClientsPage() {
         <div className="relative min-h-full pb-24" style={{ background: 'var(--cream)' }}>
             {/* Header */}
             <div className="px-6 pt-8 pb-0">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="size-10" /> {/* Spacer */}
-                    <h1 className="font-display text-2xl font-light italic tracking-tight text-aesthetic-taupe text-center flex-1">Mis Clientas</h1>
-                    <div className="size-10" /> {/* Spacer */}
+                <div className="flex items-center justify-center mb-4">
+                    <h1 className="font-display text-4xl font-light italic tracking-tight text-aesthetic-taupe text-center">Mis Clientas</h1>
                 </div>
             </div>
 

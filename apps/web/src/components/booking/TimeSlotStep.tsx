@@ -87,12 +87,12 @@ export default function TimeSlotStep({ selectedDate, selectedTime, onSelect, onN
     const afternoonSlots = timeSlots.filter(s => parseInt(s.time.split(':')[0]) >= 13);
 
     const SlotGrid = ({ slots, title, icon }: { slots: TimeSlot[], title: string, icon: string }) => (
-        <div className="mb-8">
+        <div className="mb-8 px-2">
             <div className="flex items-center gap-2 mb-4">
                 <span className="text-xl">{icon}</span>
                 <h4 className="text-[10px] font-bold text-nf-gray uppercase tracking-widest">{title}</h4>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 min-[380px]:grid-cols-3 gap-3">
                 {slots.map((slot) => {
                     const isSelected = selectedTime === slot.time;
                     return (

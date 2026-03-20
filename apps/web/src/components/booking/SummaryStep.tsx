@@ -62,12 +62,6 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                     </div>
                 </button>
 
-                <div className="flex gap-1 mb-6">
-                    {[...Array(6)].map((_, i) => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-pink" style={{ opacity: i < 4 ? 0.4 : i === 4 ? 1 : 0.15 }} />
-                    ))}
-                </div>
-
                 <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 5: Resumen</p>
                 <h1 className="font-serif text-3xl text-charcoal leading-tight">
                     Confirma tu <span className="text-pink">cita</span>

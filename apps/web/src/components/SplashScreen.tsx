@@ -59,7 +59,7 @@ export default function SplashScreen({
 
             {/* Tagline */}
             <p
-                className="italic text-nf-gray text-base animate-fade-in-up"
+                className="italic text-nf-gray text-base animate-fade-in-up text-center px-8"
                 style={{ animationDelay: '0.35s', fontFamily: 'Georgia, var(--font-serif)' }}
             >
                 {tagline}

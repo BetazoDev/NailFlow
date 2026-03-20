@@ -47,12 +47,6 @@ export default function ImageUploadStep({
                     </div>
                 </button>
 
-                <div className="flex gap-1 mb-6">
-                    {[...Array(6)].map((_, i) => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-pink" style={{ opacity: i < 3 ? 0.4 : i === 3 ? 1 : 0.15 }} />
-                    ))}
-                </div>
-
                 <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 4: Inspiración</p>
                 <h1 className="font-serif text-3xl text-charcoal leading-tight">
                     Tu <span className="text-pink">visión</span> creativa

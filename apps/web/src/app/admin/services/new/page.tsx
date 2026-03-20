@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Service } from '@/lib/types';
 
 import { api } from '@/lib/api';
 import { useTenant } from '@/lib/tenant-context';
@@ -20,6 +21,9 @@ function NewServiceContent() {
     const [price, setPrice] = useState('');
     const [duration, setDuration] = useState(60);
     const [category, setCategory] = useState('');
+    const [isPackage, setIsPackage] = useState(false);
+    const [allServices, setAllServices] = useState<Service[]>([]);
+    const [includedServiceIds, setIncludedServiceIds] = useState<string[]>([]);
     const [existingCategories, setExistingCategories] = useState<string[]>([]);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -33,6 +37,7 @@ function NewServiceContent() {
             setLoading(true);
             api.getServices()
                 .then(services => {
+                    setAllServices(services);
                     // Extract unique categories
                     const cats = Array.from(new Set(services.map(s => s.category).filter(Boolean) as string[]));
                     setExistingCategories(cats);
@@ -46,6 +51,8 @@ function NewServiceContent() {
                             setDuration(data.duration_minutes || 60);
                             setCategory(data.category || '');
                             setImagePreview(data.image_url || null);
+                            setIsPackage(data.is_package || false);
+                            setIncludedServiceIds(data.included_service_ids || []);
                         }
                     }
                 })
@@ -91,6 +98,8 @@ function NewServiceContent() {
                 duration_minutes: duration,
                 required_advance: Math.round((parseFloat(price) || 0) * 0.4),
                 image_url: finalImageUrl,
+                is_package: isPackage,
+                included_service_ids: isPackage ? includedServiceIds : [],
             };
 
             console.log('Enviando datos a Firestore:', serviceData);
@@ -155,6 +164,22 @@ function NewServiceContent() {
                     </section>
 
                     <div className="space-y-8">
+                        {/* Type Toggle */}
+                        <div className="flex gap-2 p-1 bg-white/50 rounded-2xl border border-aesthetic-accent shadow-minimal">
+                            <button 
+                                onClick={() => setIsPackage(false)}
+                                className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${!isPackage ? 'bg-aesthetic-taupe text-white shadow-lg' : 'text-aesthetic-muted hover:text-aesthetic-taupe'}`}
+                            >
+                                Servicio
+                            </button>
+                            <button 
+                                onClick={() => setIsPackage(true)}
+                                className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${isPackage ? 'bg-aesthetic-taupe text-white shadow-lg' : 'text-aesthetic-muted hover:text-aesthetic-taupe'}`}
+                            >
+                                Paquete
+                            </button>
+                        </div>
+
                         {/* Name */}
                         <div className="space-y-2">
                             <label className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Nombre del Servicio</label>
@@ -205,7 +230,7 @@ function NewServiceContent() {
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-aesthetic-muted/40 font-display italic">$</span>
                                     <input
-                                        className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 pl-8 text-base font-display italic shadow-minimal transition-all"
+                                        className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 text-base font-display italic shadow-minimal transition-all pl-8"
                                         placeholder="0.00"
                                         value={price}
                                         onChange={e => setPrice(e.target.value.replace(/[^0-9.]/g, ''))}
@@ -229,6 +254,45 @@ function NewServiceContent() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Included services (FOR PACKAGES) */}
+                        {isPackage && (
+                            <div className="space-y-4 animate-fade-in">
+                                <label className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Servicios Incluidos</label>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {allServices.filter(s => !s.is_package && s.id !== id).map(s => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => {
+                                                if (includedServiceIds.includes(s.id)) {
+                                                    setIncludedServiceIds(prev => prev.filter(i => i !== s.id));
+                                                } else {
+                                                    setIncludedServiceIds(prev => [...prev, s.id]);
+                                                }
+                                            }}
+                                            className={`flex items-center gap-3 p-4 rounded-2xl border transition-all ${
+                                                includedServiceIds.includes(s.id)
+                                                ? 'bg-aesthetic-soft-pink/30 border-aesthetic-pink shadow-minimal'
+                                                : 'bg-white border-aesthetic-accent/20 hover:border-aesthetic-pink/30'
+                                            }`}
+                                        >
+                                            <div className={`size-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                includedServiceIds.includes(s.id) ? 'border-aesthetic-pink bg-aesthetic-pink' : 'border-aesthetic-accent'
+                                            }`}>
+                                                {includedServiceIds.includes(s.id) && <span className="material-symbol text-white text-[10px] font-bold">check</span>}
+                                            </div>
+                                            <div className="text-left flex-1 min-w-0">
+                                                <p className="text-sm font-display italic text-aesthetic-taupe truncate leading-tight">{s.name}</p>
+                                                <p className="text-[10px] text-aesthetic-muted font-bold tracking-widest">{s.duration_minutes} min</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                                {allServices.filter(s => !s.is_package && s.id !== id).length === 0 && (
+                                    <p className="text-[11px] text-aesthetic-muted italic text-center py-4">No hay servicios registrados para incluir.</p>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {error && (

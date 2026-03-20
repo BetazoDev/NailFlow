@@ -9,8 +9,6 @@ import { api } from '@/lib/api';
 import { TenantContext } from '@/lib/tenant-context';
 import { PALETTES, TYPOGRAPHY } from '@/lib/constants';
 
-// Branding will be loaded from shared constants
-
 const NAV_ITEMS = [
     { href: '/admin', label: 'Inicio', icon: 'home', roles: ['owner', 'staff'] },
     { href: '/admin/agenda', label: 'Agenda', icon: 'calendar_today', roles: ['owner', 'staff'] },
@@ -37,6 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const router = useRouter();
     const [isAuth, setIsAuth] = useState<boolean | null>(null);
     const [userRole, setUserRole] = useState<'owner' | 'staff' | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [tenantId, setTenantId] = useState<string | null>(null);
     const [domain, setDomain] = useState<string | null>(null);
@@ -53,7 +52,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 const role = localStorage.getItem('mock_role') as 'owner' | 'staff' || 'owner';
                 setUserRole(role);
 
-                // Fetch tenant
                 const t = await api.getTenantByOwner(user.uid);
                 if (t) {
                     setTenantId(t.id);
@@ -62,11 +60,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     setPhotoUrl(t.branding?.photo_url || null);
                     setSalonName(t.name || 'NailFlow');
                 } else {
-                    // Fallback to testing state or error state
-                    setTenantId('demo-tenant'); // fallback for testing if no tenant created yet by owner
+                    setTenantId('demo-tenant');
                     setDomain('demo.diabolicalservices.tech');
-
-                    // Also try to load demo-tenant data directly for branding
                     api.getTenantById('demo-tenant').then(dt => {
                         if (dt) {
                             setLogoUrl(dt.branding?.logo_url || null);
@@ -80,10 +75,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return () => unsubscribe();
     }, [router]);
 
-    // Load saved branding from Firestore and apply CSS vars
     useEffect(() => {
         if (!tenantId) return;
-
         api.getTenantById(tenantId).then(tenant => {
             if (!tenant) return;
             setLogoUrl(tenant.branding?.logo_url || null);
@@ -117,98 +110,107 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const getIsActive = (href: string) => pathname === href || (href !== '/admin' && pathname.startsWith(href));
 
-    return (
-        <div className="h-screen bg-cream flex flex-col lg:flex-row overflow-hidden">
-            {/* Desktop Sidebar (hidden on mobile) */}
-            <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-cream-dark h-full shadow-sm z-20 flex-shrink-0">
-                <div className="p-8">
-                    <div className="flex items-center gap-3 mb-10">
-                        <div className="size-10 rounded-xl flex items-center justify-center shadow-soft bg-aesthetic-accent overflow-hidden">
-                            {logoUrl ? (
-                                <img src={api.getPublicUrl(logoUrl)} alt="Logo" className="w-full h-full object-cover" />
-                            ) : (
-                                <span className="text-aesthetic-taupe font-bold font-display text-lg italic">N</span>
-                            )}
-                        </div>
+    const SidebarContent = () => (
+        <div className="flex flex-col h-full bg-white">
+            <div className="p-8">
+                <div className="flex items-center gap-3 mb-10">
+                    <div className="size-10 rounded-xl flex items-center justify-center shadow-soft bg-aesthetic-accent overflow-hidden">
+                        {logoUrl ? (
+                            <img src={api.getPublicUrl(logoUrl)} alt="Logo" className="w-full h-full object-cover" />
+                        ) : (
+                            <span className="text-aesthetic-taupe font-bold font-display text-lg italic">N</span>
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0">
                         <h2 className="font-display text-xl font-light italic tracking-tight text-aesthetic-taupe truncate">{salonName}</h2>
-                    </div>
-
-                    <nav className="flex flex-col gap-2">
-                        {NAV_ITEMS.filter(item => item.roles.includes(userRole || 'owner')).map((item) => {
-                            const isActive = getIsActive(item.href);
-                            return (
-                                <Link
-                                    key={`desktop-${item.href}`}
-                                    href={item.href}
-                                    className={`flex flex-col items-center gap-2 px-4 py-3.5 rounded-2xl transition-all duration-300 ${isActive
-                                        ? 'text-aesthetic-pink font-medium'
-                                        : 'text-aesthetic-muted/60 hover:text-aesthetic-pink'
-                                        }`}
-                                >
-                                    <MaterialSymbol name={item.icon} active={isActive} />
-                                    <span className="text-[10px] uppercase tracking-[0.2em] font-bold">{item.label}</span>
-                                </Link>
-                            );
-                        })}
-                    </nav>
-                </div>
-
-                <div className="mt-auto p-8 border-t border-cream-dark/50">
-                    <button onClick={handleLogout} className="flex items-center gap-3 text-nf-gray hover:text-charcoal transition-colors w-full">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
-                        <span className="text-sm font-medium">Cerrar sesión</span>
-                    </button>
-                    <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-aesthetic-accent shadow-minimal p-1">
-                            {logoUrl ? (
-                                <img src={api.getPublicUrl(logoUrl)} alt="Salon Logo" className="w-full h-full object-contain" />
-                            ) : photoUrl ? (
-                                <img src={api.getPublicUrl(photoUrl)} alt="Profile" className="w-full h-full object-cover" />
-                            ) : (
-                                <span className="font-display italic text-aesthetic-taupe text-lg">{salonName[0]}</span>
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-aesthetic-taupe leading-tight truncate">{salonName}</p>
-                            <p className="text-[10px] text-aesthetic-muted uppercase tracking-wider">{userRole === 'owner' ? 'Propietario' : 'Staff'}</p>
-                        </div>
+                        <p className="text-[9px] uppercase tracking-[0.2em] font-bold text-aesthetic-muted/60 leading-none mt-0.5">Dashboard</p>
                     </div>
                 </div>
+
+                <nav className="flex flex-col gap-2">
+                    {NAV_ITEMS.filter(item => item.roles.includes(userRole || 'owner')).map((item) => {
+                        const isActive = getIsActive(item.href);
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                onClick={() => setIsSidebarOpen(false)}
+                                className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 ${isActive
+                                    ? 'bg-aesthetic-taupe text-white shadow-soft'
+                                    : 'text-aesthetic-muted/60 hover:text-aesthetic-pink hover:bg-aesthetic-soft-pink/20'
+                                    }`}
+                            >
+                                <MaterialSymbol name={item.icon} active={isActive} />
+                                <span className={`text-[11px] uppercase tracking-[0.15em] font-bold ${isActive ? 'text-white' : ''}`}>{item.label}</span>
+                            </Link>
+                        );
+                    })}
+                </nav>
+            </div>
+
+            <div className="mt-auto p-8 border-t border-cream-dark/50">
+                <button onClick={handleLogout} className="flex items-center gap-3 text-nf-gray hover:text-charcoal transition-colors w-full group">
+                    <span className="material-symbol text-xl transition-transform group-hover:scale-110">logout</span>
+                    <span className="text-sm font-medium">Cerrar sesión</span>
+                </button>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="h-screen bg-cream flex flex-col lg:flex-row overflow-hidden relative">
+            {/* Desktop Sidebar */}
+            <aside className="hidden lg:flex flex-col w-72 h-full z-20 flex-shrink-0">
+                <SidebarContent />
             </aside>
 
-            {/* Mobile constraints structure for the main content */}
-            <main className="flex-1 flex justify-center lg:justify-start lg:p-10 h-full overflow-hidden">
-                <div className="w-full h-full lg:max-w-[98%] relative flex flex-col bg-cream lg:bg-transparent lg:rounded-none">
+            {/* Mobile Header / Top Bar */}
+            <header className="lg:hidden flex items-center justify-between px-6 py-5 bg-white/80 backdrop-blur-md border-b border-cream-dark/50 z-30 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-xl bg-aesthetic-accent overflow-hidden border border-white shadow-soft">
+                        {logoUrl && <img src={api.getPublicUrl(logoUrl)} alt="Logo" className="w-full h-full object-cover" />}
+                    </div>
+                    <h1 className="font-display italic text-2xl text-aesthetic-taupe tracking-tight">{salonName}</h1>
+                </div>
+                <button 
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="size-12 flex items-center justify-center rounded-2xl bg-white border border-aesthetic-accent text-aesthetic-taupe shadow-minimal transition-all active:scale-95 group"
+                >
+                    <span className="material-symbol text-2xl transition-transform group-hover:scale-110">menu</span>
+                </button>
+            </header>
 
-                    {/* Content Area */}
-                    <div className="flex-1 overflow-y-auto pb-24 lg:pb-10 lg:bg-white lg:rounded-3xl lg:shadow-[0_8px_32px_rgba(0,0,0,0.03)] lg:border lg:border-cream-dark/50 p-0 lg:overflow-hidden relative">
-                        <div className="lg:absolute lg:inset-0 lg:overflow-y-auto lg:p-6 custom-scrollbar">
+            {/* Mobile Sidebar Overlay (Drawer) */}
+            {isSidebarOpen && (
+                <div className="lg:hidden fixed inset-0 z-[100] animate-fade-in" onClick={() => setIsSidebarOpen(false)}>
+                    <div className="absolute inset-0 bg-charcoal/30 backdrop-blur-sm" />
+                    <div className="relative w-80 h-full bg-white shadow-2xl animate-slide-in-right flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="absolute top-4 right-4 z-10 font-bold uppercase tracking-widest text-[#811910]">
+                            <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-aesthetic-muted pb-0">
+                                <span className="material-symbol">close</span>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto w-full no-scrollbar pb-10">
+                            <SidebarContent />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Main Content Area */}
+            <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+                <div className="flex-1 overflow-y-auto lg:p-10 relative">
+                    <div className="mx-auto w-full h-full max-w-[1800px] lg:bg-white lg:rounded-3xl lg:shadow-minimal lg:border lg:border-cream-dark/50 p-0 relative">
+                        <div className="lg:p-8">
                             <TenantContext.Provider value={{ tenantId, domain }}>
                                 {children}
                             </TenantContext.Provider>
                         </div>
                     </div>
-
-                    {/* Mobile Bottom Navigation (hidden on desktop) */}
-                    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-cream-dark flex items-center justify-around h-[80px] px-2 pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.04)] z-50">
-                        {NAV_ITEMS.filter(item => item.roles.includes(userRole || 'owner')).map((item) => {
-                            const isActive = getIsActive(item.href);
-                            return (
-                                <Link
-                                    key={`mobile-${item.href}`}
-                                    href={item.href}
-                                    className={`flex flex-col items-center gap-1.5 px-4 py-2 transition-all duration-300 ${isActive ? 'text-aesthetic-pink' : 'text-aesthetic-muted/40 hover:text-aesthetic-pink'
-                                        }`}
-                                >
-                                    <MaterialSymbol name={item.icon} active={isActive} />
-                                    <span className={`text-[9px] font-bold uppercase tracking-[0.15em]`}>
-                                        {item.label}
-                                    </span>
-                                </Link>
-                            );
-                        })}
-                    </nav>
                 </div>
+
+                {/* Mobile FAB (Optional reminder) */}
+                {/* No FAB as per request */}
             </main>
         </div>
     );
