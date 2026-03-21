@@ -66,10 +66,10 @@ export default function ImageUploadStep({
                 </div>
             </div>
 
-            {/* Scrollable content áreas */}
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
+            {/* Scrollable content areas */}
+            <div className="flex-1 overflow-y-auto no-scrollbar scroll-smooth">
                 {/* Upload Zone */}
-                <div className="px-6 pt-8 stagger-children">
+                <div className="px-6 pt-8 pb-10 stagger-children">
                     <div
                         className={`border-[3px] border-dashed rounded-[2.5rem] flex flex-col items-center justify-center py-16 cursor-pointer transition-all duration-500 transform
                             ${dragging ? 'border-pink bg-pink-pale shadow-2xl scale-[1.02]' : 'border-pink-light/30 hover:border-pink/40 bg-white/80 hover:bg-white shadow-xl hover:shadow-2xl'}
@@ -96,41 +96,41 @@ export default function ImageUploadStep({
                             Sube fotos de diseños que te gusten para que {staffName} pueda prepararse mejor para tu cita. Las fotos se enviarán junto con tu reserva.
                         </p>
                     </div>
-                </div>
 
-                {/* Selected Photos */}
-                {localPreviews.length > 0 && (
-                    <div className="px-6 pt-10 pb-4 animate-fade-in">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="font-serif text-lg text-charcoal">Seleccionadas</h3>
-                            <span className="text-[10px] font-bold text-pink uppercase tracking-[0.2em] bg-pink-pale px-3 py-1 rounded-full border border-pink-light/20">
-                                {localPreviews.length} de 6
-                            </span>
+                    {/* Selected Photos */}
+                    {localPreviews.length > 0 && (
+                        <div className="pt-10 animate-fade-in">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="font-serif text-lg text-charcoal">Seleccionadas</h3>
+                                <span className="text-[10px] font-bold text-pink uppercase tracking-[0.2em] bg-pink-pale px-3 py-1 rounded-full border border-pink-light/20">
+                                    {localPreviews.length} de 6
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                                {localPreviews.map((url, idx) => (
+                                    <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden shadow-lg group hover:scale-105 transition-transform">
+                                        <img src={url} alt={`ref ${idx + 1}`} className="w-full h-full object-cover" />
+                                        <button
+                                            onClick={() => removeImage(idx)}
+                                            className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-white text-charcoal flex items-center justify-center shadow-lg">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                            </div>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-4">
-                            {localPreviews.map((url, idx) => (
-                                <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden shadow-lg group hover:scale-105 transition-transform">
-                                    <img src={url} alt={`ref ${idx + 1}`} className="w-full h-full object-cover" />
-                                    <button
-                                        onClick={() => removeImage(idx)}
-                                        className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                                    >
-                                        <div className="w-10 h-10 rounded-full bg-white text-charcoal flex items-center justify-center shadow-lg">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                                        </div>
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
-            {/* CTA: Fixed at the bottom */}
-            <div className="absolute bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40">
+            {/* CTA: Sticky at the bottom */}
+            <div className="sticky bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40 transition-all duration-300">
                 <button
                     onClick={onNext}
-                    className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl btn-gradient text-white"
+                    className="w-full max-w-lg mx-auto py-5 rounded-full text-base font-serif flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl btn-gradient text-white"
                 >
                     {localPreviews.length > 0 ? 'Ver Resumen' : 'Continuar sin fotos'}
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

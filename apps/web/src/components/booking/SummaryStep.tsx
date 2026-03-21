@@ -83,55 +83,78 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
             </div>
 
             {/* Scrollable content areas */}
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-32 px-6 py-8">
-                {/* Main Card */}
+            <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-8">
+                {/* Unified Main Card */}
                 <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-cream-dark/30 mb-8 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-pink-pale/20 rounded-full -mr-16 -mt-16 blur-2xl" />
 
                     <div className="relative z-10">
-                        <div className="flex items-start gap-4 mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-pink-pale flex items-center justify-center text-xl shadow-inner flex-shrink-0">✨</div>
-                            <div className="flex-1">
-                                <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest mb-2">Servicios Seleccionados</p>
-                                <div className="space-y-2">
-                                    {booking.selected_services?.map((svc, i) => (
-                                        <div key={svc.id} className="flex justify-between items-center group">
-                                            <h2 className="font-serif text-lg text-charcoal font-bold">{svc.name}</h2>
-                                            <span className="text-sm font-bold text-pink opacity-70">${svc.estimated_price}</span>
-                                        </div>
-                                    )) || (
+                        <div className="mb-8">
+                            <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-lg bg-pink-pale flex items-center justify-center text-xs">✨</span>
+                                Servicios Seleccionados
+                            </p>
+                            <div className="space-y-3">
+                                {booking.selected_services?.map((svc) => (
+                                    <div key={svc.id} className="flex justify-between items-center group bg-cream/30 p-4 rounded-2xl border border-cream-dark/10">
+                                        <h2 className="font-serif text-lg text-charcoal font-bold">{svc.name}</h2>
+                                        <span className="text-sm font-bold text-pink">${Number(svc.estimated_price)}</span>
+                                    </div>
+                                )) || (
+                                    <div className="bg-cream/30 p-4 rounded-2xl border border-cream-dark/10">
                                         <h2 className="font-serif text-xl text-charcoal font-bold">{booking.service_name || '—'}</h2>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 py-6 border-y border-cream-dark/30">
-                            <div>
-                                <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                        <div className="space-y-4 py-6 border-y border-cream-dark/30">
+                            <div className="flex items-center justify-between">
+                                <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest flex items-center gap-1.5">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                                     Fecha
                                 </p>
                                 <span className="font-serif text-charcoal font-bold">{formatFullDate(booking.date)}</span>
                             </div>
-                            <div>
-                                <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                            <div className="flex items-center justify-between">
+                                <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest flex items-center gap-1.5">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                                     Hora
                                 </p>
                                 <span className="font-serif text-charcoal font-bold">{booking.time || '—'} HS</span>
                             </div>
-                        </div>
-
-                        {booking.staff_name && (
-                            <div className="pt-6 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-cream-dark/30 flex items-center justify-center text-sm ring-4 ring-cream/50">👩‍🎨</div>
+                            {booking.staff_name && (
+                                <div className="flex items-center justify-between pt-2">
+                                    <p className="text-[10px] font-bold text-nf-gray uppercase tracking-widest flex items-center gap-1.5">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                                        Especialista
+                                    </p>
                                     <span className="text-xs font-bold text-charcoal uppercase tracking-widest">{booking.staff_name}</span>
                                 </div>
-                                <span className="text-[10px] font-bold text-pink uppercase tracking-widest">Profesional</span>
+                            )}
+                        </div>
+
+                        {/* Pricing details integrated inside the main card area or just below */}
+                        <div className="mt-8 space-y-4">
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-nf-gray">Total del servicio</span>
+                                <span className="font-serif text-2xl font-bold text-charcoal">${Number(booking.total_price || price).toFixed(2)}</span>
                             </div>
-                        )}
+
+                            {Number(booking.total_required_advance || advance) > 0 && (
+                                <div className="p-5 rounded-3xl bg-pink-pale/20 border border-pink-light/20">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold uppercase tracking-[0.2em] text-pink">Seña para reservar</span>
+                                        </div>
+                                        <span className="font-serif text-xl font-bold text-pink">${Number(booking.total_required_advance || advance).toFixed(2)}</span>
+                                    </div>
+                                    <p className="text-[9px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider opacity-70">
+                                        Este monto se descontará del total el día de tu cita. Pago seguro vía Mercado Pago.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -142,10 +165,10 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                     </div>
 
                     {localPreviews.length > 0 ? (
-                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                        <div className="flex gap-4 overflow-x-auto pb-4 thin-scrollbar">
                             {localPreviews.map((url, idx) => (
-                                <div key={idx} className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 shadow-md border-2 border-white transform rotate-1 hover:rotate-0 transition-all">
-                                    <img src={api.getPublicUrl(url)} alt={`ref-${idx}`} className="w-full h-full object-cover" />
+                                <div key={idx} className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 shadow-md border-2 border-white transform rotate-1 hover:rotate-0 transition-all">
+                                    <img src={url} alt={`ref-${idx}`} className="w-full h-full object-cover" />
                                 </div>
                             ))}
                         </div>
@@ -162,43 +185,14 @@ export default function SummaryStep({ booking, localPreviews, pendingFiles, tena
                         </button>
                     )}
                 </div>
-
-                {/* Pricing Table */}
-                <div className="bg-charcoal text-white rounded-[2.5rem] p-8 shadow-2xl mb-12">
-                    <div className="flex justify-between items-center mb-6">
-                        <span className="text-xs font-bold uppercase tracking-[0.2em] opacity-60">Total Servicios</span>
-                        <div className="h-px flex-1 mx-4 bg-white/10" />
-                        <span className="font-serif text-2xl font-bold">${(booking.total_price || price).toFixed(2)}</span>
-                    </div>
-
-                    {(booking.total_required_advance || advance) > 0 && (
-                        <>
-                            <div className="flex justify-between items-center mb-10">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-pink">Seña adelanto</span>
-                                    <span className="text-[9px] opacity-40 uppercase tracking-widest mt-0.5">Confirmación inmediata</span>
-                                </div>
-                                <div className="h-px flex-1 mx-4 bg-white/10" />
-                                <span className="font-serif text-2xl font-bold text-pink">${(booking.total_required_advance || advance).toFixed(2)}</span>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex gap-3 items-center">
-                                <div className="w-8 h-8 rounded-lg bg-pink/20 flex items-center justify-center text-sm">💳</div>
-                                <p className="text-[10px] text-white/60 leading-relaxed font-medium uppercase tracking-wider">
-                                    El adelanto se descontará del total el día de tu cita.
-                                </p>
-                            </div>
-                        </>
-                    )}
-                </div>
             </div>
 
-            {/* CTA: Fixed at the bottom */}
-            <div className={`absolute bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40 transition-all duration-500 ${isUploading ? 'opacity-80' : ''}`}>
+            {/* CTA: Sticky at the bottom */}
+            <div className={`sticky bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40 transition-all duration-500 ${isUploading ? 'opacity-80' : ''}`}>
                 <button
                     onClick={handleConfirm}
                     disabled={!booking.date || !booking.time || (!booking.service_id && !booking.selected_services?.length) || isUploading}
-                    className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    className="w-full max-w-lg mx-auto py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                     {isUploading ? (
                         <>

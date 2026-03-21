@@ -49,49 +49,47 @@ export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect,
             </div>
 
             {/* Scrollable content areas */}
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
-
-            {/* Calendar */}
-            <div className="px-6 py-6 overflow-y-auto flex-1">
-                {!selectedDate ? (
-                    <div className="stagger-children">
-                        <CalendarStep
-                            selectedDate={selectedDate}
-                            onSelect={onDateSelect}
-                            tenantId={tenantId}
-                        />
-                        <div className="mt-8 p-6 rounded-[2rem] bg-pink-pale/30 border border-pink-light/20 flex gap-4 items-start">
-                            <span className="text-2xl">⏳</span>
-                            <p className="text-[11px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider">
-                                Selecciona un día disponible para ver los horarios que tenemos preparados para ti.
-                            </p>
+            <div className="flex-1 overflow-y-auto no-scrollbar scroll-smooth">
+                <div className="px-6 py-6 pb-24">
+                    {!selectedDate ? (
+                        <div className="stagger-children">
+                            <CalendarStep
+                                selectedDate={selectedDate}
+                                onSelect={onDateSelect}
+                                tenantId={tenantId}
+                            />
+                            <div className="mt-8 p-6 rounded-[2rem] bg-pink-pale/30 border border-pink-light/20 flex gap-4 items-start">
+                                <span className="text-2xl">⏳</span>
+                                <p className="text-[11px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider">
+                                    Selecciona un día disponible para ver los horarios que tenemos preparados para ti.
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="-mx-6">
-                        <TimeSlotStep
-                            selectedDate={selectedDate}
-                            selectedTime={selectedTime}
-                            onSelect={onTimeSelect}
-                            onNext={onNext}
-                            onBack={() => onDateSelect('')}
-                            tenantId={tenantId}
-                            staffId={staffId}
-                            serviceId={serviceId}
-                            totalDuration={totalDuration}
-                        />
-                    </div>
-                )}
-            </div>
+                    ) : (
+                        <div className="-mx-6">
+                            <TimeSlotStep
+                                selectedDate={selectedDate}
+                                selectedTime={selectedTime}
+                                onSelect={onTimeSelect}
+                                onNext={onNext}
+                                onBack={() => onDateSelect('')}
+                                tenantId={tenantId}
+                                staffId={staffId}
+                                serviceId={serviceId}
+                                totalDuration={totalDuration}
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* CTA: Fixed at the bottom */}
-            <div className={`absolute bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40 transition-all duration-500 ${selectedTime ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+            {/* CTA: Sticky at the bottom */}
+            <div className={`sticky bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40 transition-all duration-500 ${selectedTime ? 'translate-y-0 opacity-100 shadow-up' : 'translate-y-full opacity-0 pointer-events-none'}`}>
                 <button
                     onClick={onNext}
-                    className="w-full py-5 rounded-full text-base font-serif flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl btn-gradient text-white"
+                    className="w-full max-w-lg mx-auto py-5 rounded-full text-base font-serif flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl btn-gradient text-white"
                 >
-                    Confirmar para las {selectedTime}
+                    Confirmar para las {selectedTime} HS
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="5" y1="12" x2="19" y2="12" />
                         <polyline points="12 5 19 12 12 19" />

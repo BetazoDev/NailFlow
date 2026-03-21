@@ -118,9 +118,9 @@ export function BookingProvider({
     };
 
     const bookingData: BookingData = useMemo(() => {
-        const total_price = selectedServices.reduce((acc, s) => acc + (s.estimated_price || 0), 0);
-        const total_duration = selectedServices.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
-        const total_required_advance = selectedServices.reduce((acc, s) => acc + (s.required_advance || 0), 0);
+        const total_price = selectedServices.reduce((acc, s) => acc + (Number(s.estimated_price) || 0), 0);
+        const total_duration = selectedServices.reduce((acc, s) => acc + (Number(s.duration_minutes) || 0), 0);
+        const total_required_advance = selectedServices.reduce((acc, s) => acc + (Number(s.required_advance) || 0), 0);
 
         const data: any = {
             tenant_id: tenantId,
@@ -129,9 +129,9 @@ export function BookingProvider({
             // Maintain compatibility with single service endpoints
             service_id: selectedServices[0]?.id || '',
             service_name: selectedServices[0]?.name || '',
-            service_price: selectedServices[0]?.estimated_price || 0,
-            service_duration: selectedServices[0]?.duration_minutes || 0,
-            service_required_advance: selectedServices[0]?.required_advance || 0,
+            service_price: Number(selectedServices[0]?.estimated_price) || 0,
+            service_duration: Number(selectedServices[0]?.duration_minutes) || 0,
+            service_required_advance: Number(selectedServices[0]?.required_advance) || 0,
             
             // New multi-service fields
             selected_services: selectedServices,

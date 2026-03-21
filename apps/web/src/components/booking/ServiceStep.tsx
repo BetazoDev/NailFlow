@@ -92,7 +92,7 @@ export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBa
             </div>
 
             {/* Service list: Only this area scrolls */}
-            <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-6 pb-40">
+            <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-6 scroll-smooth">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-4">
                         <div className="w-10 h-10 border-3 border-pink-pale border-t-pink rounded-full animate-spin" />
@@ -104,7 +104,7 @@ export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBa
                         <p className="text-nf-gray font-serif italic text-lg">Próximamente más servicios...</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-5 stagger-children">
+                    <div className="grid grid-cols-1 gap-5 stagger-children pb-10">
                         {filteredServices.map((service) => {
                             const isSelected = selectedServiceIds.includes(service.id);
                             return (
@@ -172,9 +172,9 @@ export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBa
                 )}
             </div>
 
-            {/* Bottom Panel: Fixed at the bottom of THIS step's container */}
+            {/* Bottom Panel: Sticky at the bottom */}
             <div className={`
-                absolute bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 transition-all duration-500 transform z-40
+                sticky bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 transition-all duration-500 transform z-40
                 ${totalSelected > 0 ? 'translate-y-0 opacity-100 shadow-up' : 'translate-y-full opacity-0 pointer-events-none'}
             `}>
                 <div className="max-w-lg mx-auto flex items-center justify-between gap-4">
@@ -182,7 +182,7 @@ export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBa
                         <p className="text-[10px] font-bold text-pink uppercase tracking-widest mb-0.5">
                             {totalSelected} {totalSelected === 1 ? 'Servicio' : 'Servicios'}
                         </p>
-                        <p className="font-serif text-charcoal text-xl">
+                        <p className="font-serif text-charcoal text-xl font-bold">
                             ${totalPrice}
                         </p>
                     </div>
@@ -190,7 +190,7 @@ export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBa
                         onClick={onNext}
                         className="flex-1 py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white hover:scale-105 active:scale-95 transition-all"
                     >
-                        Seleccionar fecha y hora
+                        Siguiente
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
                     </button>
                 </div>
