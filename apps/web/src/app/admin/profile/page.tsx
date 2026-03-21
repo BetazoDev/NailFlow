@@ -93,6 +93,11 @@ export default function ProfilePage() {
             setCurrentBranding(updatedBranding);
             setCurrentSettings(updatedSettings);
 
+            // Notify the admin layout sidebar to update immediately (no page reload needed)
+            window.dispatchEvent(new CustomEvent('tenant-updated', {
+                detail: { name: salonName, logoUrl: finalLogoUrl, tagline }
+            }));
+
             setSaveMsg('¡Información actualizada con éxito!');
         } catch (e: unknown) {
             setSaveMsg((e as Error).message || 'Error al guardar. Intenta de nuevo.');

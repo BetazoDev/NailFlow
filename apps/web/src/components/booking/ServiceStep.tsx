@@ -40,7 +40,7 @@ export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBa
     const totalSelected = selectedServiceIds.length;
     const totalPrice = services
         .filter(s => selectedServiceIds.includes(s.id))
-        .reduce((sum, s) => sum + s.estimated_price, 0);
+        .reduce((sum, s) => sum + (Number(s.estimated_price) || 0), 0);
 
     return (
         <div className="flex flex-col h-full relative" style={{ background: 'var(--cream)' }}>

@@ -5,6 +5,11 @@ import ClientLayout from "@/components/ClientLayout";
 export const metadata: Metadata = {
   title: "NailFlow — Reserva tu cita",
   description: "Agenda tu cita de uñas fácil y rápido. Booking platform for nail techs.",
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
@@ -15,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        <link rel="icon" href="/favicon.png" type="image/png" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0" />
       </head>
       <body className="antialiased">

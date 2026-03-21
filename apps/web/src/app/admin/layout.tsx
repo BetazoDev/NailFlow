@@ -97,6 +97,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         });
     }, [tenantId]);
 
+    // Listen for profile save events – update sidebar instantly without re-loading
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail?.name) setSalonName(detail.name);
+            if (detail?.logoUrl !== undefined) setLogoUrl(detail.logoUrl || null);
+        };
+        window.addEventListener('tenant-updated', handler);
+        return () => window.removeEventListener('tenant-updated', handler);
+    }, []);
+
     const handleLogout = async () => {
         await signOut(auth);
         document.cookie = 'mock_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';

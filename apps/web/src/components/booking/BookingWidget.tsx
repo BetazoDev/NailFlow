@@ -167,27 +167,8 @@ export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, 
 
             {/* ─── RIGHT PANEL — booking wizard ──────────────── */}
             <main className="flex-1 h-screen overflow-hidden flex flex-col" style={{ background: 'var(--cream)' }}>
-                {/* Desktop top bar highlight (STICKY TOP) */}
-                <div className="hidden lg:flex items-center justify-between px-10 pt-8 pb-4 flex-shrink-0 bg-white/50 backdrop-blur-sm sticky top-0 z-50 border-b border-cream-dark/20">
-                    <div className="flex items-center gap-2">
-                        {STEPS.filter(s => s.id !== 'confirmation').map((_, i) => (
-                            <div
-                                key={i}
-                                className="h-1 rounded-full transition-all duration-500"
-                                style={{
-                                    width: i === currentIndex ? '2rem' : '0.5rem',
-                                    background: i <= currentIndex ? 'var(--pink)' : 'var(--cream-dark)',
-                                }}
-                            />
-                        ))}
-                    </div>
-                    <p className="text-[10px] font-bold tracking-[0.2em] text-nf-gray uppercase">
-                        {STEPS[currentIndex]?.label}
-                    </p>
-                </div>
-
-                {/* The wizard */}
-                <div className="flex-1">
+                {/* The wizard — each step manages its own scroll */}
+                <div className="flex-1 overflow-hidden">
                     <BookingWizard
                         tenantId={tenant.id}
                         staffId={staffId}

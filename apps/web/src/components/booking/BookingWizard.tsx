@@ -126,9 +126,11 @@ function BookingSteps() {
 
 export default function BookingWizard(props: BookingWizardProps) {
     return (
-        <BookingProvider {...props}>
-            <BookingSteps />
-        </BookingProvider>
+        <div className="h-full">
+            <BookingProvider {...props}>
+                <BookingSteps />
+            </BookingProvider>
+        </div>
     );
 }
 
