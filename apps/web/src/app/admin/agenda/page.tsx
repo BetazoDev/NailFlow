@@ -460,6 +460,7 @@ export default function AgendaPage() {
                                     const timeStr = startDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
                                     const isCompleted = apt.status === 'completed';
                                     const isCompletable = apt.status === 'confirmed';
+                                    const isPast = new Date() >= startDate;
 
                                     return (
                                         <div key={apt.id} className="group relative pl-20" onClick={() => setSelectedApt(apt)}>
@@ -492,16 +493,16 @@ export default function AgendaPage() {
                                                         </div>
                                                     ) : isCompletable ? (
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); handleComplete(apt); }}
-                                                            disabled={completing === apt.id}
-                                                            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#88C999]/10 text-[#5a9a6a] hover:bg-[#88C999]/20 transition-all active:scale-95 disabled:opacity-50"
+                                                            onClick={(e) => { e.stopPropagation(); if (isPast) handleComplete(apt); }}
+                                                            disabled={completing === apt.id || !isPast}
+                                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-all active:scale-95 disabled:opacity-50 ${isPast ? 'bg-[#88C999]/10 text-[#5a9a6a] hover:bg-[#88C999]/20' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                                                         >
                                                             {completing === apt.id ? (
                                                                 <div className="size-4 border-2 border-[#88C999]/30 border-t-[#88C999] rounded-full animate-spin" />
                                                             ) : (
-                                                                <span className="material-symbol text-lg">task_alt</span>
+                                                                <span className={`material-symbol text-lg ${isPast ? '' : 'opacity-40'}`}>{isPast ? 'task_alt' : 'schedule'}</span>
                                                             )}
-                                                            <span className="text-[10px] tracking-[0.2em] uppercase font-bold">Completar Cita</span>
+                                                            <span className="text-[10px] tracking-[0.2em] uppercase font-bold">{isPast ? 'Completar Cita' : 'Cita Futura'}</span>
                                                         </button>
                                                     ) : (
                                                         <span className="text-[10px] tracking-[0.2em] uppercase font-bold text-aesthetic-muted/40">

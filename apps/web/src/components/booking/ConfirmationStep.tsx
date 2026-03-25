@@ -64,7 +64,7 @@ export default function ConfirmationStep({ booking, salonName = 'Ana Nails Studi
     }
 
     return (
-        <div className="flex flex-col min-h-full items-center justify-center p-6 animate-fade-in" style={{ background: 'var(--cream)' }}>
+        <div className="flex flex-col min-h-full items-center p-6 py-12 animate-fade-in overflow-y-auto" style={{ background: 'var(--cream)' }}>
             {/* Success Decoration */}
             <div className="relative mb-12">
                 <div className="w-32 h-32 rounded-full bg-pink-pale flex items-center justify-center relative z-10 shadow-xl border-4 border-white animate-scale-in">
@@ -94,9 +94,7 @@ export default function ConfirmationStep({ booking, salonName = 'Ana Nails Studi
 
             {/* Itinerary Card */}
             {(!saving && saved) && (
-                <div className="w-full max-w-sm bg-white rounded-[2.5rem] p-8 shadow-2xl border border-cream-dark/30 mb-10 relative overflow-hidden animate-fade-in-up">
-                    <div className="absolute top-0 left-0 w-full h-2 btn-gradient" />
-
+                <div className="w-full max-w-sm bg-white rounded-[2.5rem] pt-8 px-8 pb-12 shadow-2xl border border-cream-dark/30 mb-10 relative overflow-hidden animate-fade-in-up">
                     <div className="space-y-6">
                         <div className="flex items-center justify-between pb-4 border-b border-cream-dark/30">
                             <div>
