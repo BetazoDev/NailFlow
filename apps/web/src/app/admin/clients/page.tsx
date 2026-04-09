@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Appointment, Service, Client } from '@/lib/types';
+import { Appointment, Service, Client, Tenant } from '@/lib/types';
 
 import { api } from '@/lib/api';
 import { useTenant } from '@/lib/tenant-context';
@@ -24,6 +24,7 @@ export default function ClientsPage() {
     const [expandedPhone, setExpandedPhone] = useState<string | null>(null);
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
     const [historyClient, setHistoryClient] = useState<Client | null>(null);
+    const [loyaltySettings, setLoyaltySettings] = useState<Tenant['settings'] | null>(null);
     const { tenantId } = useTenant();
 
     useEffect(() => {
@@ -32,12 +33,28 @@ export default function ClientsPage() {
             api.getAppointments(),
             api.getServices(),
             api.getFavorites(),
-        ]).then(([apts, svcs, favs]) => {
+            api.getTenant(tenantId),
+        ]).then(([apts, svcs, favs, tenant]) => {
             setAppointments(apts);
             setServices(svcs);
             setFavorites(favs);
+            if (tenant) setLoyaltySettings(tenant.settings as any);
         }).finally(() => setLoading(false));
     }, [tenantId]);
+
+    // Derived: does a client qualify for a loyalty reward right now?
+    const getLoyaltyStatus = useCallback((client: Client) => {
+        const loyalty = loyaltySettings?.loyalty;
+        if (!loyalty?.enabled) return null;
+        const required = loyalty.visits_required ?? 5;
+        if (client.visits < required) return null;
+        const multiples = Math.floor(client.visits / required);
+        return {
+            multiples,
+            rewardType: loyalty.reward_type,
+            discountValue: loyalty.discount_value,
+        };
+    }, [loyaltySettings]);
 
     const getServiceName = useCallback((id: string, apt?: Appointment) => {
         const svc = services.find(s => s.id === id);
@@ -218,9 +235,22 @@ export default function ClientsPage() {
                 {filtered.map(client => {
                     const initials = client.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
                     const expanded = expandedPhone === client.phone;
+                    const loyaltyStatus = getLoyaltyStatus(client);
 
                     return (
                         <div key={client.phone} className="bg-white/60 backdrop-blur-sm rounded-3xl overflow-hidden border border-aesthetic-accent transition-all duration-300 hover:shadow-minimal">
+                            {/* Loyalty reward banner (collapsed) */}
+                            {loyaltyStatus && (
+                                <div className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-yellow-200">
+                                    <span className="text-lg">🎁</span>
+                                    <p className="text-[10px] tracking-[0.2em] uppercase font-bold text-amber-700">
+                                        {loyaltyStatus.rewardType === 'free_service'
+                                            ? `¡Premio listo! Servicio gratis acumulado`
+                                            : `¡Premio listo! ${loyaltyStatus.discountValue}% de descuento acumulado`
+                                        }
+                                    </p>
+                                </div>
+                            )}
                             {/* Main row */}
                             <button
                                 className="w-full text-left flex items-center gap-5 p-5 active:bg-aesthetic-soft-pink/20 transition-colors"
@@ -262,6 +292,21 @@ export default function ClientsPage() {
                             {/* Expanded details */}
                             {expanded && (
                                 <div className="px-6 pb-6 border-t border-aesthetic-accent/30 pt-4 space-y-6 animate-fade-in">
+                                    {/* Loyalty reward detail block */}
+                                    {loyaltyStatus && (
+                                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-yellow-200">
+                                            <span className="text-2xl mt-0.5">🎁</span>
+                                            <div>
+                                                <p className="text-[10px] tracking-[0.25em] uppercase font-bold text-amber-700 mb-1">Premio de Fidelidad Listo</p>
+                                                <p className="text-sm text-amber-800 font-display italic">
+                                                    {loyaltyStatus.rewardType === 'free_service'
+                                                        ? `Esta clienta ha acumulado ${loyaltyStatus.multiples > 1 ? `${loyaltyStatus.multiples}x` : ''} un servicio gratis. ¡Es momento de recompensarla!`
+                                                        : `Esta clienta merece un ${loyaltyStatus.discountValue}% de descuento en su próxima visita.`
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                     {client.preferences && (
                                         <div>
                                             <p className="text-[9px] tracking-[0.3em] text-aesthetic-muted/60 uppercase font-bold mb-2 ml-1">Preferencias</p>
@@ -404,6 +449,21 @@ export default function ClientsPage() {
                                     <span className="text-aesthetic-muted">Total invertido</span>
                                     <span className="font-semibold text-aesthetic-taupe">${historyClient.totalSpent}</span>
                                 </div>
+                                {/* Loyalty status in modal */}
+                                {getLoyaltyStatus(historyClient) && (() => {
+                                    const ls = getLoyaltyStatus(historyClient)!;
+                                    return (
+                                        <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-2">
+                                            <span className="text-xl">🎁</span>
+                                            <p className="text-xs font-bold text-amber-700 tracking-wide">
+                                                {ls.rewardType === 'free_service'
+                                                    ? 'Tiene derecho a un servicio GRATIS'
+                                                    : `Tiene ${ls.discountValue}% de descuento acumulado`
+                                                }
+                                            </p>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

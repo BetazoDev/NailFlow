@@ -24,6 +24,12 @@ export interface Tenant {
         start: string;
         end: string;
     }[];
+    loyalty?: {
+        enabled: boolean;
+        visits_required: number;
+        reward_type: 'discount' | 'free_service';
+        discount_value?: number;
+    };
   };
   owner_id: string;
   subscription: {

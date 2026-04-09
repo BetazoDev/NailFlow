@@ -68,6 +68,15 @@ export default function ProfilePage() {
                     { day: 0, active: false, start: '09:00', end: '09:00' },
                 ];
                 setWeeklySchedule(tenant.settings?.weekly_schedule || defaultSchedule);
+
+                // Initialize loyalty settings from saved data
+                const loyalty = tenant.settings?.loyalty;
+                if (loyalty) {
+                    setLoyaltyEnabled(loyalty.enabled ?? false);
+                    setLoyaltyVisits(loyalty.visits_required ?? 5);
+                    setLoyaltyRewardType(loyalty.reward_type ?? 'discount');
+                    setLoyaltyDiscountValue(loyalty.discount_value ?? 10);
+                }
             }
         });
     }, [tenantId]);
