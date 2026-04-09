@@ -15,7 +15,7 @@ import { Card } from '@/components/ui/Card';
 
 export default function ProfilePage() {
     const { tenantId } = useTenant();
-    const [tab, setTab] = useState<'info' | 'password' | 'horarios'>('info');
+    const [tab, setTab] = useState<'info' | 'password' | 'horarios' | 'fidelizacion'>('info');
 
     const [salonName, setSalonName] = useState('');
     const [tagline, setTagline] = useState('');
@@ -27,6 +27,14 @@ export default function ProfilePage() {
     const [saving, setSaving] = useState(false);
     const [saveMsg, setSaveMsg] = useState('');
     const logoRef = useRef<HTMLInputElement>(null);
+
+    // Loyalty program state
+    const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
+    const [loyaltyVisits, setLoyaltyVisits] = useState(5);
+    const [loyaltyRewardType, setLoyaltyRewardType] = useState<'discount' | 'free_service'>('discount');
+    const [loyaltyDiscountValue, setLoyaltyDiscountValue] = useState(10);
+    const [loyaltySaving, setLoyaltySaving] = useState(false);
+    const [loyaltyMsg, setLoyaltyMsg] = useState('');
 
     // Password
     const [currentPassword, setCurrentPassword] = useState('');
@@ -148,6 +156,32 @@ export default function ProfilePage() {
         }
     };
 
+    const handleSaveLoyalty = async () => {
+        if (!tenantId) return;
+        setLoyaltySaving(true);
+        setLoyaltyMsg('');
+        try {
+            const loyaltySettings = {
+                enabled: loyaltyEnabled,
+                visits_required: loyaltyVisits,
+                reward_type: loyaltyRewardType,
+                discount_value: loyaltyRewardType === 'discount' ? loyaltyDiscountValue : null,
+            };
+            const updatedSettings: any = {
+                ...(currentSettings || { currency: 'MXN', timezone: 'America/Mexico_City' }),
+                loyalty: loyaltySettings,
+            };
+            await api.updateTenant(tenantId, { settings: updatedSettings });
+            setCurrentSettings(updatedSettings);
+            setLoyaltyMsg('¡Programa de lealtad guardado con éxito!');
+        } catch (e: unknown) {
+            setLoyaltyMsg((e as Error).message || 'Error al guardar. Intenta de nuevo.');
+        } finally {
+            setLoyaltySaving(false);
+            setTimeout(() => setLoyaltyMsg(''), 3000);
+        }
+    };
+
     return (
         <div className="min-h-full pb-24" style={{ background: 'var(--cream)' }}>
             {/* Header */}
@@ -176,10 +210,10 @@ export default function ProfilePage() {
             {/* Tabs */}
             <div className="px-6 mb-8">
                 <div className="flex gap-2 bg-aesthetic-cream/60 backdrop-blur-sm rounded-[2rem] p-1.5 border border-white/50 shadow-inner overflow-x-auto scrollbar-hide">
-                    {( [['info', 'Negocio', 'storefront'], ['horarios', 'Horarios', 'schedule'], ['password', 'Seguridad', 'shield']] as const).map(([id, label, icon]) => (
+                    {( [['info', 'Negocio', 'storefront'], ['horarios', 'Horarios', 'schedule'], ['password', 'Seguridad', 'shield'], ['fidelizacion', 'Fidelización', 'card_giftcard']] as const).map(([id, label, icon]) => (
                         <button
                             key={id}
-                            onClick={() => setTab(id)}
+                            onClick={() => setTab(id as typeof tab)}
                             className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-6 rounded-[1.5rem] text-[10px] tracking-[0.2em] uppercase font-bold transition-all whitespace-nowrap ${tab === id ? 'bg-white text-aesthetic-pink shadow-md' : 'text-aesthetic-muted hover:text-aesthetic-taupe hover:bg-white/30'}`}
                         >
                             <span className="material-symbol text-base">{icon}</span>
@@ -393,6 +427,151 @@ export default function ProfilePage() {
                                     </p>
                                 )}
                             </div>
+                        </Card>
+                    </div>
+                )}
+
+                {tab === 'fidelizacion' && (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* Section heading */}
+                        <div>
+                            <h2 className="font-display text-2xl italic text-aesthetic-taupe">Programa de Lealtad</h2>
+                            <p className="text-[11px] text-aesthetic-muted mt-1 uppercase tracking-[0.15em] font-bold italic opacity-70">
+                                Configura las recompensas para tus clientes frecuentes.
+                            </p>
+                        </div>
+
+                        <Card variant="white" className="p-8 border-none shadow-soft">
+                            {/* Toggle header */}
+                            <div className="flex items-center justify-between gap-4 pb-6 border-b border-aesthetic-cream/60">
+                                <div>
+                                    <p className="text-sm font-bold text-aesthetic-taupe tracking-wide">Activar Programa de Clientes Frecuentes</p>
+                                    <p className="text-[10px] text-aesthetic-muted mt-0.5 uppercase tracking-[0.1em]">
+                                        {loyaltyEnabled ? 'El programa está activo' : 'Activa el programa para configurarlo'}
+                                    </p>
+                                </div>
+                                {/* iOS-style Toggle */}
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={loyaltyEnabled}
+                                    onClick={() => setLoyaltyEnabled(v => !v)}
+                                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-aesthetic-pink/30 flex-shrink-0 ${
+                                        loyaltyEnabled ? 'bg-aesthetic-pink' : 'bg-gray-200'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block size-5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                                            loyaltyEnabled ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {/* Conditional form */}
+                            {loyaltyEnabled && (
+                                <div className="pt-6 space-y-8 animate-fade-in">
+
+                                    {/* Visits required */}
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-aesthetic-taupe">
+                                            Visitas requeridas para recompensa
+                                        </label>
+                                        <div className="flex items-center gap-4">
+                                            <div className="relative flex-1">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbol text-base text-aesthetic-muted">counter_1</span>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={50}
+                                                    value={loyaltyVisits}
+                                                    onChange={e => setLoyaltyVisits(Math.max(1, Number(e.target.value)))}
+                                                    placeholder="5"
+                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-10 pr-4 py-3.5 text-sm font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 focus:bg-white focus:border-aesthetic-pink/30 outline-none transition-all"
+                                                />
+                                            </div>
+                                            {/* Stepper helpers */}
+                                            <div className="flex flex-col gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLoyaltyVisits(v => Math.min(50, v + 1))}
+                                                    className="size-8 rounded-full bg-aesthetic-cream hover:bg-aesthetic-soft-pink flex items-center justify-center transition-colors"
+                                                >
+                                                    <span className="material-symbol text-sm text-aesthetic-taupe">add</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLoyaltyVisits(v => Math.max(1, v - 1))}
+                                                    className="size-8 rounded-full bg-aesthetic-cream hover:bg-aesthetic-soft-pink flex items-center justify-center transition-colors"
+                                                >
+                                                    <span className="material-symbol text-sm text-aesthetic-taupe">remove</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p className="text-[9px] text-aesthetic-muted uppercase tracking-widest pl-1">Número de citas completadas para desbloquear la recompensa</p>
+                                    </div>
+
+                                    {/* Reward type */}
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-aesthetic-taupe">
+                                            Tipo de Recompensa
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbol text-base text-aesthetic-muted">card_giftcard</span>
+                                            <select
+                                                value={loyaltyRewardType}
+                                                onChange={e => setLoyaltyRewardType(e.target.value as 'discount' | 'free_service')}
+                                                className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl pl-10 pr-10 py-3.5 text-sm font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 focus:bg-white focus:border-aesthetic-pink/30 outline-none transition-all cursor-pointer"
+                                            >
+                                                <option value="discount">Porcentaje de Descuento</option>
+                                                <option value="free_service">Servicio Gratis</option>
+                                            </select>
+                                            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 material-symbol text-base text-aesthetic-muted">expand_more</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Discount value — only when discount type is selected */}
+                                    {loyaltyRewardType === 'discount' && (
+                                        <div className="space-y-2 animate-fade-in">
+                                            <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-aesthetic-taupe">
+                                                Valor del Descuento
+                                            </label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbol text-base text-aesthetic-muted">percent</span>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={100}
+                                                    value={loyaltyDiscountValue}
+                                                    onChange={e => setLoyaltyDiscountValue(Math.min(100, Math.max(1, Number(e.target.value))))}
+                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-10 pr-12 py-3.5 text-sm font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 focus:bg-white focus:border-aesthetic-pink/30 outline-none transition-all"
+                                                />
+                                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-aesthetic-pink">%</span>
+                                            </div>
+                                            <p className="text-[9px] text-aesthetic-muted uppercase tracking-widest pl-1">Porcentaje de descuento aplicado a la cita de recompensa</p>
+                                        </div>
+                                    )}
+
+                                    {/* Save button */}
+                                    <div className="pt-2">
+                                        <Button
+                                            variant="primary"
+                                            className="w-full h-14"
+                                            onClick={handleSaveLoyalty}
+                                            isLoading={loyaltySaving}
+                                        >
+                                            Guardar Configuración
+                                        </Button>
+                                        {loyaltyMsg && (
+                                            <p className={`text-center text-[10px] font-bold uppercase tracking-widest animate-fade-in mt-3 ${
+                                                loyaltyMsg.includes('éxito') ? 'text-green-500' : 'text-red-500'
+                                            }`}>
+                                                {loyaltyMsg}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </Card>
                     </div>
                 )}
