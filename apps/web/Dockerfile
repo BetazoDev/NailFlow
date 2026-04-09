@@ -2,20 +2,25 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy lockfiles and package manifests first (layer-cache friendly)
-COPY package.json package-lock.json ./
+# Cache bust argument - forces rebuild of all layers below
+ARG CACHEBUST=1
+RUN echo "Cache bust: $CACHEBUST"
+
+# Copy package manifests
+COPY package.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/api/package.json ./apps/api/
 
-# Install all workspace dependencies using lockfile (deterministic)
-RUN npm ci --legacy-peer-deps
+# Install dependencies
+RUN npm install --no-package-lock
 
-# Copy all source files
+# Copy ALL source files
 COPY . .
 
-# Build the Next.js web app (clear any stale cache first)
+# Build the web app (force clean .next)
 WORKDIR /app/apps/web
 RUN rm -rf .next
+RUN cp ../../.env .env 2>/dev/null || true
 RUN npm run build
 
 # Production stage
@@ -26,7 +31,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copy Next.js standalone output
+# Copy standalone output
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
