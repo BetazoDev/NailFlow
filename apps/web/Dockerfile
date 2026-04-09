@@ -6,6 +6,22 @@ WORKDIR /app
 ARG CACHEBUST=1
 RUN echo "Cache bust: $CACHEBUST"
 
+# Define Build Args for Next.js
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_CDN_CLIENT_ID
+ARG NEXT_PUBLIC_CDN_PROJECT_ID
+ARG NEXT_PUBLIC_CDN_CLIENT_SLUG
+ARG NEXT_PUBLIC_CDN_URL
+ARG NEXT_PUBLIC_CDN_API_URL
+
+# Environment variables for build time
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_CDN_CLIENT_ID=$NEXT_PUBLIC_CDN_CLIENT_ID
+ENV NEXT_PUBLIC_CDN_PROJECT_ID=$NEXT_PUBLIC_CDN_PROJECT_ID
+ENV NEXT_PUBLIC_CDN_CLIENT_SLUG=$NEXT_PUBLIC_CDN_CLIENT_SLUG
+ENV NEXT_PUBLIC_CDN_URL=$NEXT_PUBLIC_CDN_URL
+ENV NEXT_PUBLIC_CDN_API_URL=$NEXT_PUBLIC_CDN_API_URL
+
 # Copy package manifests
 COPY package.json ./
 COPY apps/web/package.json ./apps/web/
@@ -20,7 +36,6 @@ COPY . .
 # Build the web app (force clean .next)
 WORKDIR /app/apps/web
 RUN rm -rf .next
-RUN cp ../../.env .env 2>/dev/null || true
 RUN npm run build
 
 # Production stage
