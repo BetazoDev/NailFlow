@@ -2,55 +2,36 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Cache bust argument - forces rebuild of all layers below
-ARG CACHEBUST=1
-RUN echo "Cache bust: $CACHEBUST"
-
-# Define Build Args for Next.js
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_CDN_CLIENT_ID
-ARG NEXT_PUBLIC_CDN_PROJECT_ID
-ARG NEXT_PUBLIC_CDN_CLIENT_SLUG
-ARG NEXT_PUBLIC_CDN_URL
-ARG NEXT_PUBLIC_CDN_API_URL
-
-# Environment variables for build time
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_CDN_CLIENT_ID=$NEXT_PUBLIC_CDN_CLIENT_ID
-ENV NEXT_PUBLIC_CDN_PROJECT_ID=$NEXT_PUBLIC_CDN_PROJECT_ID
-ENV NEXT_PUBLIC_CDN_CLIENT_SLUG=$NEXT_PUBLIC_CDN_CLIENT_SLUG
-ENV NEXT_PUBLIC_CDN_URL=$NEXT_PUBLIC_CDN_URL
-ENV NEXT_PUBLIC_CDN_API_URL=$NEXT_PUBLIC_CDN_API_URL
-
-# Copy package manifests
+# Copy root files for workspaces
 COPY package.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/api/package.json ./apps/api/
 
-# Install dependencies
+# Install root dependencies without lockfile to resolve linux bindings
 RUN npm install --no-package-lock
 
-# Copy ALL source files
+# Copy source
 COPY . .
 
-# Build the web app (force clean .next)
+# Build web app
 WORKDIR /app/apps/web
-RUN rm -rf .next
+# Next.js may need environment variables from root (if dokploy generated it at root)
+RUN cp ../../.env .env || true
 RUN npm run build
 
 # Production stage
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV production
+ENV PORT 3000
 
-# Copy standalone output
+# Next.js standalone folder includes a bundled node_modules, so we just copy it
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
 
+# The server.js is generated inside apps/web folder
 CMD ["node", "apps/web/server.js"]
