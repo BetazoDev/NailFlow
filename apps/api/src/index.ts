@@ -823,7 +823,7 @@ apiRouter.post('/webhooks/mercadopago', async (req, res) => {
     res.sendStatus(200);
 });
 
-// Endpoint: Admin Update Tenant Branding
+// Endpoint: Admin Update Tenant Branding / Settings
 apiRouter.put('/tenant', requireAuth, async (req, res) => {
     // @ts-ignore
     const tenantId = req.tenant.id;
@@ -831,12 +831,22 @@ apiRouter.put('/tenant', requireAuth, async (req, res) => {
 
     try {
         const result = await query(
-            'UPDATE tenants SET name = COALESCE($1, name), branding = COALESCE($2, branding), settings = COALESCE($3, settings) WHERE id = $4 RETURNING *',
-            [name, branding, settings, tenantId]
+            `UPDATE tenants SET
+                name = COALESCE($1, name),
+                branding = COALESCE($2::jsonb, branding),
+                settings = COALESCE($3::jsonb, settings)
+             WHERE id = $4 RETURNING *`,
+            [
+                name ?? null,
+                branding ? JSON.stringify(branding) : null,
+                settings ? JSON.stringify(settings) : null,
+                tenantId
+            ]
         );
         res.json(result.rows[0]);
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to update tenant' });
+    } catch (e: any) {
+        console.error('Failed to update tenant:', e.message);
+        res.status(500).json({ error: 'Failed to update tenant', details: e.message });
     }
 });
 
