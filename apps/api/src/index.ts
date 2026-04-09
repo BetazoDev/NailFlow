@@ -840,18 +840,76 @@ apiRouter.put('/tenant', requireAuth, async (req, res) => {
     }
 });
 
-// Endpoint: Complete Booking Server Action (From UI logic when advancing status to paid)
+// Endpoint: Complete Booking Server Action — also tracks loyalty visit
 apiRouter.post('/appointments/:id/complete', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         // @ts-ignore
         const tenantId = req.tenant.id;
-        await query(
-            "UPDATE appointments SET status = 'completed' WHERE id = $1 AND tenant_id = $2",
+        // @ts-ignore
+        const tenant = req.tenant;
+
+        // Mark appointment as completed
+        const updateRes = await query(
+            "UPDATE appointments SET status = 'completed' WHERE id = $1 AND tenant_id = $2 RETURNING client_phone, client_name",
             [id, tenantId]
         );
-        res.json({ success: true });
+
+        if (updateRes.rowCount === 0) {
+            return res.status(404).json({ error: 'Appointment not found' });
+        }
+
+        const { client_phone, client_name } = updateRes.rows[0];
+
+        // --- Loyalty tracking ---
+        const loyaltyConfig = tenant.settings?.loyalty;
+        let rewardGranted = false;
+
+        if (client_phone && loyaltyConfig?.enabled) {
+            const visitsRequired = Number(loyaltyConfig.visits_required) || 5;
+
+            // Upsert visit count
+            const visitRes = await query(
+                `INSERT INTO client_visits (tenant_id, client_phone, visit_count, last_visit_at)
+                 VALUES ($1, $2, 1, NOW())
+                 ON CONFLICT (tenant_id, client_phone)
+                 DO UPDATE SET
+                   visit_count = client_visits.visit_count + 1,
+                   last_visit_at = NOW()
+                 RETURNING visit_count, rewards_granted`,
+                [tenantId, client_phone]
+            );
+
+            const { visit_count, rewards_granted } = visitRes.rows[0];
+            const totalRewardsDue = Math.floor(visit_count / visitsRequired);
+
+            if (totalRewardsDue > rewards_granted) {
+                // New reward unlocked!
+                await query(
+                    `UPDATE client_visits SET rewards_granted = $1 WHERE tenant_id = $2 AND client_phone = $3`,
+                    [totalRewardsDue, tenantId, client_phone]
+                );
+                await query(
+                    `UPDATE appointments SET loyalty_reward_granted = TRUE WHERE id = $1`,
+                    [id]
+                );
+                rewardGranted = true;
+                console.log(`[Loyalty] Reward unlocked for ${client_phone} (tenant: ${tenantId}). Visits: ${visit_count}`);
+
+                // Notify via n8n if configured
+                await triggerN8nWebhook(tenantId, 'loyalty.reward_unlocked', {
+                    client_phone,
+                    client_name,
+                    visit_count,
+                    reward_type: loyaltyConfig.reward_type,
+                    discount_value: loyaltyConfig.discount_value,
+                });
+            }
+        }
+
+        res.json({ success: true, rewardGranted });
     } catch (e) {
+        console.error('Failed to complete appointment:', e);
         res.status(500).json({ error: 'Failed to complete appointment' });
     }
 });
@@ -973,6 +1031,80 @@ apiRouter.post('/favorites/:phone', async (req, res) => {
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: 'Failed to update favorite' });
+    }
+});
+
+// ─── Loyalty Program Endpoints ───────────────────────────────────────────────
+
+// GET /loyalty/status/:phone — Returns visit count + reward status for a client
+apiRouter.get('/loyalty/status/:phone', requireAuth, async (req, res) => {
+    try {
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        // @ts-ignore
+        const tenant = req.tenant;
+        const { phone } = req.params;
+
+        const loyaltyConfig = tenant.settings?.loyalty;
+        if (!loyaltyConfig?.enabled) {
+            return res.json({ enabled: false });
+        }
+
+        const result = await query(
+            'SELECT visit_count, rewards_granted, last_visit_at FROM client_visits WHERE tenant_id = $1 AND client_phone = $2',
+            [tenantId, phone]
+        );
+
+        const row = result.rows[0] || { visit_count: 0, rewards_granted: 0, last_visit_at: null };
+        const visitsRequired = Number(loyaltyConfig.visits_required) || 5;
+        const visitsInCurrentCycle = row.visit_count % visitsRequired;
+        const nextRewardIn = visitsRequired - visitsInCurrentCycle;
+
+        res.json({
+            enabled: true,
+            visit_count: row.visit_count,
+            rewards_granted: row.rewards_granted,
+            visits_required: visitsRequired,
+            visits_in_current_cycle: visitsInCurrentCycle,
+            next_reward_in: nextRewardIn,
+            reward_type: loyaltyConfig.reward_type,
+            discount_value: loyaltyConfig.discount_value,
+            last_visit_at: row.last_visit_at,
+        });
+    } catch (e) {
+        console.error('Failed to fetch loyalty status:', e);
+        res.status(500).json({ error: 'Failed to fetch loyalty status' });
+    }
+});
+
+// GET /loyalty/config — Returns current loyalty program config for the tenant
+apiRouter.get('/loyalty/config', requireAuth, async (req, res) => {
+    try {
+        // @ts-ignore
+        const tenant = req.tenant;
+        const loyaltyConfig = tenant.settings?.loyalty || { enabled: false };
+        res.json(loyaltyConfig);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch loyalty config' });
+    }
+});
+
+// GET /loyalty/clients — Returns all clients with their visit data (admin view)
+apiRouter.get('/loyalty/clients', requireAuth, async (req, res) => {
+    try {
+        // @ts-ignore
+        const tenantId = req.tenant.id;
+        const result = await query(
+            `SELECT cv.client_phone, cv.visit_count, cv.rewards_granted, cv.last_visit_at
+             FROM client_visits cv
+             WHERE cv.tenant_id = $1
+             ORDER BY cv.visit_count DESC`,
+            [tenantId]
+        );
+        res.json(result.rows);
+    } catch (e) {
+        console.error('Failed to fetch loyalty clients:', e);
+        res.status(500).json({ error: 'Failed to fetch loyalty clients' });
     }
 });
 

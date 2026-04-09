@@ -94,7 +94,18 @@ export async function initDb() {
     'ALTER TABLE appointments ADD COLUMN IF NOT EXISTS price NUMERIC',
     'ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_method TEXT',
     'ALTER TABLE appointments ADD COLUMN IF NOT EXISTS image_urls JSONB',
-    'ALTER TABLE appointments ADD COLUMN IF NOT EXISTS image_url TEXT'
+    'ALTER TABLE appointments ADD COLUMN IF NOT EXISTS image_url TEXT',
+    // Loyalty program migrations
+    `CREATE TABLE IF NOT EXISTS client_visits (
+      id SERIAL PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      client_phone TEXT NOT NULL,
+      visit_count INTEGER NOT NULL DEFAULT 0,
+      last_visit_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      rewards_granted INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(tenant_id, client_phone)
+    )`,
+    'ALTER TABLE appointments ADD COLUMN IF NOT EXISTS loyalty_reward_granted BOOLEAN DEFAULT FALSE'
   ];
 
   for (const m of migrations) {
