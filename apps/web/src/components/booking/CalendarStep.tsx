@@ -1,30 +1,44 @@
-import { useState, useMemo, useEffect } from 'react';
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import { MONTH_NAMES, WEEKDAYS } from '@/lib/constants';
+import type { DaySchedule } from '@/lib/types';
 
 interface CalendarStepProps {
     selectedDate: string | null;
     onSelect: (date: string) => void;
-    onNext?: () => void;
-    tenantId?: string;
 }
 
-const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const DAY_NAMES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+const DAY_NAMES = WEEKDAYS.map(day => day.short);
 
-export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext, tenantId }: CalendarStepProps) {
-    const today = new Date();
+/** Local YYYY-MM-DD, avoiding the UTC shift that `toISOString()` introduces. */
+function toDateKey(year: number, month: number, day: number): string {
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+export default function CalendarStep({ selectedDate, onSelect }: CalendarStepProps) {
+    const today = useMemo(() => new Date(), []);
     const [currentMonth, setCurrentMonth] = useState(today.getMonth());
     const [currentYear, setCurrentYear] = useState(today.getFullYear());
-    const [schedule, setSchedule] = useState<{ day: number; active: boolean }[]>([]);
+    const [schedule, setSchedule] = useState<DaySchedule[]>([]);
 
     useEffect(() => {
-        if (!tenantId) return;
-        api.getTenant(tenantId).then(t => {
-            if (t?.settings?.weekly_schedule) {
-                setSchedule(t.settings.weekly_schedule);
-            }
-        });
-    }, [tenantId]);
+        let cancelled = false;
+        api.getTenant()
+            .then(tenant => {
+                if (!cancelled && tenant?.settings?.weekly_schedule) {
+                    setSchedule(tenant.settings.weekly_schedule);
+                }
+            })
+            .catch(() => {
+                // Without a schedule the calendar falls back to "closed on
+                // Sundays", which beats blocking the whole month.
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const daysInMonth = useMemo(() => {
         const firstDay = new Date(currentYear, currentMonth, 1).getDay(); // 0=Sun..6=Sat
@@ -66,8 +80,7 @@ export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext, 
     };
 
     const isSelected = (day: number) => {
-        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        return selectedDate === dateStr;
+        return selectedDate === toDateKey(currentYear, currentMonth, day);
     };
 
     const isToday = (day: number) =>
@@ -75,8 +88,7 @@ export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext, 
 
     const handleSelectDay = (day: number) => {
         if (isPastDate(day) || isDayDisabled(day)) return;
-        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        onSelect(dateStr);
+        onSelect(toDateKey(currentYear, currentMonth, day));
     };
 
     return (
@@ -89,12 +101,14 @@ export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext, 
                 <div className="flex gap-2">
                     <button
                         onClick={handlePrevMonth}
+                        aria-label="Mes anterior"
                         className="w-10 h-10 rounded-full bg-cream/50 flex items-center justify-center hover:bg-pink-pale hover:text-pink transition-all border border-cream-dark/20 text-nf-gray shadow-sm"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                     </button>
                     <button
                         onClick={handleNextMonth}
+                        aria-label="Mes siguiente"
                         className="w-10 h-10 rounded-full bg-cream/50 flex items-center justify-center hover:bg-pink-pale hover:text-pink transition-all border border-cream-dark/20 text-nf-gray shadow-sm"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
@@ -125,6 +139,8 @@ export default function CalendarStep({ selectedDate, onSelect, onNext: _onNext, 
                             key={day}
                             onClick={() => handleSelectDay(day)}
                             disabled={disabled}
+                            aria-pressed={selected}
+                            aria-label={`${day} de ${MONTH_NAMES[currentMonth]}`}
                             className={`
                                 relative aspect-square flex items-center justify-center rounded-2xl text-sm font-bold
                                 transition-all duration-300 transform

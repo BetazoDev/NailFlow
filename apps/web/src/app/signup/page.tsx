@@ -1,101 +1,129 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { api, ApiError } from '@/lib/api';
+import { authErrorMessage } from '@/lib/auth-errors';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
+/**
+ * First-run sign-up: creates the account *and* claims the salon on this domain.
+ *
+ * Previously it only created a Firebase user, so the new owner landed in an
+ * admin panel that belonged to nobody — no salon, no staff record, no access.
+ */
 export default function SignupPage() {
     const router = useRouter();
+    const [salonName, setSalonName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSignup = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSignup = async (event: React.FormEvent) => {
+        event.preventDefault();
+
+        if (password.length < 6) {
+            setError('La contraseña debe tener al menos 6 caracteres.');
+            return;
+        }
+
         setLoading(true);
         setError('');
 
+        let created = false;
+
         try {
-            if (!email || !password) {
-                throw new Error('Ingresa correo y contraseña');
+            await createUserWithEmailAndPassword(auth, email.trim(), password);
+            created = true;
+            await api.claimTenant(salonName.trim());
+            router.replace('/admin');
+        } catch (caught) {
+            // If the account exists but the salon is already claimed, roll the
+            // account back — leaving an orphaned login the user cannot use
+            // anywhere is worse than asking them to sign in instead.
+            if (created && auth.currentUser) {
+                await deleteUser(auth.currentUser).catch(() => {});
             }
-            if (password.length < 6) {
-                throw new Error('La contraseña debe tener al menos 6 caracteres');
-            }
 
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-            // Set session
-            document.cookie = `mock_auth_token=uid_${userCredential.user.uid}; path=/`;
-            localStorage.setItem('mock_role', 'owner');
-
-            router.push('/admin');
-            router.refresh();
-        } catch (err: any) {
-            setError(err.message || 'Error al crear cuenta');
-        } finally {
+            setError(
+                caught instanceof ApiError ? caught.message : authErrorMessage(caught)
+            );
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex text-charcoal flex-col justify-center sm:py-12 bg-cream relative">
-            <div className="p-10 xs:p-0 mx-auto md:w-full md:max-w-md">
-                <div className="bg-white shadow w-full rounded-2xl border border-cream-dark p-8 mb-6">
-                    <div className="text-center mb-8">
-                        <h1 className="font-serif text-3xl font-semibold mb-2">Crea tu cuenta</h1>
-                        <p className="text-nf-gray text-sm font-medium">Administrador NailFlow</p>
+        <main className="flex min-h-dvh flex-col justify-center bg-surface px-6 py-12">
+            <div className="mx-auto w-full max-w-md">
+                <div className="rounded-3xl border border-line bg-surface-raised p-8 shadow-soft">
+                    <div className="mb-8 text-center">
+                        <h1 className="mb-2 font-display text-3xl font-semibold text-text-strong">
+                            Crea tu salón
+                        </h1>
+                        <p className="text-sm text-text-muted">
+                            Serás la propietaria de este espacio en NailFlow.
+                        </p>
                     </div>
 
                     {error && (
-                        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
+                        <p
+                            role="alert"
+                            className="mb-6 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger"
+                        >
                             {error}
-                        </div>
+                        </p>
                     )}
 
                     <form onSubmit={handleSignup} className="space-y-5">
-                        <div>
-                            <label className="block text-sm font-semibold mb-2">Correo Electrónico</label>
-                            <input
-                                type="email"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full h-14 px-5 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-pink focus:bg-white outline-none"
-                                placeholder="tu@correo.com"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold mb-2">Contraseña</label>
-                            <input
-                                type="password"
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full h-14 px-5 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-pink focus:bg-white outline-none"
-                                placeholder="••••••••"
-                            />
-                        </div>
+                        <Input
+                            label="Nombre del salón"
+                            required
+                            value={salonName}
+                            onChange={event => setSalonName(event.target.value)}
+                            placeholder="Ana Nails Studio"
+                            helperText="Es lo que verán tus clientas al reservar."
+                        />
 
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="btn-gradient w-full py-4 rounded-2xl text-white font-bold"
-                        >
-                            {loading ? 'Creando...' : 'Crear Cuenta'}
-                        </button>
+                        <Input
+                            label="Correo electrónico"
+                            type="email"
+                            autoComplete="email"
+                            required
+                            value={email}
+                            onChange={event => setEmail(event.target.value)}
+                            placeholder="tu@correo.com"
+                        />
+
+                        <Input
+                            label="Contraseña"
+                            type="password"
+                            autoComplete="new-password"
+                            required
+                            minLength={6}
+                            value={password}
+                            onChange={event => setPassword(event.target.value)}
+                            placeholder="••••••••"
+                            helperText="Mínimo 6 caracteres."
+                        />
+
+                        <Button type="submit" size="lg" isLoading={loading} loadingLabel="Creando…" className="w-full">
+                            Crear cuenta
+                        </Button>
                     </form>
-
-                    <div className="mt-8 text-center text-sm">
-                        <p className="text-nf-gray font-medium">
-                            ¿Ya tienes cuenta? <Link href="/login" className="text-pink font-bold">Inicia Sesión</Link>
-                        </p>
-                    </div>
                 </div>
+
+                <p className="mt-6 text-center text-sm text-text-muted">
+                    ¿Ya tienes cuenta?{' '}
+                    <Link href="/login" className="font-bold text-brand hover:underline">
+                        Inicia sesión
+                    </Link>
+                </p>
             </div>
-        </div>
+        </main>
     );
 }

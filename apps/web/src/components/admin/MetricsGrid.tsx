@@ -1,82 +1,91 @@
 'use client';
 
-import React from 'react';
-import { Card } from '../ui/Card';
+import { Card } from '@/components/ui/Card';
+import { formatMoney } from '@/lib/format';
 
 interface MetricProps {
     label: string;
     value: string | number;
-    subValue?: string;
+    hint?: string;
     icon: string;
-    trend?: {
-        value: string;
-        positive: boolean;
-    };
-    color?: string;
+    /** A token name from the design system, not a raw hex value. */
+    accent: string;
 }
 
-const Metric = ({ label, value, subValue, icon, trend, color = 'var(--pink)' }: MetricProps) => (
-    <Card variant="white" className="flex flex-col p-8 group">
-        <div className="flex items-start justify-between mb-8">
-            <div 
-                className="size-14 rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500"
-                style={{ background: 'var(--cream)' }}
+function Metric({ label, value, hint, icon, accent }: MetricProps) {
+    return (
+        <Card className="flex flex-col p-8">
+            <div
+                className="mb-8 grid size-14 place-items-center rounded-2xl"
+                style={{ background: 'var(--surface-sunken)' }}
             >
-                <span className="material-symbol text-2xl font-light" style={{ color }}>{icon}</span>
+                <span className="material-symbol text-2xl" style={{ color: accent }} aria-hidden="true">
+                    {icon}
+                </span>
             </div>
-            {trend && (
-                <div className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${trend.positive ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'}`}>
-                    <span className="material-symbol text-xs">{trend.positive ? 'trending_up' : 'trending_down'}</span>
-                    {trend.value}
-                </div>
-            )}
-        </div>
-        <p className="text-[10px] tracking-[0.2em] uppercase font-bold text-nf-gray mb-1 opacity-60 font-display italic">
-            {label}
-        </p>
-        <div className="flex items-baseline gap-2">
-            <h3 className="font-display text-4xl font-light italic text-charcoal tracking-tight">{value}</h3>
-            {subValue && <span className="text-xs font-medium text-nf-gray/40">{subValue}</span>}
-        </div>
-    </Card>
-);
 
-interface MetricsGridProps {
+            <p className="mb-1 font-display text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
+                {label}
+            </p>
+            <p className="font-display text-4xl font-light italic tracking-tight text-text-strong">{value}</p>
+            {hint && <p className="mt-1 text-xs text-text-muted">{hint}</p>}
+        </Card>
+    );
+}
+
+export interface MetricsGridProps {
     income: number;
     completedCitations: number;
     pendingCitations: number;
     newClients: number;
     periodLabel: string;
+    currency?: string;
 }
 
-export const MetricsGrid = ({ income, completedCitations, pendingCitations, newClients, periodLabel }: MetricsGridProps) => {
+/**
+ * The salon's numbers for the selected period.
+ *
+ * Every tile shows a measured value. The revenue tile used to carry a hardcoded
+ * "+12%" trend badge that was never computed from anything — a made-up figure
+ * presented exactly like the real ones beside it.
+ */
+export function MetricsGrid({
+    income,
+    completedCitations,
+    pendingCitations,
+    newClients,
+    periodLabel,
+    currency,
+}: MetricsGridProps) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Metric 
-                label={`Ingresos ${periodLabel}`} 
-                value={`$${income.toLocaleString()}`} 
-                icon="payments" 
-                trend={{ value: '+12%', positive: true }} 
-                color="var(--pink)"
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Metric
+                label={`Ingresos · ${periodLabel}`}
+                value={formatMoney(income, currency)}
+                hint="Solo citas completadas"
+                icon="payments"
+                accent="var(--brand-primary)"
             />
-            <Metric 
-                label="Citas Completadas" 
-                value={completedCitations} 
-                icon="check_circle" 
-                color="#88C999"
+            <Metric
+                label="Citas completadas"
+                value={completedCitations}
+                icon="check_circle"
+                accent="var(--success)"
             />
-            <Metric 
-                label="Citas Pendientes" 
-                value={pendingCitations} 
-                icon="schedule" 
-                color="var(--orange-pale, #F4A261)"
+            <Metric
+                label="Citas pendientes"
+                value={pendingCitations}
+                hint="Hoy"
+                icon="schedule"
+                accent="var(--warning)"
             />
-            <Metric 
-                label="Nuevas Clientas" 
-                value={newClients} 
-                icon="person_add" 
-                color="var(--aesthetic-taupe)"
+            <Metric
+                label="Clientas nuevas"
+                value={newClients}
+                hint={`Primera reserva · ${periodLabel.toLowerCase()}`}
+                icon="person_add"
+                accent="var(--text-strong)"
             />
         </div>
     );
-};
+}

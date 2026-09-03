@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { api } from '@/lib/api';
-import { useTenant } from '@/lib/tenant-context';
+import { useEffect, useRef, useState } from 'react';
+import { api, ApiError } from '@/lib/api';
+import { useSession } from '@/lib/session-context';
+import { applyBranding } from '@/lib/theme';
+import { DEFAULT_PALETTE_ID, DEFAULT_TYPOGRAPHY_ID, PALETTES, TYPOGRAPHY, WEEKDAYS } from '@/lib/constants';
+import type { DaySchedule, TenantBranding, TenantSettings } from '@/lib/types';
 import {
     updatePassword,
     EmailAuthProvider,
@@ -13,17 +16,37 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 
+/** Sensible opening hours for a salon that has not configured any yet. */
+const DEFAULT_SCHEDULE: DaySchedule[] = [
+    { day: 1, active: true, start: '09:00', end: '20:00' },
+    { day: 2, active: true, start: '09:00', end: '20:00' },
+    { day: 3, active: true, start: '09:00', end: '20:00' },
+    { day: 4, active: true, start: '09:00', end: '20:00' },
+    { day: 5, active: true, start: '09:00', end: '20:00' },
+    { day: 6, active: true, start: '09:00', end: '15:00' },
+    { day: 0, active: false, start: '09:00', end: '09:00' },
+];
+
+const TABS = [
+    ['info', 'Negocio', 'storefront'],
+    ['apariencia', 'Apariencia', 'palette'],
+    ['horarios', 'Horarios', 'schedule'],
+    ['fidelizacion', 'Fidelización', 'card_giftcard'],
+    ['password', 'Seguridad', 'shield'],
+] as const;
+
 export default function ProfilePage() {
-    const { tenantId } = useTenant();
-    const [tab, setTab] = useState<'info' | 'password' | 'horarios' | 'fidelizacion'>('info');
+    const { tenant, refresh } = useSession();
+    const [tab, setTab] = useState<'info' | 'apariencia' | 'horarios' | 'password' | 'fidelizacion'>('info');
 
     const [salonName, setSalonName] = useState('');
     const [tagline, setTagline] = useState('');
-    const [currentBranding, setCurrentBranding] = useState<any>(null);
+    const [currentBranding, setCurrentBranding] = useState<TenantBranding>({});
+    const [paletteId, setPaletteId] = useState(DEFAULT_PALETTE_ID);
+    const [typographyId, setTypographyId] = useState(DEFAULT_TYPOGRAPHY_ID);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [weeklySchedule, setWeeklySchedule] = useState<{ day: number; active: boolean; start: string; end: string }[]>([]);
-    const [currentSettings, setCurrentSettings] = useState<any>(null);
+    const [weeklySchedule, setWeeklySchedule] = useState<DaySchedule[]>([]);
     const [saving, setSaving] = useState(false);
     const [saveMsg, setSaveMsg] = useState('');
     const logoRef = useRef<HTMLInputElement>(null);
@@ -48,80 +71,98 @@ export default function ProfilePage() {
     const user = auth.currentUser;
 
     useEffect(() => {
-        if (!tenantId) return;
-        api.getTenant(tenantId).then(tenant => {
-            if (tenant) {
-                setSalonName(tenant.name || '');
-                setTagline(tenant.branding?.tagline || '');
-                setLogoPreview(tenant.branding?.logo_url || null);
-                setCurrentBranding(tenant.branding);
-                setCurrentSettings(tenant.settings);
-                
-                // Initialize schedule
-                const defaultSchedule = [
-                    { day: 1, active: true, start: '09:00', end: '20:00' },
-                    { day: 2, active: true, start: '09:00', end: '20:00' },
-                    { day: 3, active: true, start: '09:00', end: '20:00' },
-                    { day: 4, active: true, start: '09:00', end: '20:00' },
-                    { day: 5, active: true, start: '09:00', end: '20:00' },
-                    { day: 6, active: true, start: '09:00', end: '15:00' },
-                    { day: 0, active: false, start: '09:00', end: '09:00' },
-                ];
-                setWeeklySchedule(tenant.settings?.weekly_schedule || defaultSchedule);
+        if (!tenant) return;
 
-                // Initialize loyalty settings from saved data
-                const loyalty = tenant.settings?.loyalty;
-                if (loyalty) {
-                    setLoyaltyEnabled(loyalty.enabled ?? false);
-                    setLoyaltyVisits(loyalty.visits_required ?? 5);
-                    setLoyaltyRewardType(loyalty.reward_type ?? 'discount');
-                    setLoyaltyDiscountValue(loyalty.discount_value ?? 10);
-                }
-            }
-        });
-    }, [tenantId]);
+        setSalonName(tenant.name ?? '');
+        setTagline(tenant.branding?.tagline ?? '');
+        setLogoPreview(tenant.branding?.logo_url ?? null);
+        setCurrentBranding(tenant.branding ?? {});
+        setPaletteId(tenant.branding?.palette_id ?? DEFAULT_PALETTE_ID);
+        setTypographyId(tenant.branding?.typography ?? DEFAULT_TYPOGRAPHY_ID);
+        setWeeklySchedule(tenant.settings?.weekly_schedule ?? DEFAULT_SCHEDULE);
+
+        const loyalty = tenant.settings?.loyalty;
+        if (loyalty) {
+            setLoyaltyEnabled(loyalty.enabled);
+            setLoyaltyVisits(loyalty.visits_required);
+            setLoyaltyRewardType(loyalty.reward_type);
+            setLoyaltyDiscountValue(loyalty.discount_value ?? 10);
+        }
+    }, [tenant]);
+
+    /**
+     * Preview the palette live while the owner is choosing. Saving persists it;
+     * leaving without saving simply reloads the stored branding.
+     */
+    useEffect(() => {
+        applyBranding({ ...currentBranding, palette_id: paletteId, typography: typographyId });
+    }, [paletteId, typographyId, currentBranding]);
+
+    /**
+     * One save path for every section of this page.
+     *
+     * `PUT /api/tenant` merges the JSON it receives, so sending only the keys
+     * that changed no longer risks wiping the rest of the branding object.
+     */
+    const save = async (
+        patch: { name?: string; branding?: TenantBranding; settings?: TenantSettings },
+        onMessage: (message: string) => void
+    ) => {
+        try {
+            const updated = await api.updateTenant(patch);
+            setCurrentBranding(updated.branding ?? {});
+            await refresh();
+            onMessage('¡Guardado!');
+        } catch (caught) {
+            onMessage(caught instanceof ApiError ? caught.message : 'Error al guardar. Intenta de nuevo.');
+        } finally {
+            setTimeout(() => onMessage(''), 3000);
+        }
+    };
 
     const handleSaveInfo = async () => {
-        if (!tenantId) return;
         setSaving(true);
         setSaveMsg('');
         try {
-            let finalLogoUrl = logoPreview || '';
+            let logoUrl = logoPreview;
             if (logoFile) {
-                finalLogoUrl = await api.uploadImage(tenantId, 'branding', logoFile);
-                setLogoPreview(finalLogoUrl);
+                logoUrl = await api.uploadImage(logoFile, 'branding');
+                setLogoPreview(logoUrl);
+                setLogoFile(null);
             }
 
-            const updatedBranding: any = currentBranding
-                ? { ...currentBranding, logo_url: finalLogoUrl, tagline }
-                : { logo_url: finalLogoUrl, tagline, primary_color: '#C97794', secondary_color: '#F8D2D8' };
-
-            const updatedSettings: any = {
-                ...(currentSettings || { currency: 'MXN', timezone: 'America/Mexico_City' }),
-                weekly_schedule: weeklySchedule
-            };
-
-            await api.updateTenant(tenantId, {
-                name: salonName,
-                branding: updatedBranding,
-                settings: updatedSettings
-            });
-            
-            setCurrentBranding(updatedBranding);
-            setCurrentSettings(updatedSettings);
-
-            // Notify the admin layout sidebar to update immediately (no page reload needed)
-            window.dispatchEvent(new CustomEvent('tenant-updated', {
-                detail: { name: salonName, logoUrl: finalLogoUrl, tagline }
-            }));
-
-            setSaveMsg('¡Información actualizada con éxito!');
-        } catch (e: unknown) {
-            setSaveMsg((e as Error).message || 'Error al guardar. Intenta de nuevo.');
+            await save(
+                { name: salonName.trim(), branding: { logo_url: logoUrl ?? undefined, tagline: tagline.trim() } },
+                setSaveMsg
+            );
+        } catch (caught) {
+            setSaveMsg(caught instanceof ApiError ? caught.message : 'No pudimos subir el logo.');
+            setTimeout(() => setSaveMsg(''), 3000);
         } finally {
             setSaving(false);
-            setTimeout(() => setSaveMsg(''), 3000);
         }
+    };
+
+    const handleSaveAppearance = async () => {
+        setSaving(true);
+        setSaveMsg('');
+        await save({ branding: { palette_id: paletteId, typography: typographyId } }, setSaveMsg);
+        setSaving(false);
+    };
+
+    const handleSaveSchedule = async () => {
+        const invalid = weeklySchedule.find(day => day.active && day.start >= day.end);
+        if (invalid) {
+            const label = WEEKDAYS.find(day => day.day === invalid.day)?.label ?? 'Un día';
+            setSaveMsg(`${label}: la hora de cierre debe ser posterior a la de apertura.`);
+            setTimeout(() => setSaveMsg(''), 4000);
+            return;
+        }
+
+        setSaving(true);
+        setSaveMsg('');
+        await save({ settings: { weekly_schedule: weeklySchedule } }, setSaveMsg);
+        setSaving(false);
     };
 
     const handleChangePassword = async () => {
@@ -165,34 +206,48 @@ export default function ProfilePage() {
         }
     };
 
+    /**
+     * Updates one weekday immutably, inserting it if the salon had never
+     * configured that day. The previous version mutated the array in place and
+     * indexed with `findIndex`, so editing a day that was not yet in the list
+     * wrote to `undefined`.
+     */
+    const updateDay = (day: number, patch: Partial<DaySchedule>) => {
+        setWeeklySchedule(current => {
+            const existing = current.find(entry => entry.day === day);
+            const base: DaySchedule =
+                existing ?? { day: day as DaySchedule['day'], active: false, start: '09:00', end: '18:00' };
+            const updated = { ...base, ...patch };
+
+            return existing
+                ? current.map(entry => (entry.day === day ? updated : entry))
+                : [...current, updated];
+        });
+    };
+
     const handleSaveLoyalty = async () => {
-        if (!tenantId) return;
         setLoyaltySaving(true);
         setLoyaltyMsg('');
-        try {
-            const loyaltySettings = {
-                enabled: loyaltyEnabled,
-                visits_required: loyaltyVisits,
-                reward_type: loyaltyRewardType,
-                discount_value: loyaltyRewardType === 'discount' ? loyaltyDiscountValue : null,
-            };
-            const updatedSettings: any = {
-                ...(currentSettings || { currency: 'MXN', timezone: 'America/Mexico_City' }),
-                loyalty: loyaltySettings,
-            };
-            await api.updateTenant(tenantId, { settings: updatedSettings });
-            setCurrentSettings(updatedSettings);
-            setLoyaltyMsg('¡Programa de lealtad guardado con éxito!');
-        } catch (e: unknown) {
-            setLoyaltyMsg((e as Error).message || 'Error al guardar. Intenta de nuevo.');
-        } finally {
-            setLoyaltySaving(false);
-            setTimeout(() => setLoyaltyMsg(''), 3000);
-        }
+        await save(
+            {
+                settings: {
+                    loyalty: {
+                        enabled: loyaltyEnabled,
+                        visits_required: loyaltyVisits,
+                        reward_type: loyaltyRewardType,
+                        // Omitted rather than null: the field only means something
+                        // for a percentage reward.
+                        ...(loyaltyRewardType === 'discount' ? { discount_value: loyaltyDiscountValue } : {}),
+                    },
+                },
+            },
+            setLoyaltyMsg
+        );
+        setLoyaltySaving(false);
     };
 
     return (
-        <div className="min-h-full pb-24" style={{ background: 'var(--cream)' }}>
+        <div className="min-h-full pb-24">
             {/* Header */}
             <div className="px-6 pt-8 pb-6">
                 <p className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase mb-2 font-display italic font-medium">Administración</p>
@@ -201,10 +256,14 @@ export default function ProfilePage() {
 
             {/* Avatar section */}
             <div className="px-6 mb-8">
-                <Card variant="white" className="flex items-center gap-5 p-6">
+                <Card variant="raised" className="flex items-center gap-5 p-6">
                     <div className="size-24 rounded-full bg-aesthetic-soft-pink border-4 border-white shadow-soft flex items-center justify-center text-aesthetic-taupe text-4xl font-display italic flex-shrink-0 overflow-hidden ring-1 ring-aesthetic-accent/50">
                         {logoPreview ? (
-                            <img src={api.getPublicUrl(logoPreview)} alt="Logo" className="w-full h-full object-cover" />
+                            <img
+                                src={logoPreview.startsWith('blob:') ? logoPreview : api.getImageUrl(logoPreview)}
+                                alt=""
+                                className="w-full h-full object-cover"
+                            />
                         ) : (
                             user?.email?.charAt(0).toUpperCase() || '✨'
                         )}
@@ -219,13 +278,14 @@ export default function ProfilePage() {
             {/* Tabs */}
             <div className="px-6 mb-8">
                 <div className="flex gap-2 bg-aesthetic-cream/60 backdrop-blur-sm rounded-[2rem] p-1.5 border border-white/50 shadow-inner overflow-x-auto scrollbar-hide">
-                    {( [['info', 'Negocio', 'storefront'], ['horarios', 'Horarios', 'schedule'], ['password', 'Seguridad', 'shield'], ['fidelizacion', 'Fidelización', 'card_giftcard']] as const).map(([id, label, icon]) => (
+                    {TABS.map(([id, label, icon]) => (
                         <button
                             key={id}
-                            onClick={() => setTab(id as typeof tab)}
+                            onClick={() => setTab(id)}
+                            aria-pressed={tab === id}
                             className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-6 rounded-[1.5rem] text-[10px] tracking-[0.2em] uppercase font-bold transition-all whitespace-nowrap ${tab === id ? 'bg-white text-aesthetic-pink shadow-md' : 'text-aesthetic-muted hover:text-aesthetic-taupe hover:bg-white/30'}`}
                         >
-                            <span className="material-symbol text-base">{icon}</span>
+                            <span className="material-symbol text-base" aria-hidden="true">{icon}</span>
                             {label}
                         </button>
                     ))}
@@ -236,7 +296,7 @@ export default function ProfilePage() {
             <div className="px-6">
                 {tab === 'info' && (
                     <div className="space-y-6 animate-fade-in">
-                        <Card variant="white" className="p-8 border-none shadow-soft overflow-hidden">
+                        <Card variant="raised" className="p-8 border-none shadow-soft overflow-hidden">
                             <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-8">Información del Salón</h3>
                             
                             <div className="space-y-8">
@@ -244,7 +304,11 @@ export default function ProfilePage() {
                                     <div className="relative cursor-pointer group mb-4" onClick={() => logoRef.current?.click()}>
                                         <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-soft flex items-center justify-center bg-aesthetic-cream/40 transition-transform group-hover:scale-105 duration-500 ring-2 ring-aesthetic-pink/20">
                                             {logoPreview ? (
-                                                <img src={api.getPublicUrl(logoPreview)} alt="logo" className="w-full h-full object-cover" />
+                                                <img
+                                                    src={logoPreview.startsWith('blob:') ? logoPreview : api.getImageUrl(logoPreview)}
+                                                    alt=""
+                                                    className="w-full h-full object-cover"
+                                                />
                                             ) : (
                                                 <span className="material-symbol text-4xl text-aesthetic-accent/40">add_photo_alternate</span>
                                             )}
@@ -302,40 +366,138 @@ export default function ProfilePage() {
                     </div>
                 )}
 
+                {tab === 'apariencia' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <Card variant="raised" className="p-8 border-none shadow-soft">
+                            <h3 className="mb-2 font-display text-2xl italic text-aesthetic-taupe">Apariencia</h3>
+                            <p className="mb-8 text-[11px] uppercase tracking-[0.15em] text-aesthetic-muted opacity-70">
+                                Se aplica a tu página de reservas y a este panel.
+                            </p>
+
+                            <fieldset className="mb-10">
+                                <legend className="mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-aesthetic-muted">
+                                    Paleta
+                                </legend>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    {PALETTES.map(palette => (
+                                        <label
+                                            key={palette.id}
+                                            className={`flex cursor-pointer items-center gap-4 rounded-2xl border-2 p-4 transition-all ${
+                                                paletteId === palette.id
+                                                    ? 'border-aesthetic-pink shadow-soft'
+                                                    : 'border-transparent bg-surface-sunken/40 hover:border-aesthetic-accent'
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="palette"
+                                                value={palette.id}
+                                                checked={paletteId === palette.id}
+                                                onChange={() => setPaletteId(palette.id)}
+                                                className="sr-only"
+                                            />
+                                            <span className="flex shrink-0 gap-1" aria-hidden="true">
+                                                {palette.swatches.map(color => (
+                                                    <span
+                                                        key={color}
+                                                        className="size-6 rounded-full border border-white shadow-sm"
+                                                        style={{ background: color }}
+                                                    />
+                                                ))}
+                                            </span>
+                                            <span className="min-w-0">
+                                                <span className="block text-sm font-semibold text-aesthetic-taupe">
+                                                    {palette.name}
+                                                </span>
+                                                <span className="block text-[11px] leading-snug text-aesthetic-muted">
+                                                    {palette.description}
+                                                </span>
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            <fieldset className="mb-8">
+                                <legend className="mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-aesthetic-muted">
+                                    Tipografía
+                                </legend>
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    {TYPOGRAPHY.map(option => (
+                                        <label
+                                            key={option.id}
+                                            className={`cursor-pointer rounded-2xl border-2 p-4 text-center transition-all ${
+                                                typographyId === option.id
+                                                    ? 'border-aesthetic-pink shadow-soft'
+                                                    : 'border-transparent bg-surface-sunken/40 hover:border-aesthetic-accent'
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="typography"
+                                                value={option.id}
+                                                checked={typographyId === option.id}
+                                                onChange={() => setTypographyId(option.id)}
+                                                className="sr-only"
+                                            />
+                                            <span className="block text-2xl text-aesthetic-taupe" style={{ fontFamily: option.display }}>
+                                                Aa
+                                            </span>
+                                            <span className="mt-2 block text-xs font-semibold text-aesthetic-taupe">
+                                                {option.label}
+                                            </span>
+                                            <span className="mt-0.5 block text-[10px] leading-snug text-aesthetic-muted">
+                                                {option.description}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            <Button className="h-14 w-full" onClick={handleSaveAppearance} isLoading={saving}>
+                                Guardar apariencia
+                            </Button>
+
+                            {saveMsg && (
+                                <p role="status" className="mt-4 text-center text-[10px] font-bold uppercase tracking-widest">
+                                    {saveMsg}
+                                </p>
+                            )}
+                        </Card>
+                    </div>
+                )}
+
                 {tab === 'horarios' && (
                     <div className="space-y-6 animate-fade-in">
-                        <Card variant="white" className="p-8 border-none shadow-soft">
+                        <Card variant="raised" className="p-8 border-none shadow-soft">
                             <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-2">Horarios de Atención</h3>
                             <p className="text-[11px] text-aesthetic-muted mb-8 leading-relaxed uppercase tracking-[0.15em] font-bold italic opacity-70">
                                 Define tus horas de operación para el booking dinámico.
                             </p>
 
                             <div className="space-y-3">
-                                {['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map((dayName, idx) => {
-                                    const sched = weeklySchedule.find(s => s.day === idx) || { day: idx, active: false, start: '09:00', end: '18:00' };
+                                {WEEKDAYS.map(({ day: idx, label: dayName }) => {
+                                    const sched = weeklySchedule.find(entry => entry.day === idx)
+                                        ?? { day: idx, active: false, start: '09:00', end: '18:00' };
+                                    const invalid = sched.active && sched.start >= sched.end;
+
                                     return (
                                         <div key={idx} className={`p-5 rounded-[2rem] border-2 transition-all duration-500 ${sched.active ? 'bg-aesthetic-cream/30 border-aesthetic-pink/20 shadow-sm' : 'bg-gray-50/50 border-gray-100/50 opacity-40 grayscale-[0.5]'}`}>
                                             <div className="flex items-center justify-between mb-4">
                                                 <div className="flex items-center gap-4">
                                                     <button 
-                                                        onClick={() => {
-                                                            const newSched = [...weeklySchedule];
-                                                            const i = newSched.findIndex(s => s.day === idx);
-                                                            if (i >= 0) newSched[i].active = !newSched[i].active;
-                                                            else newSched.push({ day: idx, active: true, start: '09:00', end: '18:00' });
-                                                            setWeeklySchedule(newSched);
-                                                        }}
-                                                        className={`size-7 rounded-full flex items-center justify-center transition-all duration-300 ${sched.active ? 'bg-aesthetic-pink text-white shadow-mid' : 'bg-gray-200 text-gray-400'}`}
+                                                        onClick={() => updateDay(idx, { active: !sched.active })}
+                                                        role="switch"
+                                                        aria-checked={sched.active}
+                                                        aria-label={`${dayName}: ${sched.active ? 'abierto' : 'cerrado'}`}
+                                                        className={`size-7 rounded-full flex items-center justify-center transition-all duration-300 ${sched.active ? 'bg-aesthetic-pink text-white shadow-soft' : 'bg-surface-sunken text-text-subtle'}`}
                                                     >
-                                                        {sched.active ? <span className="material-symbol text-base font-bold">check</span> : <span className="material-symbol text-base font-bold">close</span>}
+                                                        <span className="material-symbol text-base font-bold" aria-hidden="true">{sched.active ? 'check' : 'close'}</span>
                                                     </button>
                                                     <span className={`text-xs font-bold uppercase tracking-widest ${sched.active ? 'text-aesthetic-taupe' : 'text-gray-400'}`}>{dayName}</span>
                                                 </div>
                                                 {sched.active && (
-                                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 rounded-full">
-                                                        <div className="size-1.5 rounded-full bg-green-500 animate-pulse" />
-                                                        <span className="text-[9px] text-green-600 font-bold uppercase tracking-widest">Activo</span>
-                                                    </div>
+                                                    <span className="status-pill" data-status="completed">Abierto</span>
                                                 )}
                                             </div>
 
@@ -346,49 +508,55 @@ export default function ProfilePage() {
                                                         <input 
                                                             type="time" 
                                                             value={sched.start}
-                                                            onChange={(e) => {
-                                                                const newSched = [...weeklySchedule];
-                                                                const i = newSched.findIndex(s => s.day === idx);
-                                                                newSched[i].start = e.target.value;
-                                                                setWeeklySchedule(newSched);
-                                                            }}
+                                                            onChange={e => updateDay(idx, { start: e.target.value })}
+                                                            aria-label={`Hora de apertura, ${dayName}`}
+                                                            aria-invalid={invalid || undefined}
                                                             className="w-full bg-white border-none rounded-2xl px-4 py-3 text-xs font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 outline-none" 
                                                         />
                                                     </div>
                                                     <div className="pt-2 text-aesthetic-muted opacity-30">
-                                                        <span className="material-symbol text-lg">arrow_forward</span>
+                                                        <span className="material-symbol text-lg" aria-hidden="true">arrow_forward</span>
                                                     </div>
                                                     <div className="flex-1 relative">
                                                         <span className="absolute -top-6 left-1 text-[8px] uppercase tracking-widest text-aesthetic-muted font-bold">Cierre</span>
                                                         <input 
                                                             type="time" 
                                                             value={sched.end}
-                                                            onChange={(e) => {
-                                                                const newSched = [...weeklySchedule];
-                                                                const i = newSched.findIndex(s => s.day === idx);
-                                                                newSched[i].end = e.target.value;
-                                                                setWeeklySchedule(newSched);
-                                                            }}
+                                                            onChange={e => updateDay(idx, { end: e.target.value })}
+                                                            aria-label={`Hora de cierre, ${dayName}`}
+                                                            aria-invalid={invalid || undefined}
                                                             className="w-full bg-white border-none rounded-2xl px-4 py-3 text-xs font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 outline-none" 
                                                         />
                                                     </div>
                                                 </div>
+                                            )}
+
+                                            {invalid && (
+                                                <p role="alert" className="mt-3 pl-11 text-[11px] text-danger">
+                                                    El cierre debe ser posterior a la apertura.
+                                                </p>
                                             )}
                                         </div>
                                     );
                                 })}
                             </div>
 
-                            <Button variant="primary" className="w-full h-14 mt-10" onClick={handleSaveInfo} isLoading={saving}>
-                                Actualizar Todos los Horarios
+                            <Button className="mt-10 h-14 w-full" onClick={handleSaveSchedule} isLoading={saving}>
+                                Guardar horarios
                             </Button>
+
+                            {saveMsg && (
+                                <p role="status" className="mt-4 text-center text-[10px] font-bold uppercase tracking-widest">
+                                    {saveMsg}
+                                </p>
+                            )}
                         </Card>
                     </div>
                 )}
 
                 {tab === 'password' && (
                     <div className="space-y-6 animate-fade-in">
-                        <Card variant="white" className="p-8 border-none shadow-soft">
+                        <Card variant="raised" className="p-8 border-none shadow-soft">
                             <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-8">Cambiar Contraseña</h3>
                             
                             <div className="space-y-6">
@@ -426,12 +594,12 @@ export default function ProfilePage() {
                                 </Button>
 
                                 {pwMsg && (
-                                    <p className="text-center text-[10px] font-bold uppercase tracking-widest animate-fade-in text-green-500">
+                                    <p role="status" className="animate-fade-in text-center text-[10px] font-bold uppercase tracking-widest text-success">
                                         {pwMsg}
                                     </p>
                                 )}
                                 {pwError && (
-                                    <p className="text-center text-[10px] font-bold uppercase tracking-widest animate-fade-in text-red-500">
+                                    <p role="alert" className="animate-fade-in text-center text-[10px] font-bold uppercase tracking-widest text-danger">
                                         {pwError}
                                     </p>
                                 )}
@@ -450,7 +618,7 @@ export default function ProfilePage() {
                             </p>
                         </div>
 
-                        <Card variant="white" className="p-8 border-none shadow-soft">
+                        <Card variant="raised" className="p-8 border-none shadow-soft">
                             {/* Toggle header */}
                             <div className="flex items-center justify-between gap-4 pb-6 border-b border-aesthetic-cream/60">
                                 <div>

@@ -1,23 +1,18 @@
 'use client';
 
-import React from 'react';
 import CalendarStep from './CalendarStep';
 import TimeSlotStep from './TimeSlotStep';
+import { useBooking } from './BookingContext';
 
-interface DateTimeStepProps {
-    selectedDate: string | null;
-    selectedTime: string | null;
-    onDateSelect: (date: string) => void;
-    onTimeSelect: (time: string) => void;
-    onNext: () => void;
-    onBack?: () => void;
-    tenantId?: string;
-    staffId?: string;
-    serviceId?: string;
-    totalDuration?: number;
-}
+export default function DateTimeStep() {
+    const { draft, goNext, goBack, setDate } = useBooking();
 
-export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect, onTimeSelect, onNext, onBack, tenantId = 'demo', staffId, serviceId, totalDuration }: DateTimeStepProps) {
+    const selectedDate = draft.date;
+    const selectedTime = draft.time;
+    const onDateSelect = (date: string) => setDate(date || null);
+    const onNext = goNext;
+    const onBack = goBack;
+
     return (
         <div className="flex flex-col h-full relative" style={{ background: 'var(--cream)' }}>
             {/* Header: Sticky at the top */}
@@ -53,11 +48,7 @@ export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect,
                 <div className="px-6 py-6 pb-24">
                     {!selectedDate ? (
                         <div className="stagger-children">
-                            <CalendarStep
-                                selectedDate={selectedDate}
-                                onSelect={onDateSelect}
-                                tenantId={tenantId}
-                            />
+                            <CalendarStep selectedDate={selectedDate} onSelect={onDateSelect} />
                             <div className="mt-8 p-6 rounded-[2rem] bg-pink-pale/30 border border-pink-light/20 flex gap-4 items-start">
                                 <span className="text-2xl">⏳</span>
                                 <p className="text-[11px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider">
@@ -67,17 +58,7 @@ export default function DateTimeStep({ selectedDate, selectedTime, onDateSelect,
                         </div>
                     ) : (
                         <div className="-mx-6">
-                            <TimeSlotStep
-                                selectedDate={selectedDate}
-                                selectedTime={selectedTime}
-                                onSelect={onTimeSelect}
-                                onNext={onNext}
-                                onBack={() => onDateSelect('')}
-                                tenantId={tenantId}
-                                staffId={staffId}
-                                serviceId={serviceId}
-                                totalDuration={totalDuration}
-                            />
+                            <TimeSlotStep onBack={() => onDateSelect('')} />
                         </div>
                     )}
                 </div>

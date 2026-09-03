@@ -1,49 +1,54 @@
-import { api } from '@/lib/api';
-import BookingWidget from '@/components/booking/BookingWidget';
 import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
-
-interface Props {
-    params: {
-        staffSlug: string;
-    }
-}
+import type { Metadata } from 'next';
+import { api } from '@/lib/api';
+import { requestDomain } from '@/lib/server';
+import BookingWidget from '@/components/booking/BookingWidget';
 
 export const dynamic = 'force-dynamic';
 
-export default async function StaffBookingPage({ params }: Props) {
-    const headersList = headers();
-    let domain = headersList.get('host') || 'demo.diabolicalservices.tech';
-    if (domain.includes('localhost') || domain.includes('127.0.0.1')) {
-        domain = 'demo.diabolicalservices.tech';
-    }
+interface Props {
+    params: { staffSlug: string };
+}
 
+/** A staff member's personal booking link (spec §5): `domain.com/book/lidia`. */
+async function resolve(staffSlug: string) {
+    const domain = requestDomain();
     const tenant = await api.getTenant(domain);
+    if (!tenant) return null;
 
-    if (!tenant) {
-        notFound();
-    }
+    const staff = await api.getStaff(domain).catch(() => []);
+    const member = staff.find(person => person.slug === staffSlug);
 
-    // Resolve the staff member by slug
-    const allStaff = await api.getStaff();
-    const staffMember = allStaff.find(s => {
-        const memberSlug = s.slug || s.name.toLowerCase().replace(/\s+/g, '-');
-        return memberSlug === params.staffSlug;
-    });
+    return member ? { tenant, member } : null;
+}
 
-    const staffName = staffMember?.name || params.staffSlug.replace(/-/g, ' ');
-    const staffId = staffMember?.id || 'staff-1';
-    const staffPhoto = staffMember?.photo_url || undefined;
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const resolved = await resolve(params.staffSlug);
+    if (!resolved) return { title: 'Reserva no disponible' };
+
+    const { tenant, member } = resolved;
+    return {
+        title: `Reserva con ${member.name} · ${tenant.name ?? 'NailFlow'}`,
+        description: member.bio ?? `Agenda tu cita con ${member.name}.`,
+    };
+}
+
+export default async function StaffBookingPage({ params }: Props) {
+    const resolved = await resolve(params.staffSlug);
+
+    // An unknown slug is a 404, not a silent fallback to whoever happens to be
+    // first — booking with the wrong person is worse than an honest error.
+    if (!resolved) notFound();
+
+    const { tenant, member } = resolved;
 
     return (
-        <div className="min-h-screen bg-cream selection:bg-pink-pale selection:text-charcoal relative">
-            <BookingWidget
-                tenant={tenant}
-                staffId={staffId}
-                staffName={staffName}
-                staffPhoto={staffPhoto}
-                skipSplash={false}
-            />
-        </div>
+        <BookingWidget
+            tenant={tenant}
+            staffId={member.id}
+            staffName={member.name}
+            staffPhoto={member.photo_url ?? undefined}
+            skipSplash
+        />
     );
 }

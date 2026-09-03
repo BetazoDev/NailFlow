@@ -2,39 +2,46 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { useBooking } from './BookingContext';
 
-interface PersonalDataStepProps {
-    name: string;
-    phone: string;
-    email: string;
-    onNameChange: (v: string) => void;
-    onPhoneChange: (v: string) => void;
-    onEmailChange: (v: string) => void;
-    onNext: () => void;
-    staffName?: string;
-    staffPhoto?: string;
-}
+/** E.164, matching what the API accepts and what WhatsApp needs. */
+const PHONE_PATTERN = /^\+?[1-9]\d{7,14}$/;
 
-export default function PersonalDataStep({
-    name, phone, email,
-    onNameChange, onPhoneChange, onEmailChange, onNext,
-    staffName = 'Ana', staffPhoto,
-}: PersonalDataStepProps) {
-    const [errors, setErrors] = useState<Record<string, string>>({});
+export default function PersonalDataStep() {
+    const { draft, setClient, goNext } = useBooking();
+    const [errors, setErrors] = useState<{ name?: string; phone?: string; email?: string }>({});
 
-    const validate = () => {
-        const errs: Record<string, string> = {};
-        if (!name.trim()) errs.name = 'Por favor dinos tu nombre';
-        if (!phone.trim()) errs.phone = 'Necesitamos un teléfono para avisarte';
-        return errs;
-    };
+    const name = draft.clientName;
+    const phone = draft.clientPhone;
+    const email = draft.clientEmail;
 
+    const staffName = draft.staffName;
+    const staffPhoto = draft.staffPhoto;
+
+    /**
+     * Validated here as well as on the server: catching a malformed phone before
+     * the client has filled in five more screens is a much kinder failure than
+     * a 400 at the payment step.
+     */
     const handleNext = () => {
-        const errs = validate();
-        if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-        setErrors({});
-        onNext();
+        const found: typeof errors = {};
+        if (!name.trim()) found.name = 'Por favor dinos tu nombre';
+        if (!phone.trim()) {
+            found.phone = 'Necesitamos un teléfono para avisarte';
+        } else if (!PHONE_PATTERN.test(phone.replace(/[\s()-]/g, ''))) {
+            found.phone = 'Escríbelo en formato internacional, por ejemplo +5215512345678';
+        }
+        if (email.trim() && !email.includes('@')) {
+            found.email = 'Ese correo no parece válido';
+        }
+
+        setErrors(found);
+        if (Object.keys(found).length === 0) goNext();
     };
+
+    const onNameChange = (value: string) => setClient({ clientName: value });
+    const onPhoneChange = (value: string) => setClient({ clientPhone: value });
+    const onEmailChange = (value: string) => setClient({ clientEmail: value });
 
     return (
         <div className="flex flex-col h-full relative" style={{ background: 'var(--cream)' }}>
@@ -58,7 +65,7 @@ export default function PersonalDataStep({
                     <div className="relative mb-6">
                         <div className="w-24 h-24 rounded-full overflow-hidden shadow-xl ring-4 ring-white relative z-10">
                             {staffPhoto ? (
-                                <img src={api.getPublicUrl(staffPhoto)} alt={staffName} className="w-full h-full object-cover" />
+                                <img src={api.getImageUrl(staffPhoto)} alt={staffName} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-white bg-gradient-to-br from-pink to-coral">
                                     {staffName[0]}

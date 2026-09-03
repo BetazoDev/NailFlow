@@ -1,14 +1,20 @@
 {
-    "name": "nailflow-monorepo",
+    "name": "nailflow",
     "version": "1.0.0",
     "private": true,
+    "description": "Booking and management platform for nail studios.",
     "workspaces": [
+        "packages/*",
         "apps/*"
     ],
+    "engines": {
+        "node": ">=20"
+    },
     "scripts": {
-        "dev": "concurrently \"npm run dev -w @nailflow/api\" \"npm run dev -w @nailflow/web\"",
-        "build": "npm run build --workspaces",
-        "install:all": "npm install"
+        "dev": "npm run build -w @nailflow/shared && concurrently -n api,web -c magenta,cyan \"npm run dev -w @nailflow/api\" \"npm run dev -w @nailflow/web\"",
+        "build": "npm run build -w @nailflow/shared && npm run build -w @nailflow/api && npm run build -w @nailflow/web",
+        "typecheck": "npm run build -w @nailflow/shared && npm run typecheck --workspaces --if-present",
+        "lint": "npm run build -w @nailflow/shared && eslint \"apps/api/src/**/*.ts\" \"packages/**/src/**/*.ts\" && npm run lint -w @nailflow/web"
     },
     "devDependencies": {
         "concurrently": "^9.2.1"

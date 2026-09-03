@@ -1,199 +1,146 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Appointment, Service, Client, Tenant } from '@/lib/types';
-
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
-import { useTenant } from '@/lib/tenant-context';
-
-// Mock preferences/allergy data for CRM
-const MOCK_CLIENT_EXTRAS: Record<string, { preferences?: string; allergies?: string }> = {
-    '+5491100000001': { preferences: 'Prefiere tonos nude y acabado mate. Uñas de crecimiento rápido.', allergies: 'Alérgica al látex' },
-    '+5491100000002': { preferences: 'Le gustan los diseños florales y colores pastel.', allergies: undefined },
-    '+5491100000003': { preferences: 'Prefiere diseños geométricos con colores neutros.', allergies: undefined },
-};
+import { useSession } from '@/lib/session-context';
+import { buildClients, loyaltyStatusFor } from '@/lib/clients';
+import { formatMoney, formatShortDate, formatDate, formatTime, initials, whatsappLink } from '@/lib/format';
+import { STATUS_PRESENTATION } from '@/lib/constants';
+import type { Appointment, Client, Service } from '@/lib/types';
 
 type FilterTab = 'todas' | 'recientes' | 'favoritas';
 
+const TAB_LABELS: Record<FilterTab, string> = {
+    todas: 'Todas',
+    recientes: 'Recientes',
+    favoritas: 'Favoritas',
+};
+
 export default function ClientsPage() {
+    const { tenant } = useSession();
+
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [services, setServices] = useState<Service[]>([]);
+    const [favorites, setFavorites] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<FilterTab>('todas');
     const [expandedPhone, setExpandedPhone] = useState<string | null>(null);
-    const [favorites, setFavorites] = useState<Set<string>>(new Set());
     const [historyClient, setHistoryClient] = useState<Client | null>(null);
-    const [loyaltySettings, setLoyaltySettings] = useState<Tenant['settings'] | null>(null);
-    const { tenantId } = useTenant();
 
     useEffect(() => {
-        if (!tenantId) return;
+        if (!tenant) return;
+        let cancelled = false;
+
         Promise.all([
             api.getAppointments(),
-            api.getServices(),
+            api.getServices({ includeInactive: true }),
             api.getFavorites(),
-            api.getTenant(tenantId),
-        ]).then(([apts, svcs, favs, tenant]) => {
-            setAppointments(apts);
-            setServices(svcs);
-            setFavorites(favs);
-            if (tenant) setLoyaltySettings(tenant.settings as any);
-        }).finally(() => setLoading(false));
-    }, [tenantId]);
+        ])
+            .then(([nextAppointments, nextServices, nextFavorites]) => {
+                if (cancelled) return;
+                setAppointments(nextAppointments);
+                setServices(nextServices);
+                setFavorites(nextFavorites);
+            })
+            .catch(() => {
+                if (!cancelled) setLoadError('No pudimos cargar tus clientas. Recarga la página.');
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
 
-    // Derived: does a client qualify for a loyalty reward right now?
-    const getLoyaltyStatus = useCallback((client: Client) => {
-        const loyalty = loyaltySettings?.loyalty;
-        if (!loyalty?.enabled) return null;
-        const required = loyalty.visits_required ?? 5;
-        if (client.visits < required) return null;
-        const multiples = Math.floor(client.visits / required);
-        return {
-            multiples,
-            rewardType: loyalty.reward_type,
-            discountValue: loyalty.discount_value,
+        return () => {
+            cancelled = true;
         };
-    }, [loyaltySettings]);
+    }, [tenant]);
 
-    const getServiceName = useCallback((id: string, apt?: Appointment) => {
-        const svc = services.find(s => s.id === id);
-        if (svc) return svc.name;
-        if (apt?.service_name) return apt.service_name;
-        return 'Servicio';
-    }, [services]);
+    const clients = useMemo(
+        () => buildClients({ appointments, services, favorites }),
+        [appointments, services, favorites]
+    );
 
-    const getServicePrice = useCallback((id: string, apt?: Appointment) => {
-        const svc = services.find(s => s.id === id);
-        if (svc) return Number(svc.estimated_price) || 0;
-        if (apt?.service_price) return Number(apt.service_price) || 0;
-        if (apt?.price) return Number(apt.price) || 0;
-        return 0;
-    }, [services]);
-
-    const clients: Client[] = useMemo(() => {
-        const map = new Map<string, Client>();
-        appointments.forEach(apt => {
-            // Key by phone primarily, also check email for merging
-            const key = apt.client_phone;
-            const existing = map.get(key);
-            const svcName = getServiceName(apt.service_id, apt);
-            const svcPrice = getServicePrice(apt.service_id, apt);
-
-            if (existing) {
-                existing.visits += 1;
-                existing.totalSpent = Number(existing.totalSpent) + svcPrice;
-                if (apt.datetime_start > existing.lastVisit) {
-                    existing.lastVisit = apt.datetime_start;
-                    existing.lastService = svcName;
-                }
-                if (!existing.services.includes(svcName)) existing.services.push(svcName);
-                // Merge email
-                if (apt.client_email && !existing.email) {
-                    existing.email = apt.client_email;
-                }
-            } else {
-                // Check if same email exists under a different phone
-                let merged = false;
-                if (apt.client_email) {
-                    for (const [, client] of map) {
-                        if (client.email === apt.client_email) {
-                            client.visits += 1;
-                            client.totalSpent = Number(client.totalSpent) + svcPrice;
-                            if (apt.datetime_start > client.lastVisit) {
-                                client.lastVisit = apt.datetime_start;
-                                client.lastService = svcName;
-                            }
-                            if (!client.services.includes(svcName)) client.services.push(svcName);
-                            merged = true;
-                            break;
-                        }
-                    }
-                }
-                if (!merged) {
-                    const extras = MOCK_CLIENT_EXTRAS[apt.client_phone] || {};
-                    map.set(key, {
-                        name: apt.client_name,
-                        phone: apt.client_phone,
-                        email: apt.client_email,
-                        visits: 1,
-                        lastVisit: apt.datetime_start,
-                        lastService: svcName,
-                        totalSpent: svcPrice,
-                        services: [svcName],
-                        preferences: extras.preferences,
-                        allergies: extras.allergies,
-                        favorite: favorites.has(apt.client_phone),
-                    });
-                }
-            }
-        });
-        // Apply favorite flag
-        const result = Array.from(map.values());
-        result.forEach(c => { c.favorite = favorites.has(c.phone); });
-        return result;
-    }, [appointments, getServiceName, getServicePrice, favorites]);
+    const loyalty = tenant?.settings?.loyalty;
+    const getLoyaltyStatus = useCallback(
+        (client: Client) => loyaltyStatusFor(client, loyalty),
+        [loyalty]
+    );
 
     const filtered = useMemo(() => {
         let list = clients;
-        if (search) {
-            const q = search.toLowerCase();
-            list = list.filter(c =>
-                c.name.toLowerCase().includes(q) || c.phone.includes(q) || (c.email || '').toLowerCase().includes(q)
+
+        if (search.trim()) {
+            const query = search.trim().toLowerCase();
+            list = list.filter(
+                client =>
+                    client.name.toLowerCase().includes(query) ||
+                    client.phone.includes(query) ||
+                    (client.email ?? '').toLowerCase().includes(query)
             );
         }
-        if (activeTab === 'recientes') {
-            list = list.slice().sort((a, b) => (a.lastVisit > b.lastVisit ? -1 : 1)).slice(0, 5);
-        }
-        if (activeTab === 'favoritas') {
-            list = list.filter(c => c.favorite);
-        }
+
+        if (activeTab === 'recientes') list = list.slice(0, 5);
+        if (activeTab === 'favoritas') list = list.filter(client => client.favorite);
+
         return list;
     }, [clients, search, activeTab]);
 
+    /**
+     * Optimistic: the star flips immediately and reverts if the write fails.
+     * Waiting on the round trip made the control feel broken on a slow network.
+     */
     const toggleFavorite = async (client: Client) => {
-        if (!tenantId) return;
-        const newState = !client.favorite;
+        const next = !client.favorite;
+
+        setFavorites(current => {
+            const updated = new Set(current);
+            if (next) updated.add(client.phone);
+            else updated.delete(client.phone);
+            return updated;
+        });
+
         try {
-            await api.setFavorite(client.phone, newState);
-            setFavorites(prev => {
-                const next = new Set(prev);
-                if (newState) next.add(client.phone);
-                else next.delete(client.phone);
-                return next;
+            await api.setFavorite(client.phone, next);
+        } catch {
+            setFavorites(current => {
+                const reverted = new Set(current);
+                if (next) reverted.delete(client.phone);
+                else reverted.add(client.phone);
+                return reverted;
             });
-        } catch (e) {
-            console.error('Error toggling favorite:', e);
         }
     };
 
-    const formatDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '');
-    };
-
-    const _formatFullDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
-    };
-
-    // Get all appointments for a client (for history modal)
-    const getClientHistory = (client: Client) => {
-        return appointments
-            .filter(apt => apt.client_phone === client.phone || (client.email && apt.client_email === client.email))
-            .sort((a, b) => new Date(b.datetime_start).getTime() - new Date(a.datetime_start).getTime());
-    };
+    const getClientHistory = useCallback(
+        (client: Client) =>
+            appointments
+                .filter(appointment => appointment.client_phone === client.phone)
+                .sort((a, b) => b.datetime_start.localeCompare(a.datetime_start)),
+        [appointments]
+    );
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-pink-light border-t-pink rounded-full animate-spin" />
+            <div className="space-y-3 p-6" aria-busy="true" aria-label="Cargando clientas">
+                {Array.from({ length: 5 }, (_, index) => (
+                    <div key={index} className="skeleton h-24 w-full" />
+                ))}
             </div>
         );
     }
 
+    if (loadError) {
+        return (
+            <p role="alert" className="m-6 rounded-2xl border border-danger/30 bg-danger/10 p-6 text-center text-sm text-danger">
+                {loadError}
+            </p>
+        );
+    }
+
     return (
-        <div className="relative min-h-full pb-24" style={{ background: 'var(--cream)' }}>
+        <div className="relative min-h-full pb-24" >
             {/* Header */}
             <div className="px-6 pt-8 pb-0">
                 <div className="flex items-center justify-center mb-4">
@@ -207,7 +154,10 @@ export default function ClientsPage() {
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <span className="material-symbol text-aesthetic-muted/60 text-xl font-light">search</span>
                     </div>
+                    <label htmlFor="client-search" className="sr-only">Buscar clienta</label>
                     <input
+                        id="client-search"
+                        type="search"
                         className="block w-full pl-11 pr-4 py-3.5 bg-aesthetic-soft-pink/40 border-none rounded-full focus:ring-1 focus:ring-aesthetic-pink/30 placeholder:text-aesthetic-muted/50 text-base font-display italic"
                         placeholder="Buscar clienta..."
                         value={search}
@@ -222,10 +172,11 @@ export default function ClientsPage() {
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
+                        aria-pressed={activeTab === tab}
                         className={`pill-tab ${activeTab === tab ? 'pill-tab-active' : 'pill-tab-inactive'}`}
                     >
-                        {tab === 'favoritas' && <span className="material-symbol text-sm mr-1">star</span>}
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        {tab === 'favoritas' && <span className="material-symbol text-sm mr-1" aria-hidden="true">star</span>}
+                        {TAB_LABELS[tab]}
                     </button>
                 ))}
             </div>
@@ -233,20 +184,24 @@ export default function ClientsPage() {
             {/* Client list */}
             <div className="px-6 mt-5 space-y-3 stagger-children">
                 {filtered.map(client => {
-                    const initials = client.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
                     const expanded = expandedPhone === client.phone;
                     const loyaltyStatus = getLoyaltyStatus(client);
+                    const hasReward = Boolean(loyaltyStatus && loyaltyStatus.rewards > 0);
+                    const whatsapp = whatsappLink(
+                        client.phone,
+                        `¡Hola ${client.name}! Te escribimos de ${tenant?.name ?? 'tu salón'}.`
+                    );
 
                     return (
                         <div key={client.phone} className="bg-white/60 backdrop-blur-sm rounded-3xl overflow-hidden border border-aesthetic-accent transition-all duration-300 hover:shadow-minimal">
                             {/* Loyalty reward banner (collapsed) */}
-                            {loyaltyStatus && (
+                            {hasReward && (
                                 <div className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-yellow-200">
                                     <span className="text-lg">🎁</span>
                                     <p className="text-[10px] tracking-[0.2em] uppercase font-bold text-amber-700">
-                                        {loyaltyStatus.rewardType === 'free_service'
-                                            ? `¡Premio listo! Servicio gratis acumulado`
-                                            : `¡Premio listo! ${loyaltyStatus.discountValue}% de descuento acumulado`
+                                        {loyaltyStatus!.rewardType === 'free_service'
+                                            ? '¡Premio listo! Servicio gratis acumulado'
+                                            : `¡Premio listo! ${loyaltyStatus!.discountValue}% de descuento acumulado`
                                         }
                                     </p>
                                 </div>
@@ -258,7 +213,7 @@ export default function ClientsPage() {
                             >
                                 {/* Avatar */}
                                 <div className="size-14 rounded-full flex items-center justify-center flex-shrink-0 text-base font-bold font-display italic border border-aesthetic-accent shadow-sm bg-aesthetic-soft-pink text-aesthetic-taupe">
-                                    {initials}
+                                    {initials(client.name)}
                                 </div>
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
@@ -269,14 +224,16 @@ export default function ClientsPage() {
                                         )}
                                     </div>
                                     <p className="text-xs text-aesthetic-muted/80 mt-1 font-display italic">
-                                        Ult: {formatDate(client.lastVisit)} • <span className="opacity-60">{client.lastService || 'Servicio'}</span>
+                                        Últ: {client.lastVisit ? formatShortDate(client.lastVisit) : 'Sin visitas'} • <span className="opacity-60">{client.lastService || 'Servicio'}</span>
                                         {client.visits > 1 && <span className="ml-2 opacity-40">({client.visits} visitas)</span>}
                                     </p>
                                 </div>
                                 {/* Star + Chevron */}
                                 <div className="flex items-center gap-2">
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); toggleFavorite(client); }}
+                                        onClick={(e) => { e.stopPropagation(); void toggleFavorite(client); }}
+                                        aria-label={client.favorite ? `Quitar a ${client.name} de favoritas` : `Marcar a ${client.name} como favorita`}
+                                        aria-pressed={client.favorite}
                                         className="size-9 rounded-full flex items-center justify-center hover:bg-aesthetic-soft-pink/40 transition-colors"
                                     >
                                         <span className={`material-symbol text-xl ${client.favorite ? 'text-yellow-400' : 'text-aesthetic-muted/30'}`}>
@@ -293,37 +250,20 @@ export default function ClientsPage() {
                             {expanded && (
                                 <div className="px-6 pb-6 border-t border-aesthetic-accent/30 pt-4 space-y-6 animate-fade-in">
                                     {/* Loyalty reward detail block */}
-                                    {loyaltyStatus && (
+                                    {hasReward && (
                                         <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-yellow-200">
                                             <span className="text-2xl mt-0.5">🎁</span>
                                             <div>
                                                 <p className="text-[10px] tracking-[0.25em] uppercase font-bold text-amber-700 mb-1">Premio de Fidelidad Listo</p>
                                                 <p className="text-sm text-amber-800 font-display italic">
-                                                    {loyaltyStatus.rewardType === 'free_service'
-                                                        ? `Esta clienta ha acumulado ${loyaltyStatus.multiples > 1 ? `${loyaltyStatus.multiples}x` : ''} un servicio gratis. ¡Es momento de recompensarla!`
-                                                        : `Esta clienta merece un ${loyaltyStatus.discountValue}% de descuento en su próxima visita.`
+                                                    {loyaltyStatus!.rewardType === 'free_service'
+                                                        ? `Esta clienta ha acumulado ${loyaltyStatus!.rewards > 1 ? `${loyaltyStatus!.rewards}x ` : ''}un servicio gratis. ¡Es momento de recompensarla!`
+                                                        : `Esta clienta merece un ${loyaltyStatus!.discountValue}% de descuento en su próxima visita.`
                                                     }
                                                 </p>
                                             </div>
                                         </div>
                                     )}
-                                    {client.preferences && (
-                                        <div>
-                                            <p className="text-[9px] tracking-[0.3em] text-aesthetic-muted/60 uppercase font-bold mb-2 ml-1">Preferencias</p>
-                                            <div className="bg-aesthetic-soft-pink/20 rounded-2xl p-4 border border-aesthetic-accent/20">
-                                                <p className="italic text-aesthetic-taupe text-sm leading-relaxed font-display">&ldquo;{client.preferences}&rdquo;</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {client.allergies && (
-                                        <div className="flex items-center gap-2.5 px-3 py-2 bg-red-50 rounded-xl border border-red-100">
-                                            <span className="material-symbol text-red-400 text-lg">warning</span>
-                                            <p className="text-[10px] tracking-[0.2em] uppercase font-bold text-red-500 font-display italic">
-                                                ALERGIA: {client.allergies}
-                                            </p>
-                                        </div>
-                                    )}
-
                                     {/* Contact info */}
                                     <div className="flex flex-wrap gap-3 text-xs text-aesthetic-muted">
                                         <span className="flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 border border-aesthetic-accent/20">
@@ -344,11 +284,11 @@ export default function ClientsPage() {
                                             <p className="text-[8px] tracking-[0.2em] text-aesthetic-muted uppercase font-bold">Visitas</p>
                                         </div>
                                         <div className="bg-white border border-aesthetic-accent rounded-2xl p-4 text-center shadow-sm">
-                                            <p className="font-display text-2xl font-light italic text-aesthetic-taupe mb-1">${client.totalSpent}</p>
+                                            <p className="font-display text-2xl font-light italic text-aesthetic-taupe mb-1">{formatMoney(client.totalSpent, tenant?.settings?.currency)}</p>
                                             <p className="text-[8px] tracking-[0.2em] text-aesthetic-muted uppercase font-bold">Inversión</p>
                                         </div>
                                         <div className="bg-white border border-aesthetic-accent rounded-2xl p-4 text-center shadow-sm">
-                                            <p className="font-display text-2xl font-light italic text-aesthetic-taupe mb-1">${client.visits > 0 ? Math.round(client.totalSpent / client.visits) : 0}</p>
+                                            <p className="font-display text-2xl font-light italic text-aesthetic-taupe mb-1">{formatMoney(client.visits > 0 ? client.totalSpent / client.visits : 0, tenant?.settings?.currency)}</p>
                                             <p className="text-[8px] tracking-[0.2em] text-aesthetic-muted uppercase font-bold">Ticket Prom.</p>
                                         </div>
                                     </div>
@@ -360,9 +300,17 @@ export default function ClientsPage() {
                                         >
                                             Ver Historial
                                         </button>
-                                        <button className="size-12 rounded-full border border-aesthetic-accent flex items-center justify-center text-aesthetic-muted hover:bg-aesthetic-soft-pink/40 transition-all">
-                                            <span className="material-symbol text-xl">call</span>
-                                        </button>
+                                        {whatsapp && (
+                                            <a
+                                                href={whatsapp}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                aria-label={`Escribir por WhatsApp a ${client.name}`}
+                                                className="size-12 rounded-full border border-aesthetic-accent flex items-center justify-center text-aesthetic-muted hover:bg-aesthetic-soft-pink/40 transition-all"
+                                            >
+                                                <span className="material-symbol text-xl" aria-hidden="true">chat</span>
+                                            </a>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -404,29 +352,26 @@ export default function ClientsPage() {
 
                         {/* Scrollable history list */}
                         <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-3 custom-scrollbar">
-                            {getClientHistory(historyClient).map((apt, idx) => {
-                                const svc = services.find(s => s.id === apt.service_id);
-                                const startDate = new Date(apt.datetime_start);
-                                const dateStr = startDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
-                                const timeStr = startDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
-                                const statusLabels: Record<string, { label: string; color: string }> = {
-                                    confirmed: { label: 'Confirmada', color: '#C97794' },
-                                    completed: { label: 'Completada', color: '#88C999' },
-                                    pending_payment: { label: 'Pendiente', color: '#AB937D' },
-                                    cancelled: { label: 'Cancelada', color: '#999' },
-                                };
-                                const s = statusLabels[apt.status] || statusLabels.pending_payment;
+                            {getClientHistory(historyClient).map(apt => {
+                                const service = services.find(item => item.id === apt.service_id);
+                                const presentation = STATUS_PRESENTATION[apt.status];
 
                                 return (
-                                    <div key={apt.id || idx} className="bg-white rounded-2xl p-5 border border-aesthetic-accent/20 shadow-sm">
+                                    <div key={apt.id} className="bg-white rounded-2xl p-5 border border-aesthetic-accent/20 shadow-sm">
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1 min-w-0">
-                                                <p className="font-display text-lg italic text-aesthetic-taupe truncate">{svc?.name || 'Servicio'}</p>
-                                                <p className="text-xs text-aesthetic-muted mt-1 capitalize">{dateStr} • {timeStr}</p>
+                                                <p className="font-display text-lg italic text-aesthetic-taupe truncate">
+                                                    {apt.service_name ?? service?.name ?? 'Servicio'}
+                                                </p>
+                                                <p className="text-xs text-aesthetic-muted mt-1 capitalize">
+                                                    {formatDate(apt.datetime_start)} • {formatTime(apt.datetime_start)}
+                                                </p>
                                             </div>
-                                            <div className="text-right flex-shrink-0">
-                                                <p className="font-semibold text-aesthetic-taupe">${svc?.estimated_price || 0}</p>
-                                                <span className="text-[9px] tracking-[0.15em] uppercase font-bold" style={{ color: s.color }}>{s.label}</span>
+                                            <div className="text-right flex-shrink-0 space-y-1">
+                                                <p className="font-semibold text-aesthetic-taupe">
+                                                    {formatMoney(apt.price, tenant?.settings?.currency)}
+                                                </p>
+                                                <span className="status-pill" data-status={presentation.token}>{presentation.label}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -447,11 +392,12 @@ export default function ClientsPage() {
                                 </div>
                                 <div className="flex justify-between text-sm mt-2">
                                     <span className="text-aesthetic-muted">Total invertido</span>
-                                    <span className="font-semibold text-aesthetic-taupe">${historyClient.totalSpent}</span>
+                                    <span className="font-semibold text-aesthetic-taupe">{formatMoney(historyClient.totalSpent, tenant?.settings?.currency)}</span>
                                 </div>
                                 {/* Loyalty status in modal */}
-                                {getLoyaltyStatus(historyClient) && (() => {
-                                    const ls = getLoyaltyStatus(historyClient)!;
+                                {(() => {
+                                    const ls = getLoyaltyStatus(historyClient);
+                                    if (!ls || ls.rewards === 0) return null;
                                     return (
                                         <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-2">
                                             <span className="text-xl">🎁</span>

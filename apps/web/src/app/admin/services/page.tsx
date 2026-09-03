@@ -5,7 +5,8 @@ import { Service } from '@/lib/types';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import { useTenant } from '@/lib/tenant-context';
+import { useSession } from '@/lib/session-context';
+import { formatMoney } from '@/lib/format';
 
 export default function ServicesPage() {
     const [services, setServices] = useState<Service[]>([]);
@@ -14,14 +15,28 @@ export default function ServicesPage() {
     const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    const { tenantId } = useTenant();
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const { tenant } = useSession();
 
     useEffect(() => {
-        if (!tenantId) return;
+        if (!tenant) return;
+        let cancelled = false;
+
         api.getServices()
-            .then(setServices)
-            .finally(() => setLoading(false));
-    }, [tenantId]);
+            .then(next => {
+                if (!cancelled) setServices(next);
+            })
+            .catch(() => {
+                if (!cancelled) setLoadError('No pudimos cargar tu catálogo. Recarga la página.');
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [tenant]);
 
     const filtered = services.filter(s =>
         !search || s.name.toLowerCase().includes(search.toLowerCase())
@@ -34,15 +49,19 @@ export default function ServicesPage() {
         return acc;
     }, {} as Record<string, Service[]>);
 
-    const handleDelete = async () => {
-        if (!deleteTarget || !tenantId) return;
+    /**
+     * Retires the service rather than deleting it, so past appointments keep
+     * the name and price they were booked at.
+     */
+    const handleArchive = async () => {
+        if (!deleteTarget) return;
         setDeleting(true);
         try {
-            await api.deleteService(deleteTarget.id);
-            setServices(prev => prev.filter(s => s.id !== deleteTarget.id));
+            await api.archiveService(deleteTarget.id);
+            setServices(current => current.filter(service => service.id !== deleteTarget.id));
             setDeleteTarget(null);
-        } catch (e) {
-            console.error('Error deleting service:', e);
+        } catch {
+            setLoadError('No pudimos archivar el servicio. Intenta de nuevo.');
         } finally {
             setDeleting(false);
         }
@@ -50,14 +69,22 @@ export default function ServicesPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-aesthetic-accent border-t-aesthetic-pink rounded-full animate-spin" />
+            <div className="space-y-3 p-6" aria-busy="true" aria-label="Cargando servicios">
+                {Array.from({ length: 4 }, (_, index) => (
+                    <div key={index} className="skeleton h-20 w-full" />
+                ))}
             </div>
         );
     }
 
     return (
-        <div className="relative min-h-full pb-24" style={{ background: 'var(--cream)' }}>
+        <div className="relative min-h-full pb-24">
+            {loadError && (
+                <p role="alert" className="mx-6 mt-6 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+                    {loadError}
+                </p>
+            )}
+
             {/* Header */}
             <div className="px-6 pt-8 pb-0">
                 <p className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase mb-2 font-display italic font-medium">Gestión del Catálogo</p>
@@ -79,7 +106,10 @@ export default function ServicesPage() {
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <span className="material-symbol text-aesthetic-muted/60 text-xl">search</span>
                     </div>
+                    <label htmlFor="service-search" className="sr-only">Buscar servicio</label>
                     <input
+                        id="service-search"
+                        type="search"
                         className="block w-full pl-11 pr-4 py-3.5 bg-aesthetic-soft-pink/40 border-none rounded-full focus:ring-1 focus:ring-aesthetic-pink/30 placeholder:text-aesthetic-muted/50 text-base font-display italic"
                         placeholder="Buscar servicio..."
                         value={search}
@@ -100,8 +130,8 @@ export default function ServicesPage() {
                                     <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-aesthetic-cream/30 border border-aesthetic-accent/20">
                                         {service.image_url && service.image_url.trim() !== '' ? (
                                             <img
-                                                src={api.getPublicUrl(service.image_url)}
-                                                alt={service.name}
+                                                src={api.getImageUrl(service.image_url)}
+                                                alt=""
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {
                                                     const target = e.target as HTMLImageElement;
@@ -118,9 +148,6 @@ export default function ServicesPage() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <p className="font-semibold text-aesthetic-taupe text-[15px] truncate">{service.name}</p>
-                                            {service.is_package && (
-                                                <span className="text-[7px] tracking-widest uppercase font-bold px-1.5 py-0.5 rounded bg-aesthetic-pink text-white">Paquete</span>
-                                            )}
                                         </div>
                                         <div className="flex items-center gap-3 mt-1">
                                             <span className="text-xs text-aesthetic-muted flex items-center gap-1">
@@ -128,7 +155,7 @@ export default function ServicesPage() {
                                                 {service.duration_minutes === 0 ? 'Varía' : `${service.duration_minutes} min`}
                                             </span>
                                             <span className="text-xs font-semibold text-aesthetic-taupe">
-                                                {service.estimated_price > 0 ? `$${service.estimated_price}` : `Desde $${service.required_advance}`}
+                                                {formatMoney(service.estimated_price, tenant?.settings?.currency)}
                                             </span>
                                         </div>
                                     </div>
@@ -139,9 +166,10 @@ export default function ServicesPage() {
                                         </Link>
                                         <button
                                             onClick={() => setDeleteTarget(service)}
-                                            className="size-10 flex items-center justify-center rounded-xl bg-red-50 text-red-300 hover:bg-red-100 hover:text-red-500 transition-colors duration-300"
+                                            aria-label={`Archivar ${service.name}`}
+                                            className="size-10 flex items-center justify-center rounded-xl bg-danger/10 text-danger/70 hover:bg-danger/20 hover:text-danger transition-colors duration-300"
                                         >
-                                            <span className="material-symbol text-lg font-light">delete</span>
+                                            <span className="material-symbol text-lg font-light" aria-hidden="true">archive</span>
                                         </button>
                                     </div>
                                 </div>
@@ -157,25 +185,21 @@ export default function ServicesPage() {
                 )}
             </div>
 
-            {/* FAB */}
-            <Link href="/admin/services/new" className="fixed bottom-32 right-6 size-14 bg-aesthetic-pink text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-30">
-                <span className="material-symbol text-3xl font-light">add</span>
-            </Link>
-
             {/* Delete Confirmation Modal */}
             {deleteTarget && (
                 <div className="fixed inset-0 bg-aesthetic-taupe/40 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-fade-in" onClick={() => !deleting && setDeleteTarget(null)}>
                     <div className="bg-aesthetic-cream rounded-[2.5rem] p-10 w-full max-w-sm shadow-2xl relative border border-white/50 text-center" onClick={e => e.stopPropagation()}>
                         {/* Decorative */}
-                        <div className="absolute top-0 right-0 size-32 bg-red-100/30 blur-3xl rounded-full -mr-16 -mt-16" />
+                        <div className="absolute top-0 right-0 size-32 bg-danger/10 blur-3xl rounded-full -mr-16 -mt-16" />
 
                         <div className="relative">
-                            <div className="size-16 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mx-auto mb-6">
-                                <span className="material-symbol text-red-400 text-3xl">delete_forever</span>
+                            <div className="size-16 rounded-full bg-danger/10 border border-danger/20 flex items-center justify-center mx-auto mb-6">
+                                <span className="material-symbol text-danger text-3xl" aria-hidden="true">archive</span>
                             </div>
-                            <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-3">¿Eliminar Servicio?</h3>
+                            <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-3">¿Archivar servicio?</h3>
                             <p className="text-sm text-aesthetic-muted mb-8 leading-relaxed">
-                                Se eliminará <strong className="text-aesthetic-taupe">&ldquo;{deleteTarget.name}&rdquo;</strong> permanentemente. Esta acción no se puede deshacer.
+                                <strong className="text-aesthetic-taupe">&ldquo;{deleteTarget.name}&rdquo;</strong> dejará de aparecer
+                                en tu página de reservas. Las citas pasadas conservan su nombre y precio.
                             </p>
 
                             <div className="flex gap-3">
@@ -187,14 +211,14 @@ export default function ServicesPage() {
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={handleDelete}
+                                    onClick={handleArchive}
                                     disabled={deleting}
-                                    className="flex-1 py-4 rounded-full bg-red-500 text-white text-[10px] tracking-[0.2em] uppercase font-bold shadow-minimal hover:bg-red-600 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                                    className="flex-1 py-4 rounded-full bg-danger text-white text-[10px] tracking-[0.2em] uppercase font-bold shadow-minimal transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
                                     {deleting ? (
                                         <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     ) : (
-                                        'Eliminar'
+                                        'Archivar'
                                     )}
                                 </button>
                             </div>

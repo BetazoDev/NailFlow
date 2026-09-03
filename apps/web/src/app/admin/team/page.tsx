@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { Staff } from '@/lib/types';
-import { useTenant } from '@/lib/tenant-context';
+import { useSession } from '@/lib/session-context';
 
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -22,24 +22,39 @@ export default function TeamPage() {
     const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
     const [newPhotoPreview, setNewPhotoPreview] = useState<string | undefined>(undefined);
     const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const photoInputRef = useRef<HTMLInputElement>(null);
 
-    const { tenantId, domain } = useTenant();
+    const { tenant } = useSession();
+    const domain = tenant?.domain ?? null;
 
     useEffect(() => {
-        if (!tenantId) return;
-        api.getStaff()
-            .then(data => {
-                if (data.length > 0) setTeam(data);
-            })
-            .finally(() => setLoading(false));
-    }, [tenantId]);
+        if (!tenant) return;
+        let cancelled = false;
 
+        // The full list, including inactive members and their emails — the
+        // public `/staff` endpoint withholds both.
+        api.getTeam()
+            .then(members => {
+                if (!cancelled) setTeam(members);
+            })
+            .catch(() => {
+                if (!cancelled) setSaveError('No pudimos cargar tu equipo. Recarga la página.');
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [tenant]);
+
+    /** The owner books at the salon's root URL; staff get `/book/<slug>` (spec §5). */
     const getStaffUrl = (member: Staff) => {
-        const slug = member.slug || member.name.toLowerCase().replace(/\s+/g, '-');
-        const baseDomain = domain && domain.includes('.') ? domain : `${domain}.nailflow.app`;
-        // Dirección/owner: root domain. Staff: /book/slug
-        return member.role === 'owner'
+        const slug = member.slug ?? '';
+        const baseDomain = domain ?? '';
+        return member.role === 'owner' || !slug
             ? { href: `https://${baseDomain}`, text: baseDomain }
             : { href: `https://${baseDomain}/book/${slug}`, text: `${baseDomain}/book/${slug}` };
     };
@@ -78,12 +93,13 @@ export default function TeamPage() {
     };
 
     const handleSaveMember = async () => {
-        if (!newName.trim() || !tenantId) return;
+        if (!newName.trim()) return;
+        setSaveError(null);
         setSaving(true);
         try {
-            let photoUrl = editingMember?.photo_url || '';
+            let photoUrl = editingMember?.photo_url ?? null;
             if (newPhotoFile) {
-                photoUrl = await api.uploadImage(tenantId, 'team', newPhotoFile);
+                photoUrl = await api.uploadImage(newPhotoFile, 'team');
             }
 
             if (editingMember) {
@@ -94,7 +110,7 @@ export default function TeamPage() {
                     role: newRole,
                     bio: newSpecialty.trim(),
                     specialty: newSpecialty.trim(),
-                    photo_url: photoUrl,
+                    photo_url: photoUrl ?? undefined,
                     slug: newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
                 };
                 await api.updateStaffMember(editingMember.id, updatedData);
@@ -102,13 +118,12 @@ export default function TeamPage() {
             } else {
                 // Add new member
                 const staffData = await api.createStaffMember({
-                    tenant_id: tenantId,
                     name: newName.trim(),
                     email: newEmail.trim(),
                     role: newRole,
                     bio: newSpecialty.trim(),
                     specialty: newSpecialty.trim(),
-                    photo_url: photoUrl,
+                    photo_url: photoUrl ?? undefined,
                     active: true,
                     services_offered: [],
                     weekly_schedule: [],
@@ -122,10 +137,12 @@ export default function TeamPage() {
 
             resetForm();
             setShowAddModal(false);
-        } catch (e: any) {
-            console.error('Error saving staff member:', e);
-            const errorMsg = e.details || e.message || 'Error desconocido';
-            alert('Error al guardar: ' + errorMsg);
+        } catch (caught) {
+            // An inline message rather than `alert()`: a modal dialog is a poor
+            // fit for a validation failure the owner has to act on in the form.
+            setSaveError(
+                caught instanceof ApiError ? caught.message : 'No pudimos guardar. Intenta de nuevo.'
+            );
         } finally {
             setSaving(false);
         }
@@ -186,7 +203,7 @@ export default function TeamPage() {
                                             <div className="flex items-center gap-4">
                                                 <div className="size-12 rounded-full flex items-center justify-center text-sm font-display italic bg-white border border-aesthetic-accent text-aesthetic-taupe shadow-minimal transition-transform group-hover:scale-110 overflow-hidden">
                                                     {member.photo_url ? (
-                                                        <img src={api.getPublicUrl(member.photo_url)} alt={member.name} className="w-full h-full object-cover" />
+                                                        <img src={api.getImageUrl(member.photo_url)} alt={member.name} className="w-full h-full object-cover" />
                                                     ) : initials}
                                                 </div>
                                                 <div>
@@ -261,7 +278,7 @@ export default function TeamPage() {
                             <div className="flex items-center gap-5 mb-4">
                                 <div className="size-16 rounded-full flex items-center justify-center text-lg font-display italic bg-aesthetic-cream border-2 border-white shadow-soft text-aesthetic-taupe overflow-hidden">
                                     {member.photo_url ? (
-                                        <img src={api.getPublicUrl(member.photo_url)} alt={member.name} className="w-full h-full object-cover" />
+                                        <img src={api.getImageUrl(member.photo_url)} alt={member.name} className="w-full h-full object-cover" />
                                     ) : initials}
                                 </div>
                                 <div className="flex-1">
@@ -352,7 +369,7 @@ export default function TeamPage() {
                                     onClick={() => photoInputRef.current?.click()}
                                 >
                                     {newPhotoPreview ? (
-                                        <img src={api.getPublicUrl(newPhotoPreview)} alt="preview" className="w-full h-full object-cover" />
+                                        <img src={api.getImageUrl(newPhotoPreview)} alt="preview" className="w-full h-full object-cover" />
                                     ) : (
                                         <span className="material-symbol text-3xl text-aesthetic-muted/30">add_a_photo</span>
                                     )}
@@ -416,6 +433,12 @@ export default function TeamPage() {
                                 </div>
                             </div>
 
+                            {saveError && (
+                                <p role="alert" className="mt-4 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+                                    {saveError}
+                                </p>
+                            )}
+
                             <button
                                 onClick={handleSaveMember}
                                 disabled={saving || !newName.trim()}
@@ -426,7 +449,7 @@ export default function TeamPage() {
                                 ) : (
                                     <>
                                         {editingMember ? 'GUARDAR CAMBIOS' : 'AGREGAR MIEMBRO'}
-                                        <span className="material-symbol text-base group-hover:translate-x-2 transition-transform">arrow_forward</span>
+                                        <span className="material-symbol text-base group-hover:translate-x-2 transition-transform" aria-hidden="true">arrow_forward</span>
                                     </>
                                 )}
                             </button>

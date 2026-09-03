@@ -1,46 +1,58 @@
 'use client';
 
-import { Service } from '@/lib/types';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import type { Service } from '@/lib/types';
+import { useBooking } from './BookingContext';
 
-interface ServiceStepProps {
-    selectedServiceIds: string[];
-    onToggle: (service: Service) => void;
-    onNext: () => void;
-    onBack: () => void;
-    tenantId?: string;
-}
+const ALL = 'All';
 
-export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBack, tenantId = 'demo' }: ServiceStepProps) {
+export default function ServiceStep() {
+    const { draft, totals, toggleService, goNext, goBack } = useBooking();
+
     const [services, setServices] = useState<Service[]>([]);
-    const [category, setCategory] = useState<string>('All');
+    const [category, setCategory] = useState<string>(ALL);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     useEffect(() => {
-        async function loadServices() {
-            try {
-                const data = await api.getServices();
-                setServices(data);
-            } catch (err) {
-                console.error('Failed to load services:', err);
-                setServices([]);
-            } finally {
-                setLoading(false);
-            }
-        }
-        loadServices();
-    }, [tenantId]);
+        let cancelled = false;
 
-    const categories = ['All', ...Array.from(new Set(services.map(s => s.category || 'Otros')))];
-    const filteredServices = category === 'All'
-        ? services
-        : services.filter(s => (s.category || 'Otros') === category);
+        api.getServices()
+            .then(data => {
+                if (!cancelled) setServices(data);
+            })
+            .catch(() => {
+                // Surface the failure instead of rendering an empty catalogue,
+                // which reads as "this salon offers nothing".
+                if (!cancelled) setLoadError('No pudimos cargar los servicios. Recarga la página.');
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const selectedServiceIds = draft.services.map(service => service.id);
+    const onToggle = toggleService;
+    const onNext = goNext;
+    const onBack = goBack;
+
+    const categories = useMemo(
+        () => [ALL, ...Array.from(new Set(services.map(service => service.category || 'Otros')))],
+        [services]
+    );
+
+    const filteredServices = useMemo(
+        () => (category === ALL ? services : services.filter(s => (s.category || 'Otros') === category)),
+        [services, category]
+    );
 
     const totalSelected = selectedServiceIds.length;
-    const totalPrice = services
-        .filter(s => selectedServiceIds.includes(s.id))
-        .reduce((sum, s) => sum + (Number(s.estimated_price) || 0), 0);
+    const totalPrice = totals.price;
 
     return (
         <div className="flex flex-col h-full relative" style={{ background: 'var(--cream)' }}>
@@ -92,6 +104,12 @@ export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBa
             </div>
 
             {/* Service list: Only this area scrolls */}
+            {loadError && (
+                <p role="alert" className="mx-6 mt-4 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-center text-sm text-danger">
+                    {loadError}
+                </p>
+            )}
+
             <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-6 scroll-smooth">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -123,7 +141,7 @@ export default function ServiceStep({ selectedServiceIds, onToggle, onNext, onBa
                                         {/* Image/Icon */}
                                         <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-inner flex-shrink-0">
                                             {service.image_url ? (
-                                                <img src={api.getPublicUrl(service.image_url)} alt={service.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                                <img src={api.getImageUrl(service.image_url)} alt={service.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                             ) : (
                                                 <div className="w-full h-full bg-pink-pale flex items-center justify-center text-3xl">💅</div>
                                             )}

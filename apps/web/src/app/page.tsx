@@ -1,35 +1,49 @@
-import { api } from '@/lib/api';
-import BookingWidget from '@/components/booking/BookingWidget';
 import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
+import { api } from '@/lib/api';
+import { requestDomain } from '@/lib/server';
+import BookingWidget from '@/components/booking/BookingWidget';
 
-export default async function RootPage() {
-  // Determine domain from headers or use default
-  const headersList = headers();
-  let domain = headersList.get('host') || 'demo.diabolicalservices.tech';
-  
-  if (domain.includes('localhost') || domain.includes('127.0.0.1')) {
-    domain = 'demo.diabolicalservices.tech';
-  }
+export const dynamic = 'force-dynamic';
 
-  const tenant = await api.getTenant(domain);
+/**
+ * The salon's public booking page.
+ *
+ * Which salon this is comes from the request's host, so one deployment serves
+ * every tenant's own domain without a per-tenant route.
+ */
+export default async function BookingPage() {
+    const domain = requestDomain();
+    const tenant = await api.getTenant(domain);
 
-  if (!tenant) {
-    notFound();
-  }
+    if (!tenant) notFound();
 
-  const allStaff = await api.getStaff();
-  const owner = allStaff.find(s => s.role === 'owner') || allStaff[0];
+    const staff = await api.getStaff(domain).catch(() => []);
+    const host = staff.find(member => member.role === 'owner') ?? staff[0];
 
-  return (
-    <div className="min-h-screen bg-cream selection:bg-pink-pale selection:text-charcoal relative">
-      <BookingWidget
-        tenant={tenant}
-        staffId={owner?.id}
-        staffName={owner?.name}
-        staffPhoto={owner?.photo_url}
-        skipSplash={false}
-      />
-    </div>
-  );
+    // No bookable staff means no agenda to show. Say so rather than rendering a
+    // wizard that cannot complete.
+    if (!host) {
+        return (
+            <main className="grid min-h-dvh place-items-center bg-surface px-6 text-center">
+                <div>
+                    <h1 className="mb-3 font-display text-3xl text-text-strong">
+                        {tenant.name ?? 'Este salón'} aún no está listo
+                    </h1>
+                    <p className="max-w-sm text-sm text-text-muted">
+                        Todavía no hay especialistas dados de alta, así que no podemos abrir la
+                        agenda. Vuelve pronto.
+                    </p>
+                </div>
+            </main>
+        );
+    }
+
+    return (
+        <BookingWidget
+            tenant={tenant}
+            staffId={host.id}
+            staffName={host.name}
+            staffPhoto={host.photo_url ?? undefined}
+        />
+    );
 }

@@ -1,41 +1,59 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useBooking } from './BookingContext';
 
-interface ImageUploadStepProps {
-    localPreviews: string[];
-    pendingFiles: File[];
-    onFilesChange: (files: File[], previews: string[]) => void;
-    onNext: () => void;
-    onBack: () => void;
-    staffName?: string;
-}
+/** Spec §5: reference photos are optional, and capped so uploads stay quick. */
+const MAX_FILES = 6;
+const MAX_BYTES = 8 * 1024 * 1024;
+const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 
-export default function ImageUploadStep({
-    localPreviews, pendingFiles, onFilesChange, onNext, onBack, staffName = 'Ana'
-}: ImageUploadStepProps) {
+export default function ImageUploadStep() {
+    const { pendingFiles, localPreviews, setFiles, goNext, goBack, draft } = useBooking();
     const fileRef = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
+    const [notice, setNotice] = useState<string | null>(null);
 
+    const staffName = draft.staffName;
+
+    /**
+     * Type and size are checked before the file is held in memory: the previous
+     * version accepted anything and only found out at upload time, after the
+     * client had already moved on.
+     */
     const addFiles = (fileList: FileList | null) => {
         if (!fileList) return;
-        const newFiles: File[] = [];
-        const newPreviews: string[] = [];
+
+        const accepted: File[] = [];
+        let rejected = 0;
+
         for (const file of Array.from(fileList)) {
-            if (!file.type.startsWith('image/')) continue;
-            newFiles.push(file);
-            newPreviews.push(URL.createObjectURL(file));
+            if (!ACCEPTED.includes(file.type) || file.size > MAX_BYTES) {
+                rejected += 1;
+                continue;
+            }
+            accepted.push(file);
         }
-        // Max 6 files per spec
-        const combined = [...pendingFiles, ...newFiles].slice(0, 6);
-        const combinedPreviews = [...localPreviews, ...newPreviews].slice(0, 6);
-        onFilesChange(combined, combinedPreviews);
+
+        const combined = [...pendingFiles, ...accepted].slice(0, MAX_FILES);
+        setFiles(combined);
+
+        if (rejected > 0) {
+            setNotice('Algunas fotos se omitieron: acepta JPG, PNG, WebP o AVIF de hasta 8 MB.');
+        } else if (pendingFiles.length + accepted.length > MAX_FILES) {
+            setNotice(`Solo podemos guardar ${MAX_FILES} fotos.`);
+        } else {
+            setNotice(null);
+        }
     };
 
-    const removeImage = (idx: number) => {
-        URL.revokeObjectURL(localPreviews[idx]);
-        onFilesChange(pendingFiles.filter((_, i) => i !== idx), localPreviews.filter((_, i) => i !== idx));
+    const removeImage = (index: number) => {
+        setFiles(pendingFiles.filter((_, i) => i !== index));
+        setNotice(null);
     };
+
+    const onNext = goNext;
+    const onBack = goBack;
 
     return (
         <div className="flex flex-col h-full relative" style={{ background: 'var(--cream)' }}>
@@ -65,6 +83,12 @@ export default function ImageUploadStep({
                     </h1>
                 </div>
             </div>
+
+            {notice && (
+                <p role="status" className="mx-6 mt-4 rounded-2xl border border-warning/30 bg-warning/10 p-3 text-center text-xs text-warning">
+                    {notice}
+                </p>
+            )}
 
             {/* Scrollable content areas */}
             <div className="flex-1 overflow-y-auto no-scrollbar scroll-smooth">

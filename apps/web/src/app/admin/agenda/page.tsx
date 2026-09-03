@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { useTenant } from '@/lib/tenant-context';
+import { useSession } from '@/lib/session-context';
+import { formatTime, whatsappLink } from '@/lib/format';
 import Lightbox from '@/components/ui/Lightbox';
 import type { Appointment, Service, Staff } from '@/lib/types';
 
@@ -38,7 +39,10 @@ function AppointmentDetail({ apt, service, staff, salonName, onClose, onComplete
     const balance = total - advance;
     const isPast = new Date() >= new Date(apt.datetime_start);
 
-    const waMessage = `¡Hola ${apt.client_name} bella! ✨ Te recordamos tu turno en ${salonName} este ${dateStr} a las ${timeStr} hs. ¡Nos encantaría dejar tus uñas increíbles! 💅✨ ¿Nos confirmas que vienes? 😊`;
+    const waLink = whatsappLink(
+        apt.client_phone,
+        `¡Hola ${apt.client_name}! Te recordamos tu cita en ${salonName} el ${dateStr} a las ${timeStr}. ¿Nos confirmas tu asistencia?`
+    );
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end animate-fade-in" onClick={onClose}>
@@ -98,14 +102,14 @@ function AppointmentDetail({ apt, service, staff, salonName, onClose, onComplete
                                         className="w-28 h-28 rounded-2xl overflow-hidden flex-shrink-0 cursor-zoom-in hover:scale-105 active:scale-95 transition-all"
                                         onClick={() => setLbIndex(idx)}
                                     >
-                                        <img src={api.getPublicUrl(url)} alt={`ref-${idx}`} className="w-full h-full object-cover" />
+                                        <img src={api.getImageUrl(url)} alt={`ref-${idx}`} className="w-full h-full object-cover" />
                                     </div>
                                 ))}
                             </div>
 
                             {lbIndex !== null && (
                                 <Lightbox
-                                    images={(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map(u => api.getPublicUrl(u))}
+                                    images={(apt.image_urls || (apt.image_url ? [apt.image_url] : [])).map(u => api.getImageUrl(u))}
                                     initialIndex={lbIndex}
                                     onClose={() => setLbIndex(null)}
                                 />
@@ -143,15 +147,21 @@ function AppointmentDetail({ apt, service, staff, salonName, onClose, onComplete
 
                 {/* Sticky Action Footer */}
                 <div className="px-6 pt-4 pb-12 bg-cream border-t border-aesthetic-accent/20 space-y-3">
-                    <a
-                        href={`https://wa.me/${apt.client_phone.replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-4 rounded-full font-display italic text-lg tracking-wide border border-aesthetic-pink/20 bg-aesthetic-soft-pink text-aesthetic-taupe flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-minimal active:scale-[0.98]"
-                    >
-                        <span className="material-symbol text-xl text-[#25D366]">chat</span>
-                        WhatsApp
-                    </a>
+                    {waLink ? (
+                        <a
+                            href={waLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-4 rounded-full font-display italic text-lg tracking-wide border border-aesthetic-pink/20 bg-aesthetic-soft-pink text-aesthetic-taupe flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-minimal active:scale-[0.98]"
+                        >
+                            <span className="material-symbol text-xl text-[#25D366]" aria-hidden="true">chat</span>
+                            WhatsApp
+                        </a>
+                    ) : (
+                        <p className="py-4 text-center text-xs uppercase tracking-widest text-aesthetic-muted">
+                            Sin teléfono registrado
+                        </p>
+                    )}
                     {apt.status !== 'completed' && apt.status !== 'cancelled' && (
                         <div className="w-full relative">
                             <button
@@ -298,25 +308,37 @@ export default function AgendaPage() {
     const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
     const [completing, setCompleting] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily');
-    const { tenantId } = useTenant();
-    const [salonName, setSalonName] = useState('NailFlow');
+    const { tenant } = useSession();
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const salonName = tenant?.name ?? 'NailFlow';
 
     useEffect(() => {
-        if (!tenantId) return;
-        Promise.all([
-            api.getAppointments(),
-            api.getServices(),
-            api.getStaff(),
-            api.getTenantById(tenantId)
-        ]).then(([apts, svcs, sl, tenant]) => {
-            setAppointments(apts);
-            setServices(svcs);
-            setStaffList(sl);
-            if (tenant && tenant.name) setSalonName(tenant.name);
-        }).finally(() => setLoading(false));
-    }, [tenantId]);
+        if (!tenant) return;
+        let cancelled = false;
 
-    const getService = useCallback((id: string) => services.find(s => s.id === id), [services]);
+        Promise.all([api.getAppointments(), api.getServices({ includeInactive: true }), api.getStaff()])
+            .then(([nextAppointments, nextServices, nextStaff]) => {
+                if (cancelled) return;
+                setAppointments(nextAppointments);
+                setServices(nextServices);
+                setStaffList(nextStaff);
+            })
+            .catch(() => {
+                if (!cancelled) setLoadError('No pudimos cargar tu agenda. Recarga la página.');
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [tenant]);
+
+    const getService = useCallback(
+        (id: string | null) => (id ? services.find(service => service.id === id) : undefined),
+        [services]
+    );
 
     const today = new Date();
 
@@ -328,16 +350,17 @@ export default function AgendaPage() {
         .sort((a, b) => new Date(a.datetime_start).getTime() - new Date(b.datetime_start).getTime());
 
     const handleComplete = async (apt: Appointment) => {
-        if (!tenantId) return;
         setCompleting(apt.id);
         try {
-            await api.completeAppointment(apt.id);
-            setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'completed' as const } : a));
+            await api.setAppointmentStatus(apt.id, 'completed');
+            setAppointments(current =>
+                current.map(item => (item.id === apt.id ? { ...item, status: 'completed' as const } : item))
+            );
             if (selectedApt?.id === apt.id) {
                 setSelectedApt({ ...selectedApt, status: 'completed' });
             }
-        } catch (e) {
-            console.error('Error completing appointment:', e);
+        } catch {
+            setLoadError('No pudimos completar la cita. Intenta de nuevo.');
         } finally {
             setCompleting(null);
         }
@@ -345,14 +368,22 @@ export default function AgendaPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center p-20">
-                <div className="size-10 border-2 border-aesthetic-accent border-t-aesthetic-pink rounded-full animate-spin" />
+            <div className="space-y-4 p-6" aria-busy="true" aria-label="Cargando agenda">
+                {Array.from({ length: 4 }, (_, index) => (
+                    <div key={index} className="skeleton h-28 w-full" />
+                ))}
             </div>
         );
     }
 
     return (
         <div className="relative min-h-full pb-32">
+            {loadError && (
+                <p role="alert" className="mx-6 mt-6 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+                    {loadError}
+                </p>
+            )}
+
             {/* Header */}
             <div className="px-6 pt-12 pb-4">
                 <div className="flex items-center justify-between mb-4">
@@ -457,7 +488,7 @@ export default function AgendaPage() {
                                 {dayAppointments.map((apt) => {
                                     const svc = getService(apt.service_id);
                                     const startDate = new Date(apt.datetime_start);
-                                    const timeStr = startDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+                                    const timeStr = formatTime(apt.datetime_start);
                                     const isCompleted = apt.status === 'completed';
                                     const isCompletable = apt.status === 'confirmed';
                                     const isPast = new Date() >= startDate;

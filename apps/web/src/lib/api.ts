@@ -1,290 +1,301 @@
-import { Tenant, Staff, Service, Appointment, BookingData, TimeSlot } from './types';
+import type {
+    Appointment,
+    AppointmentStatus,
+    CreateBookingRequest,
+    CreateBookingResponse,
+    Service,
+    Staff,
+    StaffRole,
+    Tenant,
+    TimeSlot,
+} from '@nailflow/shared';
 import { auth } from './firebase';
 
-let API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-nailflow.diabolicalservices.tech/api';
+/**
+ * Typed client for the NailFlow API.
+ *
+ * Every call goes through `request`, which attaches the tenant domain and — when
+ * someone is signed in — a fresh Firebase ID token. Response shapes come from
+ * `@nailflow/shared`, so a change to an endpoint's payload becomes a compile
+ * error here rather than `undefined` on screen.
+ */
 
-// HACK: Fix Dokploy misconfiguration. If the API URL points to the frontend (demo),
-// force it to the real backend (api) to prevent infinite loops and 404s.
-if (API_URL.includes('demo.diabolicalservices.tech') || (!API_URL.includes('api-') && !API_URL.includes('api.'))) {
-    API_URL = 'https://api-nailflow.diabolicalservices.tech/api';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
+
+/**
+ * Top-level folder this deployment's images live under on the CDN. Older rows
+ * store a path without it, so it is re-attached when missing.
+ */
+const CDN_SLUG = process.env.NEXT_PUBLIC_CDN_SLUG ?? 'nailssalon';
+
+/** The domain the API resolves the salon from. */
+function tenantDomain(explicit?: string): string | undefined {
+    if (explicit) return explicit;
+    if (typeof window !== 'undefined') return window.location.host;
+    return undefined;
 }
 
-if (API_URL.endsWith('/')) {
-    API_URL = API_URL.slice(0, -1);
+/** Answer from `GET /api/session`: the caller's role in the current salon. */
+export interface SessionInfo {
+    uid: string;
+    email: string | null;
+    tenantId: string;
+    /** null when the user has no relationship with this salon. */
+    role: StaffRole | null;
+    staffId: string | null;
 }
 
-const fetchApi = async (path: string, options: RequestInit = {}, domain?: string) => {
-    // Ensure path starts with /
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    
-    // Avoid double /api in the final URL if path already includes it
-    const finalUrl = cleanPath.startsWith('/api') 
-        ? `${API_URL.replace(/\/api$/, '')}${cleanPath}`
-        : `${API_URL}${cleanPath}`;
-    
-    // Add tenant domain header for resolution
-    const headers = new Headers(options.headers || {});
+export class ApiError extends Error {
+    constructor(
+        readonly status: number,
+        message: string,
+        readonly details?: unknown
+    ) {
+        super(message);
+        this.name = 'ApiError';
+    }
+}
 
-    if (typeof window !== 'undefined') {
-        headers.set('x-tenant-domain', window.location.hostname);
-        
-        // Add auth token if user is signed in
-        if (auth.currentUser) {
-            try {
-                const token = await auth.currentUser.getIdToken();
-                headers.set('Authorization', `Bearer ${token}`);
-            } catch (e) {
-                console.warn('Failed to get auth token', e);
-            }
+interface RequestOptions extends Omit<RequestInit, 'body'> {
+    body?: unknown;
+    /** Explicit tenant domain, for server-side rendering where there is no window. */
+    domain?: string;
+    /** Skip attaching the auth token even when a user is signed in. */
+    anonymous?: boolean;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const { body, domain, anonymous, headers: extraHeaders, ...init } = options;
+
+    const headers = new Headers(extraHeaders);
+    const host = tenantDomain(domain);
+    if (host) headers.set('x-tenant-domain', host);
+
+    if (body !== undefined) headers.set('Content-Type', 'application/json');
+
+    if (!anonymous && typeof window !== 'undefined' && auth.currentUser) {
+        try {
+            headers.set('Authorization', `Bearer ${await auth.currentUser.getIdToken()}`);
+        } catch {
+            // An expired session simply means the request goes out unauthenticated
+            // and the API answers 401 — which the caller already handles.
         }
-    } else if (domain) {
-        headers.set('x-tenant-domain', domain);
     }
 
-    const response = await fetch(finalUrl, {
-        ...options,
-        headers,
-    });
+    let response: Response;
+    try {
+        response = await fetch(`${API_BASE}/api${path}`, {
+            ...init,
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+        });
+    } catch {
+        // A DNS failure, refused connection or timeout is not an HTTP status.
+        // Surfacing it as an ApiError lets callers handle "cannot reach the
+        // API" the same way they handle every other failure.
+        throw new ApiError(0, 'No pudimos conectar con el servidor. Intenta de nuevo.');
+    }
+
+    if (response.status === 204) return undefined as T;
+
+    const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
-        let errorData;
-        try {
-            errorData = await response.json();
-        } catch (e) {
-            errorData = { error: response.statusText };
-        }
-        throw new Error(errorData.error || `API Error: ${response.status}`);
+        throw new ApiError(
+            response.status,
+            payload?.error ?? `Request failed with status ${response.status}`,
+            payload?.details
+        );
     }
 
-    return response.json();
-};
+    return payload as T;
+}
+
+/**
+ * Resolves to null when the resource is absent or the API is unreachable.
+ *
+ * Used by the pages that render a "this salon is not available" state: a server
+ * component that throws here would render a bare 500 instead.
+ */
+async function optional<T>(promise: Promise<T>): Promise<T | null> {
+    try {
+        return await promise;
+    } catch (error) {
+        if (error instanceof ApiError && (error.status === 404 || error.status === 0)) return null;
+        throw error;
+    }
+}
 
 export const api = {
-    // Tenant
-    getTenantByDomain: async (domain: string): Promise<Tenant | null> => {
-        try {
-            return await fetchApi(`/api/tenant?domain=${domain}`, {}, domain);
-        } catch (e) {
-            return null;
-        }
-    },
-    getTenant: async (idOrDomain: string): Promise<Tenant | null> => {
-        try {
-            const isDomain = idOrDomain.includes('.');
-            const path = isDomain ? `/api/tenant?domain=${idOrDomain}` : `/api/tenant?id=${idOrDomain}`;
-            return await fetchApi(path, {}, isDomain ? idOrDomain : undefined);
-        } catch (e) {
-            return null;
-        }
-    },
-    getTenantByOwner: async (ownerId: string): Promise<Tenant | null> => {
-        try {
-            return await fetchApi(`/api/tenant?owner_id=${ownerId}`);
-        } catch (e) {
-            return null;
-        }
-    },
-    getTenantById: async (id: string): Promise<Tenant | null> => {
-        try {
-            return await fetchApi(`/api/tenant?id=${id}`);
-        } catch (e) {
-            return null;
-        }
-    },
-    updateTenant: async (id: string, data: Partial<Tenant>): Promise<Tenant> => {
-        return fetchApi(`/api/tenant?id=${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
+    // ── Session ──────────────────────────────────────────────────────────────
+
+    /** Who the signed-in user is for the salon on this domain, and what they may do. */
+    getSession: () => optional(request<SessionInfo>('/session')),
+
+    // ── Tenant ───────────────────────────────────────────────────────────────
+
+    /** Public configuration for the salon serving this domain. */
+    getTenant: (domain?: string) => optional(request<Tenant>('/tenant', { domain, anonymous: true })),
+
+    updateTenant: (data: Partial<Pick<Tenant, 'name' | 'branding' | 'settings'>>) =>
+        request<Tenant>('/tenant', { method: 'PUT', body: data }),
+
+    /** First sign-up on a fresh deployment takes ownership of the salon. */
+    claimTenant: (salonName: string) =>
+        request<Tenant>('/tenant/claim', { method: 'POST', body: { salon_name: salonName } }),
+
+    // ── Services ─────────────────────────────────────────────────────────────
+
+    getServices: (options?: { includeInactive?: boolean }) =>
+        request<Service[]>(`/services${options?.includeInactive ? '?include_inactive=true' : ''}`),
+
+    createService: (data: Partial<Service>) =>
+        request<Service>('/services', { method: 'POST', body: data }),
+
+    updateService: (id: string, data: Partial<Service>) =>
+        request<Service>(`/services/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+
+    /** Retires the service; past appointments keep their history. */
+    archiveService: (id: string) =>
+        request<void>(`/services/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    // ── Staff ────────────────────────────────────────────────────────────────
+
+    getStaff: (domain?: string) => request<Staff[]>('/staff', { domain, anonymous: true }),
+
+    /** Full records including emails; owner only. */
+    getTeam: () => request<Staff[]>('/staff/all'),
+
+    createStaffMember: (data: Partial<Staff>) =>
+        request<Staff>('/staff', { method: 'POST', body: data }),
+
+    updateStaffMember: (id: string, data: Partial<Staff>) =>
+        request<Staff>(`/staff/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+
+    deactivateStaffMember: (id: string) =>
+        request<void>(`/staff/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    // ── Appointments ─────────────────────────────────────────────────────────
+
+    getAppointments: (filters?: { staffId?: string; from?: string; to?: string; status?: AppointmentStatus }) => {
+        const params = new URLSearchParams();
+        if (filters?.staffId) params.set('staff_id', filters.staffId);
+        if (filters?.from) params.set('from', filters.from);
+        if (filters?.to) params.set('to', filters.to);
+        if (filters?.status) params.set('status', filters.status);
+        const qs = params.toString();
+        return request<Appointment[]>(`/appointments${qs ? `?${qs}` : ''}`);
     },
 
-    // Staff
-    getStaff: async (): Promise<Staff[]> => {
-        return fetchApi('/api/staff');
-    },
-    createStaffMember: async (data: Partial<Staff>): Promise<Staff> => {
-        return fetchApi('/api/staff', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-    },
-    updateStaffMember: async (id: string, data: Partial<Staff>): Promise<Staff> => {
-        return fetchApi(`/api/staff/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-    },
+    getAppointment: (id: string) =>
+        request<Appointment>(`/appointments/${encodeURIComponent(id)}`),
 
-    // Services
-    getServices: async (): Promise<Service[]> => {
-        return fetchApi('/api/services');
-    },
-    createService: async (data: Partial<Service>): Promise<Service> => {
-        return fetchApi('/api/services', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-    },
-    updateService: async (id: string, data: Partial<Service>): Promise<Service> => {
-        return fetchApi(`/api/services/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-    },
-    deleteService: async (id: string): Promise<void> => {
-        return fetchApi(`/api/services/${id}`, { method: 'DELETE' });
-    },
-
-    // Appointments & Booking
-    getAppointments: async (): Promise<Appointment[]> => {
-        return fetchApi('/api/appointments');
-    },
-    getAvailability: async (staffId: string, date: string, serviceId?: string): Promise<TimeSlot[]> => {
-        const svcParam = serviceId ? `&service_id=${serviceId}` : '';
-        return fetchApi(`/api/availability?date=${date}&staff_id=${staffId}${svcParam}`);
-    },
-    createBooking: async (data: BookingData): Promise<{ appointmentId: string; init_point: string }> => {
-        return fetchApi('/api/bookings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-    },
-    createBookingTest: async (data: BookingData): Promise<{ appointmentId: string }> => {
-        return fetchApi('/api/bookings/test', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-    },
-    completeAppointment: async (id: string): Promise<void> => {
-        return fetchApi(`/api/appointments/${id}/complete`, { method: 'POST' });
-    },
-    updateAppointmentStatus: async (id: string, status: string): Promise<void> => {
-        return fetchApi(`/api/appointments/${id}/status`, {
+    setAppointmentStatus: (id: string, status: AppointmentStatus) =>
+        request<Appointment>(`/appointments/${encodeURIComponent(id)}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-        });
-    },
-    updateAppointmentImages: async (id: string, image_urls: string[]): Promise<void> => {
-        return fetchApi(`/api/appointments/${id}/images`, {
+            body: { status },
+        }),
+
+    setAppointmentImages: (id: string, imageUrls: string[]) =>
+        request<Appointment>(`/appointments/${encodeURIComponent(id)}/images`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image_urls }),
-        });
+            body: { image_urls: imageUrls },
+        }),
+
+    // ── Availability ─────────────────────────────────────────────────────────
+
+    getAvailability: (params: { date: string; staffId: string; serviceIds?: string[] }) => {
+        const query = new URLSearchParams({ date: params.date, staff_id: params.staffId });
+        if (params.serviceIds?.length) query.set('service_ids', params.serviceIds.join(','));
+        return request<TimeSlot[]>(`/availability?${query}`, { anonymous: true });
     },
 
-    // Slot Locking
-    holdTimeSlot: async (date: string, time: string, staff_id: string): Promise<{ success: boolean }> => {
-        return fetchApi('/api/availability/hold', {
+    holdSlot: (date: string, time: string, staffId: string) =>
+        request<{ success: boolean }>('/availability/hold', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date, time, staff_id }),
-        });
+            body: { date, time, staff_id: staffId },
+            anonymous: true,
+        }),
+
+    releaseSlot: (date: string, time: string, staffId: string) => {
+        const query = new URLSearchParams({ date, time, staff_id: staffId });
+        return request<void>(`/availability/hold?${query}`, { method: 'DELETE', anonymous: true });
     },
 
-    releaseTimeSlot: async (date: string, time: string, staff_id: string): Promise<{ success: boolean }> => {
-        return fetchApi(`/api/availability/hold?date=${date}&time=${time}&staff_id=${staff_id}`, {
-            method: 'DELETE',
-        });
-    },
+    // ── Bookings ─────────────────────────────────────────────────────────────
 
-    // CRM / Favorites
-    getFavorites: async (): Promise<Set<string>> => {
-        const data = await fetchApi('/api/favorites');
-        return new Set(data);
-    },
-    setFavorite: async (phone: string, favorite: boolean): Promise<void> => {
-        return fetchApi(`/api/favorites/${phone}`, {
+    createBooking: (data: CreateBookingRequest) =>
+        request<CreateBookingResponse>('/bookings', { method: 'POST', body: data, anonymous: true }),
+
+    /** Demo path: confirms without taking payment. Disabled in production. */
+    createTestBooking: (data: CreateBookingRequest) =>
+        request<CreateBookingResponse>('/bookings/test', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ favorite }),
-        });
-    },
+            body: data,
+            anonymous: true,
+        }),
 
-    // Images (CDN Integration)
-    uploadImage: async (tenantId: string, folder: string, file: File, projectType: 'demo' | 'clients' = 'demo'): Promise<string> => {
+    // ── CRM ──────────────────────────────────────────────────────────────────
+
+    getFavorites: async () => new Set(await request<string[]>('/favorites')),
+
+    setFavorite: (phone: string, favorite: boolean) =>
+        request<{ phone: string; favorite: boolean }>(`/favorites/${encodeURIComponent(phone)}`, {
+            method: 'PUT',
+            body: { favorite },
+        }),
+
+    // ── Images ───────────────────────────────────────────────────────────────
+
+    /**
+     * Uploads through our own Next.js route, which holds the CDN key.
+     * `folder` groups the file (e.g. `services`, `team`, `references`).
+     */
+    uploadImage: async (file: File, folder: string): Promise<string> => {
         const formData = new FormData();
-        formData.append('images', file);
+        formData.append('image', file);
         formData.append('folder', folder);
-        formData.append('projectType', projectType);
 
-        const uploadUrl = '/proxy/upload';
+        const response = await fetch('/proxy/upload', {
+            method: 'POST',
+            body: formData,
+            headers: auth.currentUser
+                ? { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }
+                : undefined,
+        });
 
-        try {
-            const response = await fetch(uploadUrl, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `CDN Upload Error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const clientSlug = 'nailssalon'; 
-
-            if (data.uploaded && data.uploaded.length > 0) {
-                const item = data.uploaded[0];
-                // Clean any tokens from URLs returned by the CDN
-                const rawUrl = item.url || item.cdnUrl || `https://cdn.diabolicalservices.tech/${clientSlug}/${item.filename}`;
-                return rawUrl.split('?')[0]; 
-            } else if (data.duplicates && data.duplicates.length > 0) {
-                const item = data.duplicates[0];
-                const rawUrl = item.url || item.cdnUrl || `https://cdn.diabolicalservices.tech/${clientSlug}/${item.filename}`;
-                return rawUrl.split('?')[0];
-            } else {
-                console.error('CDN Response missing data:', data);
-                throw new Error('Error CDN: No se retornó información de la imagen subida.');
-            }
-        } catch (error) {
-            console.error('Upload Error:', error);
-            throw error;
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.url) {
+            throw new ApiError(response.status, payload?.error ?? 'Upload failed');
         }
+        return payload.url as string;
     },
-    getPublicUrl: (url: string | null | undefined): string => {
-        if (!url) return '';
-        if (url.startsWith('data:') || url.startsWith('blob:')) return url;
 
-        const CDN_BASE = 'https://cdn.diabolicalservices.tech';
+    /**
+     * Turns a stored image reference into a URL the browser can load.
+     *
+     * Stored values vary — some are bare CDN paths, some full CDN URLs from
+     * older uploads. Everything is normalised to the API's image proxy so the
+     * CDN key never appears in the page.
+     */
+    getImageUrl: (reference: string | null | undefined): string => {
+        if (!reference) return '';
+        if (reference.startsWith('data:') || reference.startsWith('blob:')) return reference;
 
-        // Extract the clean path
-        let cleanPath = url
-            .split('?')[0] // Strictly exclude any api_key query param
-            .replace('https://', '')
-            .replace('http://', '')
-            .replace('cdn.diabolicalservices.tech/', '')
-            .replace('api.diabolicalservices.tech/api/img/', '')
-            .replace('api-nailflow.diabolicalservices.tech/api/img/', '')
-            .replace('api.diabolicalservices.tech/img/', '')
-            .replace('api-nailflow.diabolicalservices.tech/img/', '');
+        // Strip any origin and any pre-existing proxy prefix, keeping "<slug>/<path>".
+        const path = reference
+            .replace(/^https?:\/\/[^/]+/i, '')
+            .replace(/^\/?(api\/)?img\//i, '')
+            .replace(/^\/+/, '')
+            .split('?')[0];
 
-        // If it was a proxy URL like /api/img/nailssalon/image.jpg, we need the path after /img/
-        if (url.includes('/api/img/') || url.includes('/img/')) {
-             const parts = url.split(url.includes('/api/img/') ? '/api/img/' : '/img/');
-             if (parts.length > 1) {
-                 cleanPath = parts[1].split('?')[0];
-             }
-        }
+        if (!path) return '';
 
-        // Standardize leading slashes
-        cleanPath = cleanPath.replace(/^\/+/, '');
+        const segments = path.split('/').filter(Boolean);
+        if (segments[0] !== CDN_SLUG) segments.unshift(CDN_SLUG);
 
-        // Ensure the root project slug is always present
-        const clientSlug = 'nailssalon';
-        const pathParts = cleanPath.split('/').filter(Boolean);
-        if (pathParts[0] !== clientSlug) {
-            pathParts.unshift(clientSlug);
-        }
-        
-        // Return THE clean direct CDN URL as requested by the user
-        return `${CDN_BASE}/${pathParts.join('/')}`;
+        return `${API_BASE}/api/img/${segments.join('/')}`;
     },
 };
+
+export type { Appointment, Service, Staff, Tenant, TimeSlot };

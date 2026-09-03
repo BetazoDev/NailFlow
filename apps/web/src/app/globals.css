@@ -1,106 +1,203 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Noto+Serif:wght@300;400;500;600&family=Noto+Sans:wght@300;400;500&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0');
 @import "tailwindcss";
 
-/* ============================================
-   NailFlow Design System — Tailwind v4 Tokens
-   ============================================ */
+/* ============================================================================
+   NailFlow design system
+
+   One set of tokens, named by role rather than by colour. A salon's chosen
+   palette overwrites these at runtime (see src/lib/theme.ts), so every surface
+   — booking wizard and admin panel alike — re-themes together.
+
+   The app previously carried two parallel vocabularies with different values:
+   `--pink/--cream/--charcoal` in the booking flow and `--aesthetic-*` in the
+   dashboard. Both now alias onto the semantic tokens below, so the two halves
+   of the product finally agree on what "the brand colour" is.
+   ============================================================================ */
 
 :root {
-  /* Brand colors */
-  --cream: #FDFBF7;
-  --cream-dark: #F5F0E8;
-  --pink: #E8A0B4;
-  --pink-light: #F8D8E0;
-  --pink-pale: #FFF0F3;
-  --coral: #E8B4A0;
-  --coral-light: #F5DDD0;
-  --beige: #D4C8A8;
-  --beige-light: #EDE8D8;
-  --charcoal: #2C2420;
-  --charcoal-light: #5A4E48;
-  --nf-gray: #9A8E88;
-  --gray-light: #C8BEB8;
-  --nf-white: #FFFFFF;
+  /* ── Surfaces ── */
+  --surface: #FDFBF7;
+  --surface-raised: #FFFFFF;
+  --surface-sunken: #F5F0E8;
 
-  /* Aesthetic Palette (from Stitch designs) */
-  --aesthetic-pink: #d4b4b4;
-  --aesthetic-beige: #e8d8d0;
-  --aesthetic-cream: #fdfaf7;
-  --aesthetic-taupe: #8a7a7a;
-  --aesthetic-soft-pink: #f3e6e6;
-  --aesthetic-muted: #968686;
-  --aesthetic-accent: #e9d5d5;
+  /* ── Brand ── */
+  --brand-primary: #E8A0B4;
+  --brand-primary-soft: #F8D8E0;
+  --brand-primary-tint: #FFF0F3;
+  --brand-secondary: #E8B4A0;
 
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(44, 36, 32, 0.06);
-  --shadow-md: 0 4px 16px rgba(44, 36, 32, 0.08);
-  --shadow-lg: 0 8px 32px rgba(44, 36, 32, 0.12);
+  /* ── Text ── */
+  --text-strong: #2C2420;
+  --text: #5A4E48;
+  --text-muted: #9A8E88;
+  --text-subtle: #C8BEB8;
 
-  /* Radius */
+  /* ── Lines ── */
+  --border: #F0E9DF;
+
+  /* ── Status ── */
+  --success: #88C999;
+  --success-tint: rgba(136, 201, 153, 0.12);
+  --warning: #E0A458;
+  --warning-tint: rgba(224, 164, 88, 0.12);
+  --danger: #D97A7A;
+  --danger-tint: rgba(217, 122, 122, 0.12);
+
+  /* ── Elevation ── */
+  --shadow-sm: 0 2px 8px rgb(44 36 32 / 6%);
+  --shadow-md: 0 4px 16px rgb(44 36 32 / 8%);
+  --shadow-lg: 0 8px 32px rgb(44 36 32 / 12%);
+
+  /* ── Radii ── */
   --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
 
-  /* Transitions */
-  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* ── Motion ──
+     Durations are named by intent so a transition can be tuned in one place. */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration: 250ms;
+  --duration-slow: 400ms;
 
-  /* Fonts */
-  --font-serif: 'Playfair Display', Georgia, serif;
-  --font-sans: 'Inter', -apple-system, sans-serif;
-  --font-noto-serif: 'Noto Serif', serif;
-  --font-noto-sans: 'Noto Sans', sans-serif;
-  --font-newsreader: 'Newsreader', serif;
+  /* ── Type ── */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* ── Legacy aliases ───────────────────────────────────────────────────────
+     Kept so existing utility classes keep resolving while components migrate
+     to the semantic names. Every one points at a token above, which is what
+     unified the two palettes. Do not introduce new uses of these. */
+  --cream: var(--surface);
+  --cream-dark: var(--border);
+  --nf-white: var(--surface-raised);
+  --pink: var(--brand-primary);
+  --pink-light: var(--brand-primary-soft);
+  --pink-pale: var(--brand-primary-tint);
+  --coral: var(--brand-secondary);
+  --coral-light: var(--brand-primary-soft);
+  --charcoal: var(--text-strong);
+  --charcoal-light: var(--text);
+  --nf-gray: var(--text-muted);
+  --gray-light: var(--text-subtle);
+  --aesthetic-cream: var(--surface);
+  --aesthetic-pink: var(--brand-primary);
+  --aesthetic-soft-pink: var(--brand-primary-tint);
+  --aesthetic-accent: var(--brand-primary-soft);
+  --aesthetic-beige: var(--brand-secondary);
+  --aesthetic-taupe: var(--text-strong);
+  --aesthetic-muted: var(--text-muted);
+  --font-serif: var(--font-display);
+  --font-sans: var(--font-body);
 }
 
+/* Tailwind v4 reads its colour scale from here, so `bg-surface`,
+   `text-muted` and friends stay in sync with the tokens above. */
 @theme inline {
-  --color-cream: var(--cream);
-  --color-cream-dark: var(--cream-dark);
-  --color-pink: var(--pink);
-  --color-pink-light: var(--pink-light);
-  --color-pink-pale: var(--pink-pale);
-  --color-coral: var(--coral);
-  --color-coral-light: var(--coral-light);
-  --color-beige: var(--beige);
-  --color-beige-light: var(--beige-light);
-  --color-charcoal: var(--charcoal);
-  --color-charcoal-light: var(--charcoal-light);
-  --color-nf-gray: var(--nf-gray);
-  --color-gray-light: var(--gray-light);
-  --color-nf-white: var(--nf-white);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
 
-  --color-aesthetic-pink: var(--aesthetic-pink);
-  --color-aesthetic-beige: var(--aesthetic-beige);
-  --color-aesthetic-cream: var(--aesthetic-cream);
-  --color-aesthetic-taupe: var(--aesthetic-taupe);
-  --color-aesthetic-soft-pink: var(--aesthetic-soft-pink);
-  --color-aesthetic-muted: var(--aesthetic-muted);
-  --color-aesthetic-accent: var(--aesthetic-accent);
+  --color-brand: var(--brand-primary);
+  --color-brand-soft: var(--brand-primary-soft);
+  --color-brand-tint: var(--brand-primary-tint);
+  --color-brand-secondary: var(--brand-secondary);
 
-  --font-serif: var(--font-serif);
-  --font-body: var(--font-sans);
-  --font-display: var(--font-newsreader);
-  --font-noto-serif: var(--font-noto-serif);
-  --font-noto-sans: var(--font-noto-sans);
+  --color-text-strong: var(--text-strong);
+  --color-text-body: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+
+  --color-line: var(--border);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  /* Legacy scale — same values, old names. */
+  --color-cream: var(--surface);
+  --color-cream-dark: var(--border);
+  --color-nf-white: var(--surface-raised);
+  --color-pink: var(--brand-primary);
+  --color-pink-light: var(--brand-primary-soft);
+  --color-pink-pale: var(--brand-primary-tint);
+  --color-coral: var(--brand-secondary);
+  --color-coral-light: var(--brand-primary-soft);
+  --color-charcoal: var(--text-strong);
+  --color-charcoal-light: var(--text);
+  --color-nf-gray: var(--text-muted);
+  --color-gray-light: var(--text-subtle);
+  --color-aesthetic-cream: var(--surface);
+  --color-aesthetic-pink: var(--brand-primary);
+  --color-aesthetic-soft-pink: var(--brand-primary-tint);
+  --color-aesthetic-accent: var(--brand-primary-soft);
+  --color-aesthetic-beige: var(--brand-secondary);
+  --color-aesthetic-taupe: var(--text-strong);
+  --color-aesthetic-muted: var(--text-muted);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-serif: var(--font-display);
+
+  --radius-card: var(--radius-lg);
+  --shadow-soft: var(--shadow-sm);
+  --shadow-minimal: var(--shadow-sm);
 }
 
-/* ===== BASE RESET ===== */
-* {
+/* ============================================================================
+   Base
+   ============================================================================ */
+
+*,
+*::before,
+*::after {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  font-family: var(--font-sans);
-  background: var(--cream);
-  color: var(--charcoal);
-  min-height: 100vh;
+  font-family: var(--font-body);
+  background: var(--surface);
+  color: var(--text-strong);
+  min-height: 100dvh;
 }
 
-/* ===== SCROLLBARS ===== */
+/* Every interactive element gets a visible keyboard focus ring. Several
+   components previously cleared the outline without replacing it, leaving the
+   admin panel unusable by keyboard. */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Respect the reader's motion preference: our animations are decorative. */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   Scrollbars
+   ============================================================================ */
+
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -108,34 +205,36 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--gray-light);
-  border-radius: 4px;
+  background: var(--text-subtle);
+  border-radius: var(--radius-pill);
 }
 
-.thin-scrollbar::-webkit-scrollbar {
-  height: 1px;
-  width: 1px;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
-.thin-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.thin-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--pink-light);
-  border-radius: 10px;
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-/* ===== ANIMATIONS ===== */
+/* ============================================================================
+   Animation
+   ============================================================================ */
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(16px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -152,310 +251,223 @@ body {
 @keyframes slideInRight {
   from {
     opacity: 0;
-    transform: translateX(30px);
+    transform: translateX(24px);
   }
 
   to {
     opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-30px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
+    transform: none;
   }
 }
 
 @keyframes scaleIn {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.94);
   }
 
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-12px);
-  }
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.6;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
 @keyframes shimmer {
-  0% {
+  from {
     background-position: -200% 0;
   }
 
-  100% {
+  to {
     background-position: 200% 0;
   }
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.5s ease both;
+  animation: fadeInUp var(--duration-slow) var(--ease) both;
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.4s ease both;
+  animation: fadeIn var(--duration) var(--ease) both;
 }
 
 .animate-slide-in-right {
-  animation: slideInRight 0.4s ease both;
-}
-
-.animate-slide-in-left {
-  animation: slideInLeft 0.4s ease both;
+  animation: slideInRight var(--duration-slow) var(--ease) both;
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.3s ease both;
+  animation: scaleIn var(--duration) var(--ease) both;
 }
 
-/* Stagger children animation */
+/* Cascades a list in, one item at a time. */
 .stagger-children>* {
-  animation: fadeInUp 0.4s ease both;
+  animation: fadeInUp var(--duration) var(--ease) both;
 }
 
-.stagger-children>*:nth-child(1) {
-  animation-delay: 0.05s;
+.stagger-children>*:nth-child(1) { animation-delay: 40ms; }
+.stagger-children>*:nth-child(2) { animation-delay: 80ms; }
+.stagger-children>*:nth-child(3) { animation-delay: 120ms; }
+.stagger-children>*:nth-child(4) { animation-delay: 160ms; }
+.stagger-children>*:nth-child(5) { animation-delay: 200ms; }
+.stagger-children>*:nth-child(6) { animation-delay: 240ms; }
+.stagger-children>*:nth-child(7) { animation-delay: 280ms; }
+.stagger-children>*:nth-child(8) { animation-delay: 320ms; }
+
+/* Placeholder shown while data loads, instead of a bare spinner. */
+.skeleton {
+  background: linear-gradient(90deg,
+      var(--surface-sunken) 25%,
+      var(--surface-raised) 50%,
+      var(--surface-sunken) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: var(--radius-md);
 }
 
-.stagger-children>*:nth-child(2) {
-  animation-delay: 0.1s;
-}
+/* ============================================================================
+   Components
+   ============================================================================ */
 
-.stagger-children>*:nth-child(3) {
-  animation-delay: 0.15s;
-}
-
-.stagger-children>*:nth-child(4) {
-  animation-delay: 0.2s;
-}
-
-.stagger-children>*:nth-child(5) {
-  animation-delay: 0.25s;
-}
-
-.stagger-children>*:nth-child(6) {
-  animation-delay: 0.3s;
-}
-
-.stagger-children>*:nth-child(7) {
-  animation-delay: 0.35s;
-}
-
-.stagger-children>*:nth-child(8) {
-  animation-delay: 0.4s;
-}
-
-/* ===== GRADIENT BUTTONS ===== */
 .btn-gradient {
-  background: linear-gradient(135deg, var(--pink), var(--coral));
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
   color: #fff;
   border: none;
-  padding: 14px 32px;
-  border-radius: var(--radius-xl);
-  font-size: 15px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
   font-weight: 600;
-  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: var(--transition);
-  box-shadow: 0 4px 16px rgba(232, 160, 180, 0.35);
-  letter-spacing: 0.3px;
-  position: relative;
-  overflow: hidden;
+  transition: transform var(--duration-fast) var(--ease),
+              box-shadow var(--duration-fast) var(--ease);
+  box-shadow: var(--shadow-md);
 }
 
-.btn-gradient::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
-  opacity: 0;
-  transition: var(--transition);
+.btn-gradient:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
 }
 
-.btn-gradient:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(232, 160, 180, 0.45);
-}
-
-.btn-gradient:hover::after {
-  opacity: 1;
-}
-
-.btn-gradient:active {
+.btn-gradient:active:not(:disabled) {
   transform: translateY(0);
 }
 
 .btn-gradient:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
+  box-shadow: none;
 }
 
-/* ===== GLASS CARD ===== */
 .glass-card {
-  background: rgba(255, 255, 255, 0.7);
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid color-mix(in srgb, var(--surface-raised) 40%, transparent);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
 
-/* ===== INPUT STYLES ===== */
 .input-field {
   width: 100%;
   padding: 14px 18px;
-  border: 1.5px solid var(--cream-dark);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-md);
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: 15px;
-  color: var(--charcoal);
-  background: var(--nf-white);
-  transition: var(--transition);
+  color: var(--text-strong);
+  background: var(--surface-raised);
+  transition: border-color var(--duration-fast) var(--ease),
+              box-shadow var(--duration-fast) var(--ease);
   outline: none;
 }
 
 .input-field::placeholder {
-  color: var(--gray-light);
+  color: var(--text-subtle);
 }
 
 .input-field:focus {
-  border-color: var(--pink);
-  box-shadow: 0 0 0 3px rgba(232, 160, 180, 0.15);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 20%, transparent);
 }
 
-/* ===== SECTION HEADINGS ===== */
-.section-heading {
-  font-family: var(--font-serif);
-  font-weight: 600;
-  color: var(--charcoal);
+.input-field[aria-invalid='true'] {
+  border-color: var(--danger);
 }
 
-/* ===== CUSTOM UTILITIES ===== */
-/* Subtle scrollbar for desktop overflow areas */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Status pill. The colour comes from a data attribute so a status is styled
+   once here rather than re-declared in every list that renders one. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+.status-pill[data-status='confirmed'] {
+  background: var(--brand-primary-tint);
+  color: var(--text-strong);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: var(--cream-dark);
-  border-radius: 20px;
+.status-pill[data-status='pending'] {
+  background: var(--warning-tint);
+  color: var(--warning);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: var(--pink-pale);
+.status-pill[data-status='completed'] {
+  background: var(--success-tint);
+  color: var(--success);
 }
 
-/* Safe area padding for mobile nav */
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 20px);
+.status-pill[data-status='cancelled'] {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
 }
 
-/* ===== LOADING BAR (Splash) ===== */
-@keyframes loadingBar {
-  0% {
-    transform: scaleX(0);
-    transform-origin: left;
-  }
-
-  40% {
-    transform: scaleX(0.6);
-    transform-origin: left;
-  }
-
-  100% {
-    transform: scaleX(1);
-    transform-origin: left;
-  }
-}
-
-.loading-bar-track {
-  width: 120px;
-  height: 1px;
-  background: var(--cream-dark);
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.loading-bar-fill {
-  height: 100%;
-  background: var(--pink);
-  border-radius: 99px;
-  animation: loadingBar 1.8s ease-in-out forwards;
-}
-
-/* ===== PILL TAB ===== */
 .pill-tab {
-  padding: 7px 20px;
-  border-radius: 99px;
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
   font-size: 13px;
   font-weight: 500;
-  font-family: var(--font-sans);
-  transition: var(--transition);
-  cursor: pointer;
+  font-family: var(--font-body);
   border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease);
 }
 
 .pill-tab-active {
-  background: linear-gradient(135deg, var(--pink), var(--coral));
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
   color: #fff;
-  box-shadow: 0 2px 12px rgba(232, 160, 180, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .pill-tab-inactive {
-  background: var(--nf-white);
-  color: var(--charcoal-light);
-  border-color: var(--cream-dark);
+  background: var(--surface-raised);
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .pill-tab-inactive:hover {
-  border-color: var(--pink-light);
-  color: var(--charcoal);
+  border-color: var(--brand-primary-soft);
+  color: var(--text-strong);
 }
 
-/* ===== APPOINTMENT CARD ===== */
 .card-appointment {
-  background: var(--nf-white);
+  background: var(--surface-raised);
   border-radius: var(--radius-lg);
   padding: 16px 20px;
   box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(212, 200, 168, 0.2);
-  transition: var(--transition);
+  border: 1px solid var(--border);
+  transition: box-shadow var(--duration-fast) var(--ease),
+              transform var(--duration-fast) var(--ease);
 }
 
 .card-appointment:hover {
@@ -463,38 +475,95 @@ body {
   transform: translateY(-1px);
 }
 
-/* ===== FAB ===== */
-.fab {
-  position: fixed;
-  bottom: 96px;
-  right: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--pink), var(--coral));
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 20px rgba(232, 160, 180, 0.45);
-  border: none;
-  cursor: pointer;
-  transition: var(--transition);
-  z-index: 40;
+/* Splash loading bar. */
+@keyframes loadingBar {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
 }
 
-.fab:hover {
-  transform: scale(1.08) translateY(-2px);
-  box-shadow: 0 6px 28px rgba(232, 160, 180, 0.5);
+.loading-bar-track {
+  width: 120px;
+  height: 2px;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
 }
 
-.fab:active {
-  transform: scale(0.97);
+.loading-bar-fill {
+  height: 100%;
+  background: var(--brand-primary);
+  border-radius: var(--radius-pill);
+  transform-origin: left;
+  animation: loadingBar 1.8s var(--ease) forwards;
 }
 
-/* ===== ICON SUPPORT ===== */
+/* ============================================================================
+   Utilities
+   ============================================================================ */
+
+/* Keeps content clear of the iOS home indicator. */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 20px);
+}
+
+/* Visible to screen readers, invisible on screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Shadow utilities referenced across the admin panel. Declared here so
+   `shadow-soft` and `shadow-minimal` mean the same thing everywhere. */
+.shadow-soft {
+  box-shadow: var(--shadow-sm);
+}
+
+.shadow-minimal {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Upward shadow for sticky footers that float above scrolling content. */
+.shadow-up {
+  box-shadow: 0 -10px 30px rgb(44 36 32 / 5%);
+}
+
+/* Aliases for the scrollbar-hiding utility, kept while call sites converge
+   on `.no-scrollbar`. */
+.scrollbar-hide,
+.thin-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar,
+.thin-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-pill);
+}
+
 .material-symbol {
-  font-family: 'Material Symbols Outlined' !important;
+  font-family: 'Material Symbols Outlined';
   font-weight: normal;
   font-style: normal;
   font-size: 24px;
@@ -505,5 +574,6 @@ body {
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
 }
