@@ -14,24 +14,36 @@ export function applyBranding(branding: TenantBranding | undefined): void {
 
     const root = document.documentElement;
 
+    /**
+     * Only write a property whose value actually differs.
+     *
+     * Rewriting `--font-display` on a colour-only change re-resolves the font
+     * on every element that uses it, so the page reflows: the content height
+     * shifts under the scroll position and a band of blank space appears below
+     * until you scroll. Picking a palette should repaint, not relayout.
+     */
+    const set = (token: string, value: string) => {
+        if (root.style.getPropertyValue(token) !== value) {
+            root.style.setProperty(token, value);
+        }
+    };
+
     const palette =
         PALETTES.find(item => item.id === branding?.palette_id) ??
         PALETTES.find(item => item.id === DEFAULT_PALETTE_ID)!;
 
-    for (const [token, value] of Object.entries(palette.tokens)) {
-        root.style.setProperty(token, value);
-    }
+    for (const [token, value] of Object.entries(palette.tokens)) set(token, value);
 
     const typography =
         TYPOGRAPHY.find(item => item.id === branding?.typography) ??
         TYPOGRAPHY.find(item => item.id === DEFAULT_TYPOGRAPHY_ID)!;
 
-    root.style.setProperty('--font-display', typography.display);
-    root.style.setProperty('--font-body', typography.body);
+    set('--font-display', typography.display);
+    set('--font-body', typography.body);
 
     // A salon that set explicit brand colours overrides the palette's accents.
-    if (branding?.primary_color) root.style.setProperty('--brand-primary', branding.primary_color);
-    if (branding?.secondary_color) root.style.setProperty('--brand-secondary', branding.secondary_color);
+    if (branding?.primary_color) set('--brand-primary', branding.primary_color);
+    if (branding?.secondary_color) set('--brand-secondary', branding.secondary_color);
 }
 
 /**

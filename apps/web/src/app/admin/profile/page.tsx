@@ -91,21 +91,30 @@ export default function ProfilePage() {
         }
     }, [tenant]);
 
-    /**
-     * Preview the palette live while the owner is choosing. Saving persists it;
-     * leaving without saving simply reloads the stored branding.
-     */
+    /** Preview the palette live while the owner is choosing. */
     useEffect(() => {
         applyBranding({ ...currentBranding, palette_id: paletteId, typography: typographyId });
+    }, [currentBranding, paletteId, typographyId]);
 
-        // The preview writes inline custom properties on the root element, which
-        // outrank the stylesheet and outlive this page. Clearing them on unmount
-        // is what makes "leaving without saving" actually discard the choice.
+    /**
+     * Discard an unsaved preview when the page goes away.
+     *
+     * This is deliberately a separate effect with no dependencies. Returning the
+     * cleanup from the preview effect above ran it on *every* palette click —
+     * React runs a cleanup before each re-run, not only on unmount — so each
+     * selection briefly repainted the stored palette before the new one.
+     *
+     * The stored branding is read through a ref so this effect never re-runs.
+     */
+    const storedBranding = useRef(tenant?.branding);
+    storedBranding.current = tenant?.branding;
+
+    useEffect(() => {
         return () => {
             clearBrandingPreview();
-            applyBranding(tenant?.branding);
+            applyBranding(storedBranding.current);
         };
-    }, [paletteId, typographyId, currentBranding, tenant]);
+    }, []);
 
     /**
      * One save path for every section of this page.
