@@ -28,11 +28,6 @@ function optional(name: string): string | undefined {
     return process.env[name] || undefined;
 }
 
-/** In production a secret must exist; elsewhere it may be absent (feature off). */
-function secret(name: string): string | undefined {
-    return isProduction ? required(name) : optional(name);
-}
-
 function list(name: string, fallback: string[] = []): string[] {
     const raw = process.env[name];
     if (!raw) return fallback;
@@ -108,10 +103,17 @@ export const env = {
     cdn: {
         baseUrl: process.env.CDN_BASE_URL ?? 'https://cdn.diabolicalservices.tech',
         apiUrl: process.env.CDN_API_URL ?? 'https://api.diabolicalservices.tech',
-        /** Token for system-managed folders (services, staff, branding). */
-        systemToken: secret('CDN_UPLOAD_TOKEN'),
+        /**
+         * Token for system-managed folders (services, staff, branding).
+         *
+         * Optional on purpose: without it the image proxy answers 503 and
+         * photos stop loading, but bookings, availability and the admin panel
+         * all keep working. Only a variable the API cannot run at all without
+         * — DATABASE_URL — is allowed to stop it from booting.
+         */
+        systemToken: optional('CDN_UPLOAD_TOKEN'),
         /** Token for client-supplied folders (booking reference photos). */
-        referenceToken: secret('CDN_API_KEY_REFERENCES'),
+        referenceToken: optional('CDN_API_KEY_REFERENCES'),
     },
 
     n8n: {

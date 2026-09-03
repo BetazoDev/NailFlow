@@ -17,6 +17,13 @@ const log = createLogger('server');
  * tables that did not exist yet.
  */
 async function main(): Promise<void> {
+    if (!env.cdn.systemToken && !env.cdn.referenceToken) {
+        log.warn(
+            'No CDN token configured (CDN_UPLOAD_TOKEN / CDN_API_KEY_REFERENCES). ' +
+            'The API will start, but every image request answers 503.'
+        );
+    }
+
     await initDb();
 
     const app = createApp();
