@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { auth } from '../lib/firebase';
+import { firebaseAuth } from '../lib/firebase';
 import { query } from '../db/pool';
 import { ApiError } from './errors';
 import { createLogger, errorContext } from '../lib/logger';
@@ -22,6 +22,14 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
         const token = header.slice('Bearer '.length).trim();
         if (!token) {
             return next(ApiError.unauthorized('Empty Bearer token'));
+        }
+
+        // Distinguish "we cannot check" from "your token is bad": a 401 here
+        // would send the owner round the sign-in loop over a server-side
+        // misconfiguration she cannot fix.
+        const auth = firebaseAuth();
+        if (!auth) {
+            return next(new ApiError(503, 'Authentication is not configured on this server'));
         }
 
         try {
