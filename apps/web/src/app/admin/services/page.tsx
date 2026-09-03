@@ -1,33 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Service } from '@/lib/types';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/session-context';
 import { formatMoney } from '@/lib/format';
+import type { Service } from '@/lib/types';
 
 export default function ServicesPage() {
+    const { tenant } = useSession();
+
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
-    const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
-    const [deleting, setDeleting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const { tenant } = useSession();
+    const [search, setSearch] = useState('');
+    const [showArchived, setShowArchived] = useState(false);
+    const [target, setTarget] = useState<Service | null>(null);
+    const [working, setWorking] = useState(false);
+
+    const currency = tenant?.settings?.currency;
 
     useEffect(() => {
         if (!tenant) return;
         let cancelled = false;
 
-        api.getServices()
+        // Archived services are fetched too, so they can be brought back.
+        api.getServices({ includeInactive: true })
             .then(next => {
                 if (!cancelled) setServices(next);
             })
             .catch(() => {
-                if (!cancelled) setLoadError('No pudimos cargar tu catálogo. Recarga la página.');
+                if (!cancelled) setError('No pudimos cargar tu catálogo. Recarga la página.');
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -38,190 +42,250 @@ export default function ServicesPage() {
         };
     }, [tenant]);
 
-    const filtered = services.filter(s =>
-        !search || s.name.toLowerCase().includes(search.toLowerCase())
-    );
+    const visible = useMemo(() => {
+        const query = search.trim().toLowerCase();
 
-    const groupedServices = filtered.reduce((acc, curr) => {
-        const cat = curr.category || 'Otros';
-        if (!acc[cat]) acc[cat] = [];
-        acc[cat].push(curr);
-        return acc;
-    }, {} as Record<string, Service[]>);
+        return services
+            .filter(service => (showArchived ? !service.active : service.active))
+            .filter(service => {
+                if (!query) return true;
+                // Category matters here: the list groups by it, so searching for
+                // a category the owner can see should find its services.
+                return (
+                    service.name.toLowerCase().includes(query) ||
+                    (service.category ?? '').toLowerCase().includes(query) ||
+                    (service.description ?? '').toLowerCase().includes(query)
+                );
+            });
+    }, [services, search, showArchived]);
 
-    /**
-     * Retires the service rather than deleting it, so past appointments keep
-     * the name and price they were booked at.
-     */
-    const handleArchive = async () => {
-        if (!deleteTarget) return;
-        setDeleting(true);
+    const grouped = useMemo(() => {
+        const map = new Map<string, Service[]>();
+        for (const service of visible) {
+            const key = service.category || 'Otros';
+            map.set(key, [...(map.get(key) ?? []), service]);
+        }
+        return [...map.entries()].sort(([a], [b]) => a.localeCompare(b, 'es'));
+    }, [visible]);
+
+    const archivedCount = services.filter(service => !service.active).length;
+
+    /** Archiving hides a service from booking; restoring brings it back. */
+    const setArchived = async (service: Service, archived: boolean) => {
+        setWorking(true);
         try {
-            await api.archiveService(deleteTarget.id);
-            setServices(current => current.filter(service => service.id !== deleteTarget.id));
-            setDeleteTarget(null);
+            if (archived) {
+                await api.archiveService(service.id);
+            } else {
+                await api.updateService(service.id, { ...service, active: true });
+            }
+            setServices(current =>
+                current.map(item => (item.id === service.id ? { ...item, active: !archived } : item))
+            );
+            setTarget(null);
         } catch {
-            setLoadError('No pudimos archivar el servicio. Intenta de nuevo.');
+            setError(
+                archived
+                    ? 'No pudimos archivar el servicio. Intenta de nuevo.'
+                    : 'No pudimos restaurar el servicio. Intenta de nuevo.'
+            );
         } finally {
-            setDeleting(false);
+            setWorking(false);
         }
     };
 
     if (loading) {
         return (
-            <div className="space-y-3 p-6" aria-busy="true" aria-label="Cargando servicios">
-                {Array.from({ length: 4 }, (_, index) => (
-                    <div key={index} className="skeleton h-20 w-full" />
+            <div className="space-y-4 p-2" aria-busy="true" aria-label="Cargando servicios">
+                <div className="skeleton h-12 w-64" />
+                {Array.from({ length: 4 }, (_, i) => (
+                    <div key={i} className="skeleton h-20 w-full" />
                 ))}
             </div>
         );
     }
 
     return (
-        <div className="relative min-h-full pb-24">
-            {loadError && (
-                <p role="alert" className="mx-6 mt-6 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
-                    {loadError}
+        <div className="pb-16">
+            {error && (
+                <p role="alert" className="mb-6 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+                    {error}
                 </p>
             )}
 
-            {/* Header */}
-            <div className="px-6 pt-8 pb-0">
-                <p className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase mb-2 font-display italic font-medium">Gestión del Catálogo</p>
-                <div className="flex items-center justify-between">
-                    <h1 className="font-display text-4xl font-light italic tracking-tight text-aesthetic-taupe">Servicios</h1>
-                    <Link
-                        href="/admin/services/new"
-                        className="text-[10px] tracking-[0.2em] uppercase font-bold px-4 py-2 rounded-full transition-all duration-300 bg-aesthetic-pink text-white shadow-minimal hover:scale-105 active:scale-95 flex items-center gap-1"
-                    >
-                        <span className="material-symbol text-sm">add</span>
-                        Nuevo
-                    </Link>
+            <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                    <p className="t-label mb-2">Catálogo</p>
+                    <h1 className="t-display">Servicios</h1>
                 </div>
-            </div>
+                <Link
+                    href="/admin/services/new"
+                    className="btn-gradient flex items-center gap-2 px-5 py-3 text-sm"
+                >
+                    <span className="material-symbol text-lg" aria-hidden="true">add</span>
+                    Nuevo servicio
+                </Link>
+            </header>
 
-            {/* Search */}
-            <div className="px-6 mt-6">
-                <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <span className="material-symbol text-aesthetic-muted/60 text-xl">search</span>
-                    </div>
+            <div className="mb-8 flex flex-wrap items-center gap-3">
+                <div className="relative min-w-[240px] flex-1">
                     <label htmlFor="service-search" className="sr-only">Buscar servicio</label>
+                    <span
+                        className="material-symbol pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle"
+                        aria-hidden="true"
+                    >
+                        search
+                    </span>
                     <input
                         id="service-search"
                         type="search"
-                        className="block w-full pl-11 pr-4 py-3.5 bg-aesthetic-soft-pink/40 border-none rounded-full focus:ring-1 focus:ring-aesthetic-pink/30 placeholder:text-aesthetic-muted/50 text-base font-display italic"
-                        placeholder="Buscar servicio..."
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        onChange={event => setSearch(event.target.value)}
+                        placeholder="Buscar por nombre o categoría…"
+                        className="input-field pl-12"
                     />
                 </div>
-            </div>
 
-            {/* Service list grouped by categories */}
-            <div className="px-6 mt-6 space-y-8">
-                {Object.entries(groupedServices).map(([category, catServices]) => (
-                    <div key={category} className="space-y-3">
-                        <h2 className="font-display text-lg font-medium text-aesthetic-taupe italic ml-2">{category}</h2>
-                        <div className="space-y-3 stagger-children">
-                            {catServices.map(service => (
-                                <div key={service.id} className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4 border border-aesthetic-accent/10">
-                                    {/* Thumbnail */}
-                                    <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-aesthetic-cream/30 border border-aesthetic-accent/20">
-                                        {service.image_url && service.image_url.trim() !== '' ? (
-                                            <img
-                                                src={api.getImageUrl(service.image_url)}
-                                                alt=""
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    const target = e.target as HTMLImageElement;
-                                                    target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23d1c7bd"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>';
-                                                }}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-aesthetic-muted/30">
-                                                <span className="material-symbol text-2xl font-light">spa</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {/* Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className="font-semibold text-aesthetic-taupe text-[15px] truncate">{service.name}</p>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-1">
-                                            <span className="text-xs text-aesthetic-muted flex items-center gap-1">
-                                                <span className="material-symbol text-sm font-light">schedule</span>
-                                                {service.duration_minutes === 0 ? 'Varía' : `${service.duration_minutes} min`}
-                                            </span>
-                                            <span className="text-xs font-semibold text-aesthetic-taupe">
-                                                {formatMoney(service.estimated_price, tenant?.settings?.currency)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Actions */}
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <Link href={`/admin/services/new?id=${service.id}`} className="size-10 flex items-center justify-center rounded-xl bg-aesthetic-soft-pink/30 text-aesthetic-muted hover:bg-aesthetic-pink hover:text-white transition-colors duration-300">
-                                            <span className="material-symbol text-lg font-light">edit</span>
-                                        </Link>
-                                        <button
-                                            onClick={() => setDeleteTarget(service)}
-                                            aria-label={`Archivar ${service.name}`}
-                                            className="size-10 flex items-center justify-center rounded-xl bg-danger/10 text-danger/70 hover:bg-danger/20 hover:text-danger transition-colors duration-300"
-                                        >
-                                            <span className="material-symbol text-lg font-light" aria-hidden="true">archive</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-
-                {filtered.length === 0 && !search && (
-                    <div className="text-center py-10">
-                        <p className="text-aesthetic-muted text-sm italic font-display">Sin servicios aún. ¡Agrega el primero!</p>
-                    </div>
+                {archivedCount > 0 && (
+                    <button
+                        onClick={() => setShowArchived(value => !value)}
+                        aria-pressed={showArchived}
+                        className={`rounded-full border px-4 py-2.5 text-xs font-semibold transition-colors ${
+                            showArchived
+                                ? 'border-transparent bg-text-strong text-white'
+                                : 'border-line text-text-muted hover:text-text-strong'
+                        }`}
+                    >
+                        Archivados ({archivedCount})
+                    </button>
                 )}
             </div>
 
-            {/* Delete Confirmation Modal */}
-            {deleteTarget && (
-                <div className="fixed inset-0 bg-aesthetic-taupe/40 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-fade-in" onClick={() => !deleting && setDeleteTarget(null)}>
-                    <div className="bg-aesthetic-cream rounded-[2.5rem] p-10 w-full max-w-sm shadow-2xl relative border border-white/50 text-center" onClick={e => e.stopPropagation()}>
-                        {/* Decorative */}
-                        <div className="absolute top-0 right-0 size-32 bg-danger/10 blur-3xl rounded-full -mr-16 -mt-16" />
+            {visible.length === 0 ? (
+                <div className="blank-slate">
+                    {search ? (
+                        <>
+                            <p className="t-body">Ningún servicio coincide con «{search}».</p>
+                            <button
+                                onClick={() => setSearch('')}
+                                className="t-meta underline underline-offset-4 hover:text-text-strong"
+                            >
+                                Limpiar la búsqueda
+                            </button>
+                        </>
+                    ) : showArchived ? (
+                        <p className="t-body">No tienes servicios archivados.</p>
+                    ) : (
+                        <>
+                            <span className="material-symbol text-3xl opacity-40" aria-hidden="true">spa</span>
+                            <p className="t-body">Tu catálogo está vacío.</p>
+                            <p className="t-meta">Añade tu primer servicio para empezar a recibir reservas.</p>
+                        </>
+                    )}
+                </div>
+            ) : (
+                <div className="space-y-10">
+                    {grouped.map(([category, items]) => (
+                        <section key={category}>
+                            <h2 className="t-label mb-4">{category}</h2>
+                            <ul className="space-y-3">
+                                {items.map(service => (
+                                    <li key={service.id} className="sheet flex items-center gap-4 p-4">
+                                        <span className="size-14 shrink-0 overflow-hidden rounded-xl border border-line bg-surface-sunken">
+                                            {service.image_url ? (
+                                                <img
+                                                    src={api.getImageUrl(service.image_url)}
+                                                    alt=""
+                                                    className="size-full object-cover"
+                                                />
+                                            ) : (
+                                                <span className="grid size-full place-items-center text-text-subtle">
+                                                    <span className="material-symbol" aria-hidden="true">spa</span>
+                                                </span>
+                                            )}
+                                        </span>
 
-                        <div className="relative">
-                            <div className="size-16 rounded-full bg-danger/10 border border-danger/20 flex items-center justify-center mx-auto mb-6">
-                                <span className="material-symbol text-danger text-3xl" aria-hidden="true">archive</span>
-                            </div>
-                            <h3 className="font-display text-2xl italic text-aesthetic-taupe mb-3">¿Archivar servicio?</h3>
-                            <p className="text-sm text-aesthetic-muted mb-8 leading-relaxed">
-                                <strong className="text-aesthetic-taupe">&ldquo;{deleteTarget.name}&rdquo;</strong> dejará de aparecer
-                                en tu página de reservas. Las citas pasadas conservan su nombre y precio.
-                            </p>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="t-body truncate font-semibold text-text-strong">
+                                                {service.name}
+                                            </p>
+                                            <p className="t-meta t-figure">
+                                                {service.duration_minutes} min ·{' '}
+                                                {formatMoney(service.estimated_price, currency)}
+                                                {service.required_advance > 0 && (
+                                                    <> · anticipo {formatMoney(service.required_advance, currency)}</>
+                                                )}
+                                            </p>
+                                        </div>
 
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setDeleteTarget(null)}
-                                    disabled={deleting}
-                                    className="flex-1 py-4 rounded-full border border-aesthetic-accent text-aesthetic-muted text-[10px] tracking-[0.2em] uppercase font-bold hover:bg-white transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleArchive}
-                                    disabled={deleting}
-                                    className="flex-1 py-4 rounded-full bg-danger text-white text-[10px] tracking-[0.2em] uppercase font-bold shadow-minimal transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {deleting ? (
-                                        <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        'Archivar'
-                                    )}
-                                </button>
-                            </div>
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            <Link
+                                                href={`/admin/services/new?id=${service.id}`}
+                                                aria-label={`Editar ${service.name}`}
+                                                className="grid size-10 place-items-center rounded-xl border border-line text-text-muted transition-colors hover:text-text-strong"
+                                            >
+                                                <span className="material-symbol text-lg" aria-hidden="true">edit</span>
+                                            </Link>
+
+                                            {service.active ? (
+                                                <button
+                                                    onClick={() => setTarget(service)}
+                                                    aria-label={`Archivar ${service.name}`}
+                                                    className="grid size-10 place-items-center rounded-xl border border-line text-text-muted transition-colors hover:border-danger/40 hover:text-danger"
+                                                >
+                                                    <span className="material-symbol text-lg" aria-hidden="true">archive</span>
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setArchived(service, false)}
+                                                    disabled={working}
+                                                    aria-label={`Restaurar ${service.name}`}
+                                                    className="grid size-10 place-items-center rounded-xl border border-line text-text-muted transition-colors hover:border-success/40 hover:text-success disabled:opacity-50"
+                                                >
+                                                    <span className="material-symbol text-lg" aria-hidden="true">unarchive</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    ))}
+                </div>
+            )}
+
+            {target && (
+                <div
+                    className="animate-fade-in fixed inset-0 z-50 grid place-items-center p-6"
+                    onClick={() => !working && setTarget(null)}
+                >
+                    <div className="absolute inset-0 bg-text-strong/25 backdrop-blur-sm" />
+                    <div
+                        role="dialog"
+                        aria-label="Confirmar archivado"
+                        className="sheet relative w-full max-w-sm p-8 text-center shadow-lg"
+                        onClick={event => event.stopPropagation()}
+                    >
+                        <h3 className="t-title mb-3">¿Archivar «{target.name}»?</h3>
+                        <p className="t-body mb-8">
+                            Dejará de aparecer en tu página de reservas. Las citas pasadas conservan
+                            su nombre y precio, y puedes restaurarlo cuando quieras.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setTarget(null)}
+                                disabled={working}
+                                className="flex-1 rounded-full border border-line py-3 text-sm font-semibold text-text-muted transition-colors hover:text-text-strong"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => setArchived(target, true)}
+                                disabled={working}
+                                className="flex-1 rounded-full bg-text-strong py-3 text-sm font-semibold text-white disabled:opacity-50"
+                            >
+                                {working ? 'Archivando…' : 'Archivar'}
+                            </button>
                         </div>
                     </div>
                 </div>

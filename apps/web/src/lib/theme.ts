@@ -33,3 +33,26 @@ export function applyBranding(branding: TenantBranding | undefined): void {
     if (branding?.primary_color) root.style.setProperty('--brand-primary', branding.primary_color);
     if (branding?.secondary_color) root.style.setProperty('--brand-secondary', branding.secondary_color);
 }
+
+/**
+ * Removes any palette written by a live preview, so the document falls back to
+ * the values defined in the stylesheet.
+ *
+ * `applyBranding` writes inline custom properties on the root element, which
+ * outrank the stylesheet and survive navigation. Without this, an owner who
+ * clicked through the palettes to compare them and then left without saving
+ * kept the last one she happened to click — across the whole panel — until a
+ * hard reload.
+ */
+export function clearBrandingPreview(): void {
+    if (typeof document === 'undefined') return;
+
+    const root = document.documentElement;
+    const tokens = Object.keys(PALETTES[0].tokens);
+
+    for (const token of tokens) root.style.removeProperty(token);
+    root.style.removeProperty('--font-display');
+    root.style.removeProperty('--font-body');
+    root.style.removeProperty('--brand-primary');
+    root.style.removeProperty('--brand-secondary');
+}

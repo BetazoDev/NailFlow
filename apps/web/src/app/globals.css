@@ -577,3 +577,103 @@ body {
   -webkit-font-feature-settings: 'liga';
   font-feature-settings: 'liga';
 }
+
+/* ============================================================================
+   Editorial type scale
+
+   The admin panel had text as small as 7px and shouted in wide-tracked
+   uppercase almost everywhere, which flattened every hierarchy: a client's
+   name and a field label carried the same visual weight. These are the only
+   sizes the panel should use.
+
+   The display face is for headings. Data — names, times, money — is set in the
+   body face, because italic serif numerals are markedly harder to scan.
+   ============================================================================ */
+
+.t-display {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 2.25rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
+.t-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.375rem;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+/* Micro-label above a value. Uppercase earns its place only at this size. */
+.t-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.t-body {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.t-meta {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* Times, prices, counts: tabular figures so columns line up. */
+.t-figure {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ============================================================================
+   Editorial surfaces
+
+   One card treatment, one divider, one hover. Hairlines carry the structure so
+   the page stays quiet; shadows are reserved for things that genuinely float
+   above the page, like the detail drawer.
+   ============================================================================ */
+
+.sheet {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.sheet-interactive {
+  transition: border-color var(--duration-fast) var(--ease),
+              background-color var(--duration-fast) var(--ease);
+}
+
+.sheet-interactive:hover {
+  border-color: var(--brand-primary-soft);
+  background: var(--brand-primary-tint);
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* Empty states: say what is missing and what to do, never just a shrug. */
+.blank-slate {
+  display: grid;
+  place-items: center;
+  gap: 0.75rem;
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+}

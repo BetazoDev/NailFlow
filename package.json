@@ -17,6 +17,7 @@
         "lint": "npm run build -w @nailflow/shared && eslint \"apps/api/src/**/*.ts\" \"packages/**/src/**/*.ts\" && npm run lint -w @nailflow/web"
     },
     "devDependencies": {
-        "concurrently": "^9.2.1"
+        "concurrently": "^9.2.1",
+        "tsx": "^4.23.13"
     }
 }

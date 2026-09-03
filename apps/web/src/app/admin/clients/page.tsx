@@ -4,17 +4,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/session-context';
 import { buildClients, loyaltyStatusFor } from '@/lib/clients';
-import { formatMoney, formatShortDate, formatDate, formatTime, initials, whatsappLink } from '@/lib/format';
+import { formatDate, formatMoney, formatShortDate, formatTime, initials, whatsappLink } from '@/lib/format';
 import { STATUS_PRESENTATION } from '@/lib/constants';
 import type { Appointment, Client, Service } from '@/lib/types';
 
-type FilterTab = 'todas' | 'recientes' | 'favoritas';
+type Tab = 'todas' | 'recientes' | 'favoritas';
 
-const TAB_LABELS: Record<FilterTab, string> = {
+const TAB_LABEL: Record<Tab, string> = {
     todas: 'Todas',
     recientes: 'Recientes',
     favoritas: 'Favoritas',
 };
+
+/** "Recientes" means a real window, not an arbitrary top-5. */
+const RECENT_DAYS = 30;
 
 export default function ClientsPage() {
     const { tenant } = useSession();
@@ -23,12 +26,15 @@ export default function ClientsPage() {
     const [services, setServices] = useState<Service[]>([]);
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
-    const [loadError, setLoadError] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const [search, setSearch] = useState('');
-    const [activeTab, setActiveTab] = useState<FilterTab>('todas');
-    const [expandedPhone, setExpandedPhone] = useState<string | null>(null);
-    const [historyClient, setHistoryClient] = useState<Client | null>(null);
+    const [tab, setTab] = useState<Tab>('todas');
+    const [expanded, setExpanded] = useState<string | null>(null);
+    const [history, setHistory] = useState<Client | null>(null);
+
+    const currency = tenant?.settings?.currency;
+    const loyalty = tenant?.settings?.loyalty;
 
     useEffect(() => {
         if (!tenant) return;
@@ -46,7 +52,7 @@ export default function ClientsPage() {
                 setFavorites(nextFavorites);
             })
             .catch(() => {
-                if (!cancelled) setLoadError('No pudimos cargar tus clientas. Recarga la página.');
+                if (!cancelled) setError('No pudimos cargar tus clientas. Recarga la página.');
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -62,17 +68,11 @@ export default function ClientsPage() {
         [appointments, services, favorites]
     );
 
-    const loyalty = tenant?.settings?.loyalty;
-    const getLoyaltyStatus = useCallback(
-        (client: Client) => loyaltyStatusFor(client, loyalty),
-        [loyalty]
-    );
-
     const filtered = useMemo(() => {
         let list = clients;
+        const query = search.trim().toLowerCase();
 
-        if (search.trim()) {
-            const query = search.trim().toLowerCase();
+        if (query) {
             list = list.filter(
                 client =>
                     client.name.toLowerCase().includes(query) ||
@@ -81,15 +81,21 @@ export default function ClientsPage() {
             );
         }
 
-        if (activeTab === 'recientes') list = list.slice(0, 5);
-        if (activeTab === 'favoritas') list = list.filter(client => client.favorite);
+        if (tab === 'recientes') {
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - RECENT_DAYS);
+            const key = cutoff.toISOString();
+            list = list.filter(client => client.lastVisit && client.lastVisit >= key);
+        }
+
+        if (tab === 'favoritas') list = list.filter(client => client.favorite);
 
         return list;
-    }, [clients, search, activeTab]);
+    }, [clients, search, tab]);
 
     /**
-     * Optimistic: the star flips immediately and reverts if the write fails.
-     * Waiting on the round trip made the control feel broken on a slow network.
+     * Optimistic: the star flips at once and reverts if the write fails.
+     * Waiting on the round trip made the control feel broken.
      */
     const toggleFavorite = async (client: Client) => {
         const next = !client.favorite;
@@ -110,311 +116,308 @@ export default function ClientsPage() {
                 else reverted.add(client.phone);
                 return reverted;
             });
+            setError('No pudimos guardar el favorito.');
         }
     };
 
-    const getClientHistory = useCallback(
+    /**
+     * Both the grouping and this lookup trim the phone, so a row stored with
+     * stray whitespace still lands in the history it counted towards.
+     */
+    const historyFor = useCallback(
         (client: Client) =>
             appointments
-                .filter(appointment => appointment.client_phone === client.phone)
+                .filter(appointment => appointment.client_phone?.trim() === client.phone)
                 .sort((a, b) => b.datetime_start.localeCompare(a.datetime_start)),
         [appointments]
     );
 
     if (loading) {
         return (
-            <div className="space-y-3 p-6" aria-busy="true" aria-label="Cargando clientas">
-                {Array.from({ length: 5 }, (_, index) => (
-                    <div key={index} className="skeleton h-24 w-full" />
+            <div className="space-y-4 p-2" aria-busy="true" aria-label="Cargando clientas">
+                <div className="skeleton h-12 w-64" />
+                {Array.from({ length: 5 }, (_, i) => (
+                    <div key={i} className="skeleton h-20 w-full" />
                 ))}
             </div>
-        );
-    }
-
-    if (loadError) {
-        return (
-            <p role="alert" className="m-6 rounded-2xl border border-danger/30 bg-danger/10 p-6 text-center text-sm text-danger">
-                {loadError}
-            </p>
         );
     }
 
     return (
-        <div className="relative min-h-full pb-24" >
-            {/* Header */}
-            <div className="px-6 pt-8 pb-0">
-                <div className="flex items-center justify-center mb-4">
-                    <h1 className="font-display text-4xl font-light italic tracking-tight text-aesthetic-taupe text-center">Mis Clientas</h1>
-                </div>
-            </div>
+        <div className="pb-16">
+            {error && (
+                <p role="alert" className="mb-6 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+                    {error}
+                </p>
+            )}
 
-            {/* Search */}
-            <div className="px-6 mt-4">
-                <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <span className="material-symbol text-aesthetic-muted/60 text-xl font-light">search</span>
-                    </div>
+            <header className="mb-8">
+                <p className="t-label mb-2">Tu gente</p>
+                <h1 className="t-display">Clientas</h1>
+            </header>
+
+            <div className="mb-8 space-y-4">
+                <div className="relative">
                     <label htmlFor="client-search" className="sr-only">Buscar clienta</label>
+                    <span
+                        className="material-symbol pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle"
+                        aria-hidden="true"
+                    >
+                        search
+                    </span>
                     <input
                         id="client-search"
                         type="search"
-                        className="block w-full pl-11 pr-4 py-3.5 bg-aesthetic-soft-pink/40 border-none rounded-full focus:ring-1 focus:ring-aesthetic-pink/30 placeholder:text-aesthetic-muted/50 text-base font-display italic"
-                        placeholder="Buscar clienta..."
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        onChange={event => setSearch(event.target.value)}
+                        placeholder="Buscar por nombre, teléfono o correo…"
+                        className="input-field pl-12"
                     />
+                </div>
+
+                <div className="flex gap-2">
+                    {(Object.keys(TAB_LABEL) as Tab[]).map(key => (
+                        <button
+                            key={key}
+                            onClick={() => setTab(key)}
+                            aria-pressed={tab === key}
+                            className={`rounded-full border px-4 py-2 text-xs font-semibold transition-colors ${
+                                tab === key
+                                    ? 'border-transparent bg-text-strong text-white'
+                                    : 'border-line text-text-muted hover:text-text-strong'
+                            }`}
+                        >
+                            {TAB_LABEL[key]}
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            {/* Filter tabs */}
-            <div className="px-6 mt-4 flex gap-2">
-                {(['todas', 'recientes', 'favoritas'] as FilterTab[]).map(tab => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        aria-pressed={activeTab === tab}
-                        className={`pill-tab ${activeTab === tab ? 'pill-tab-active' : 'pill-tab-inactive'}`}
-                    >
-                        {tab === 'favoritas' && <span className="material-symbol text-sm mr-1" aria-hidden="true">star</span>}
-                        {TAB_LABELS[tab]}
-                    </button>
-                ))}
-            </div>
-
-            {/* Client list */}
-            <div className="px-6 mt-5 space-y-3 stagger-children">
-                {filtered.map(client => {
-                    const expanded = expandedPhone === client.phone;
-                    const loyaltyStatus = getLoyaltyStatus(client);
-                    const hasReward = Boolean(loyaltyStatus && loyaltyStatus.rewards > 0);
-                    const whatsapp = whatsappLink(
-                        client.phone,
-                        `¡Hola ${client.name}! Te escribimos de ${tenant?.name ?? 'tu salón'}.`
-                    );
-
-                    return (
-                        <div key={client.phone} className="bg-white/60 backdrop-blur-sm rounded-3xl overflow-hidden border border-aesthetic-accent transition-all duration-300 hover:shadow-minimal">
-                            {/* Loyalty reward banner (collapsed) */}
-                            {hasReward && (
-                                <div className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-yellow-200">
-                                    <span className="text-lg">🎁</span>
-                                    <p className="text-[10px] tracking-[0.2em] uppercase font-bold text-amber-700">
-                                        {loyaltyStatus!.rewardType === 'free_service'
-                                            ? '¡Premio listo! Servicio gratis acumulado'
-                                            : `¡Premio listo! ${loyaltyStatus!.discountValue}% de descuento acumulado`
-                                        }
-                                    </p>
-                                </div>
-                            )}
-                            {/* Main row */}
+            {filtered.length === 0 ? (
+                <div className="blank-slate">
+                    {search ? (
+                        <>
+                            <p className="t-body">Ninguna clienta coincide con «{search}».</p>
                             <button
-                                className="w-full text-left flex items-center gap-5 p-5 active:bg-aesthetic-soft-pink/20 transition-colors"
-                                onClick={() => setExpandedPhone(expanded ? null : client.phone)}
+                                onClick={() => setSearch('')}
+                                className="t-meta underline underline-offset-4 hover:text-text-strong"
                             >
-                                {/* Avatar */}
-                                <div className="size-14 rounded-full flex items-center justify-center flex-shrink-0 text-base font-bold font-display italic border border-aesthetic-accent shadow-sm bg-aesthetic-soft-pink text-aesthetic-taupe">
-                                    {initials(client.name)}
-                                </div>
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-xl font-medium leading-tight text-aesthetic-taupe font-display">{client.name}</h3>
-                                        {client.favorite && (
-                                            <span className="material-symbol text-yellow-400 text-lg">star</span>
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-aesthetic-muted/80 mt-1 font-display italic">
-                                        Últ: {client.lastVisit ? formatShortDate(client.lastVisit) : 'Sin visitas'} • <span className="opacity-60">{client.lastService || 'Servicio'}</span>
-                                        {client.visits > 1 && <span className="ml-2 opacity-40">({client.visits} visitas)</span>}
+                                Limpiar la búsqueda
+                            </button>
+                        </>
+                    ) : tab === 'favoritas' ? (
+                        <p className="t-body">Aún no has marcado favoritas.</p>
+                    ) : tab === 'recientes' ? (
+                        <p className="t-body">Nadie ha venido en los últimos {RECENT_DAYS} días.</p>
+                    ) : (
+                        <>
+                            <span className="material-symbol text-3xl opacity-40" aria-hidden="true">group</span>
+                            <p className="t-body">Todavía no tienes clientas.</p>
+                            <p className="t-meta">Aparecerán aquí en cuanto reserven por primera vez.</p>
+                        </>
+                    )}
+                </div>
+            ) : (
+                <ul className="space-y-3">
+                    {filtered.map(client => {
+                        const status = loyaltyStatusFor(client, loyalty);
+                        const hasReward = Boolean(status && status.rewards > 0);
+                        const isOpen = expanded === client.phone;
+                        const wa = whatsappLink(
+                            client.phone,
+                            `¡Hola ${client.name}! Te escribimos de ${tenant?.name ?? 'tu salón'}.`
+                        );
+
+                        return (
+                            <li key={client.phone} className="sheet overflow-hidden">
+                                {hasReward && (
+                                    <p className="flex items-center gap-2 border-b border-line bg-brand-tint px-5 py-2.5">
+                                        <span aria-hidden="true">🎁</span>
+                                        <span className="t-meta font-semibold text-text-strong">
+                                            {status!.rewardType === 'free_service'
+                                                ? 'Tiene un servicio gratis acumulado'
+                                                : `Tiene ${status!.discountValue}% de descuento acumulado`}
+                                        </span>
                                     </p>
-                                </div>
-                                {/* Star + Chevron */}
-                                <div className="flex items-center gap-2">
+                                )}
+
+                                {/* The row and the star are siblings, not nested buttons.
+                                    A button inside a button is invalid HTML and the
+                                    parser rewrote it, breaking hydration on this page. */}
+                                <div className="flex items-center gap-4 p-4">
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); void toggleFavorite(client); }}
-                                        aria-label={client.favorite ? `Quitar a ${client.name} de favoritas` : `Marcar a ${client.name} como favorita`}
-                                        aria-pressed={client.favorite}
-                                        className="size-9 rounded-full flex items-center justify-center hover:bg-aesthetic-soft-pink/40 transition-colors"
+                                        onClick={() => setExpanded(isOpen ? null : client.phone)}
+                                        aria-expanded={isOpen}
+                                        className="flex min-w-0 flex-1 items-center gap-4 text-left"
                                     >
-                                        <span className={`material-symbol text-xl ${client.favorite ? 'text-yellow-400' : 'text-aesthetic-muted/30'}`}>
+                                        <span className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-tint text-sm font-semibold text-text-strong">
+                                            {initials(client.name)}
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="t-body block truncate font-semibold text-text-strong">
+                                                {client.name}
+                                            </span>
+                                            <span className="t-meta block truncate">
+                                                {client.lastVisit
+                                                    ? `Últ. ${formatShortDate(client.lastVisit)} · ${client.lastService ?? 'Servicio'}`
+                                                    : 'Sin visitas completadas'}
+                                                {client.visits > 1 && ` · ${client.visits} visitas`}
+                                            </span>
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => toggleFavorite(client)}
+                                        aria-pressed={client.favorite}
+                                        aria-label={
+                                            client.favorite
+                                                ? `Quitar a ${client.name} de favoritas`
+                                                : `Marcar a ${client.name} como favorita`
+                                        }
+                                        className="grid size-10 shrink-0 place-items-center rounded-xl transition-colors hover:bg-surface-sunken"
+                                    >
+                                        <span
+                                            className={`material-symbol text-xl ${client.favorite ? 'text-warning' : 'text-text-subtle'}`}
+                                            aria-hidden="true"
+                                        >
                                             {client.favorite ? 'star' : 'star_border'}
                                         </span>
                                     </button>
-                                    <span className={`material-symbol text-aesthetic-muted/40 transition-transform duration-500 scale-125 ${expanded ? 'rotate-180' : ''}`}>
-                                        expand_more
-                                    </span>
                                 </div>
-                            </button>
 
-                            {/* Expanded details */}
-                            {expanded && (
-                                <div className="px-6 pb-6 border-t border-aesthetic-accent/30 pt-4 space-y-6 animate-fade-in">
-                                    {/* Loyalty reward detail block */}
-                                    {hasReward && (
-                                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-yellow-200">
-                                            <span className="text-2xl mt-0.5">🎁</span>
-                                            <div>
-                                                <p className="text-[10px] tracking-[0.25em] uppercase font-bold text-amber-700 mb-1">Premio de Fidelidad Listo</p>
-                                                <p className="text-sm text-amber-800 font-display italic">
-                                                    {loyaltyStatus!.rewardType === 'free_service'
-                                                        ? `Esta clienta ha acumulado ${loyaltyStatus!.rewards > 1 ? `${loyaltyStatus!.rewards}x ` : ''}un servicio gratis. ¡Es momento de recompensarla!`
-                                                        : `Esta clienta merece un ${loyaltyStatus!.discountValue}% de descuento en su próxima visita.`
-                                                    }
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* Contact info */}
-                                    <div className="flex flex-wrap gap-3 text-xs text-aesthetic-muted">
-                                        <span className="flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 border border-aesthetic-accent/20">
-                                            <span className="material-symbol text-sm">phone</span>
-                                            {client.phone}
-                                        </span>
-                                        {client.email && (
-                                            <span className="flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 border border-aesthetic-accent/20">
-                                                <span className="material-symbol text-sm">mail</span>
-                                                {client.email}
+                                {isOpen && (
+                                    <div className="animate-fade-in space-y-5 border-t border-line p-5">
+                                        <dl className="grid grid-cols-3 gap-3">
+                                            <Stat label="Visitas" value={client.visits} />
+                                            <Stat
+                                                label="Inversión"
+                                                value={formatMoney(client.totalSpent, currency)}
+                                            />
+                                            <Stat
+                                                label="Ticket medio"
+                                                value={formatMoney(
+                                                    client.visits > 0 ? client.totalSpent / client.visits : 0,
+                                                    currency
+                                                )}
+                                            />
+                                        </dl>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className="t-meta rounded-full border border-line px-3 py-1.5">
+                                                {client.phone}
                                             </span>
-                                        )}
-                                    </div>
+                                            {client.email && (
+                                                <span className="t-meta rounded-full border border-line px-3 py-1.5">
+                                                    {client.email}
+                                                </span>
+                                            )}
+                                        </div>
 
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div className="bg-white border border-aesthetic-accent rounded-2xl p-4 text-center shadow-sm">
-                                            <p className="font-display text-2xl font-light italic text-aesthetic-taupe mb-1">{client.visits}</p>
-                                            <p className="text-[8px] tracking-[0.2em] text-aesthetic-muted uppercase font-bold">Visitas</p>
-                                        </div>
-                                        <div className="bg-white border border-aesthetic-accent rounded-2xl p-4 text-center shadow-sm">
-                                            <p className="font-display text-2xl font-light italic text-aesthetic-taupe mb-1">{formatMoney(client.totalSpent, tenant?.settings?.currency)}</p>
-                                            <p className="text-[8px] tracking-[0.2em] text-aesthetic-muted uppercase font-bold">Inversión</p>
-                                        </div>
-                                        <div className="bg-white border border-aesthetic-accent rounded-2xl p-4 text-center shadow-sm">
-                                            <p className="font-display text-2xl font-light italic text-aesthetic-taupe mb-1">{formatMoney(client.visits > 0 ? client.totalSpent / client.visits : 0, tenant?.settings?.currency)}</p>
-                                            <p className="text-[8px] tracking-[0.2em] text-aesthetic-muted uppercase font-bold">Ticket Prom.</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3 pt-2">
-                                        <button
-                                            onClick={() => setHistoryClient(client)}
-                                            className="flex-1 py-4 rounded-full bg-aesthetic-pink text-white text-[10px] tracking-[0.2em] uppercase font-bold shadow-minimal transition-all active:scale-[0.98]"
-                                        >
-                                            Ver Historial
-                                        </button>
-                                        {whatsapp && (
-                                            <a
-                                                href={whatsapp}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                aria-label={`Escribir por WhatsApp a ${client.name}`}
-                                                className="size-12 rounded-full border border-aesthetic-accent flex items-center justify-center text-aesthetic-muted hover:bg-aesthetic-soft-pink/40 transition-all"
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => setHistory(client)}
+                                                className="flex-1 rounded-full border border-line py-3 text-sm font-semibold text-text-strong transition-colors hover:bg-surface-sunken"
                                             >
-                                                <span className="material-symbol text-xl" aria-hidden="true">chat</span>
-                                            </a>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-
-                {filtered.length === 0 && (
-                    <div className="text-center py-10">
-                        <p className="text-nf-gray text-sm italic">
-                            {search ? 'No se encontraron clientas' : activeTab === 'favoritas' ? 'Sin favoritas aún. Marca clientas con ⭐' : 'Sin clientas registradas aún'}
-                        </p>
-                    </div>
-                )}
-            </div>
-
-            {/* FAB */}
-
-
-            {/* History Modal */}
-            {historyClient && (
-                <div className="fixed inset-0 bg-aesthetic-taupe/40 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center animate-fade-in" onClick={() => setHistoryClient(null)}>
-                    <div className="bg-aesthetic-cream rounded-t-[3rem] sm:rounded-[3rem] w-full max-w-lg max-h-[85vh] shadow-2xl relative border border-white/50 overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-                        {/* Decorative */}
-                        <div className="absolute top-0 right-0 size-40 bg-aesthetic-pink/10 blur-3xl rounded-full -mr-20 -mt-20" />
-
-                        {/* Header */}
-                        <div className="p-8 pb-4 relative">
-                            <button onClick={() => setHistoryClient(null)} className="absolute top-6 right-6 size-10 rounded-full bg-white/50 flex items-center justify-center hover:bg-white transition-colors">
-                                <span className="material-symbol text-aesthetic-muted">close</span>
-                            </button>
-                            <p className="text-[10px] tracking-[0.4em] text-aesthetic-muted uppercase mb-2 font-display italic font-medium">Historial Completo</p>
-                            <h2 className="font-display text-3xl italic text-aesthetic-taupe leading-tight">{historyClient.name}</h2>
-                            <div className="flex items-center gap-3 mt-2 text-xs text-aesthetic-muted">
-                                <span>{historyClient.phone}</span>
-                                {historyClient.email && <span>• {historyClient.email}</span>}
-                            </div>
-                        </div>
-
-                        {/* Scrollable history list */}
-                        <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-3 custom-scrollbar">
-                            {getClientHistory(historyClient).map(apt => {
-                                const service = services.find(item => item.id === apt.service_id);
-                                const presentation = STATUS_PRESENTATION[apt.status];
-
-                                return (
-                                    <div key={apt.id} className="bg-white rounded-2xl p-5 border border-aesthetic-accent/20 shadow-sm">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-display text-lg italic text-aesthetic-taupe truncate">
-                                                    {apt.service_name ?? service?.name ?? 'Servicio'}
-                                                </p>
-                                                <p className="text-xs text-aesthetic-muted mt-1 capitalize">
-                                                    {formatDate(apt.datetime_start)} • {formatTime(apt.datetime_start)}
-                                                </p>
-                                            </div>
-                                            <div className="text-right flex-shrink-0 space-y-1">
-                                                <p className="font-semibold text-aesthetic-taupe">
-                                                    {formatMoney(apt.price, tenant?.settings?.currency)}
-                                                </p>
-                                                <span className="status-pill" data-status={presentation.token}>{presentation.label}</span>
-                                            </div>
+                                                Ver historial
+                                            </button>
+                                            {wa && (
+                                                <a
+                                                    href={wa}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    aria-label={`Escribir a ${client.name}`}
+                                                    className="grid size-12 shrink-0 place-items-center rounded-full border border-line text-text-muted transition-colors hover:text-text-strong"
+                                                >
+                                                    <span className="material-symbol text-xl text-[#25D366]" aria-hidden="true">chat</span>
+                                                </a>
+                                            )}
                                         </div>
                                     </div>
-                                );
-                            })}
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
 
-                            {getClientHistory(historyClient).length === 0 && (
-                                <div className="text-center py-10">
-                                    <p className="text-aesthetic-muted text-sm italic font-display">Sin historial de citas</p>
-                                </div>
-                            )}
+            {history && (
+                <div
+                    className="animate-fade-in fixed inset-0 z-50 grid place-items-end sm:place-items-center"
+                    onClick={() => setHistory(null)}
+                >
+                    <div className="absolute inset-0 bg-text-strong/25 backdrop-blur-sm" />
 
-                            {/* Summary */}
-                            <div className="mt-4 p-5 bg-aesthetic-soft-pink/20 rounded-2xl border border-aesthetic-accent/20">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-aesthetic-muted">Total visitas</span>
-                                    <span className="font-semibold text-aesthetic-taupe">{historyClient.visits}</span>
-                                </div>
-                                <div className="flex justify-between text-sm mt-2">
-                                    <span className="text-aesthetic-muted">Total invertido</span>
-                                    <span className="font-semibold text-aesthetic-taupe">{formatMoney(historyClient.totalSpent, tenant?.settings?.currency)}</span>
-                                </div>
-                                {/* Loyalty status in modal */}
-                                {(() => {
-                                    const ls = getLoyaltyStatus(historyClient);
-                                    if (!ls || ls.rewards === 0) return null;
+                    <div
+                        role="dialog"
+                        aria-label={`Historial de ${history.name}`}
+                        className="relative flex max-h-[85vh] w-full flex-col rounded-t-[2rem] bg-surface-raised shadow-lg sm:max-w-lg sm:rounded-[2rem]"
+                        onClick={event => event.stopPropagation()}
+                    >
+                        <header className="flex items-start justify-between gap-4 border-b border-line p-7">
+                            <div className="min-w-0">
+                                <p className="t-label mb-1.5">Historial completo</p>
+                                <h2 className="t-title truncate">{history.name}</h2>
+                            </div>
+                            <button
+                                onClick={() => setHistory(null)}
+                                aria-label="Cerrar"
+                                className="grid size-9 shrink-0 place-items-center rounded-full text-text-muted hover:bg-surface-sunken"
+                            >
+                                <span className="material-symbol text-xl" aria-hidden="true">close</span>
+                            </button>
+                        </header>
+
+                        <div className="flex-1 space-y-3 overflow-y-auto p-7">
+                            {historyFor(history).length === 0 ? (
+                                <p className="t-meta py-8 text-center">Sin citas registradas.</p>
+                            ) : (
+                                historyFor(history).map(appointment => {
+                                    const service = services.find(item => item.id === appointment.service_id);
+                                    const presentation = STATUS_PRESENTATION[appointment.status];
+
                                     return (
-                                        <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-2">
-                                            <span className="text-xl">🎁</span>
-                                            <p className="text-xs font-bold text-amber-700 tracking-wide">
-                                                {ls.rewardType === 'free_service'
-                                                    ? 'Tiene derecho a un servicio GRATIS'
-                                                    : `Tiene ${ls.discountValue}% de descuento acumulado`
-                                                }
-                                            </p>
+                                        <div key={appointment.id} className="sheet flex items-start justify-between gap-4 p-4">
+                                            <div className="min-w-0">
+                                                <p className="t-body truncate font-medium text-text-strong">
+                                                    {appointment.service_name ?? service?.name ?? 'Servicio'}
+                                                </p>
+                                                <p className="t-meta">
+                                                    {formatDate(appointment.datetime_start)} ·{' '}
+                                                    {formatTime(appointment.datetime_start)}
+                                                </p>
+                                            </div>
+                                            <div className="shrink-0 space-y-1.5 text-right">
+                                                <p className="t-figure font-medium text-text-strong">
+                                                    {formatMoney(appointment.price, currency)}
+                                                </p>
+                                                <span className="status-pill" data-status={presentation.token}>
+                                                    {presentation.label}
+                                                </span>
+                                            </div>
                                         </div>
                                     );
-                                })()}
-                            </div>
+                                })
+                            )}
                         </div>
+
+                        <footer className="border-t border-line p-7">
+                            <dl className="grid grid-cols-2 gap-4">
+                                <Stat label="Total visitas" value={history.visits} />
+                                <Stat label="Total invertido" value={formatMoney(history.totalSpent, currency)} />
+                            </dl>
+                        </footer>
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+    return (
+        <div className="sheet p-4 text-center">
+            <dt className="t-label mb-1.5">{label}</dt>
+            <dd className="t-figure text-lg font-semibold text-text-strong">{value}</dd>
         </div>
     );
 }

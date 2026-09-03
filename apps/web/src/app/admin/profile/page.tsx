@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session-context';
-import { applyBranding } from '@/lib/theme';
+import { applyBranding, clearBrandingPreview } from '@/lib/theme';
+import { Feedback, type FeedbackState } from '@/components/admin/Feedback';
 import { DEFAULT_PALETTE_ID, DEFAULT_TYPOGRAPHY_ID, PALETTES, TYPOGRAPHY, WEEKDAYS } from '@/lib/constants';
 import type { DaySchedule, TenantBranding, TenantSettings } from '@/lib/types';
 import {
@@ -48,7 +49,7 @@ export default function ProfilePage() {
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [weeklySchedule, setWeeklySchedule] = useState<DaySchedule[]>([]);
     const [saving, setSaving] = useState(false);
-    const [saveMsg, setSaveMsg] = useState('');
+    const [saveMsg, setSaveMsg] = useState<FeedbackState | null>(null);
     const logoRef = useRef<HTMLInputElement>(null);
 
     // Loyalty program state
@@ -57,15 +58,15 @@ export default function ProfilePage() {
     const [loyaltyRewardType, setLoyaltyRewardType] = useState<'discount' | 'free_service'>('discount');
     const [loyaltyDiscountValue, setLoyaltyDiscountValue] = useState(10);
     const [loyaltySaving, setLoyaltySaving] = useState(false);
-    const [loyaltyMsg, setLoyaltyMsg] = useState('');
+    const [loyaltyMsg, setLoyaltyMsg] = useState<FeedbackState | null>(null);
 
     // Password
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [pwSaving, setPwSaving] = useState(false);
-    const [pwMsg, setPwMsg] = useState('');
-    const [pwError, setPwError] = useState('');
+    const [pwMsg, setPwMsg] = useState<FeedbackState | null>(null);
+
 
     // Current user info
     const user = auth.currentUser;
@@ -96,7 +97,15 @@ export default function ProfilePage() {
      */
     useEffect(() => {
         applyBranding({ ...currentBranding, palette_id: paletteId, typography: typographyId });
-    }, [paletteId, typographyId, currentBranding]);
+
+        // The preview writes inline custom properties on the root element, which
+        // outrank the stylesheet and outlive this page. Clearing them on unmount
+        // is what makes "leaving without saving" actually discard the choice.
+        return () => {
+            clearBrandingPreview();
+            applyBranding(tenant?.branding);
+        };
+    }, [paletteId, typographyId, currentBranding, tenant]);
 
     /**
      * One save path for every section of this page.
@@ -106,23 +115,26 @@ export default function ProfilePage() {
      */
     const save = async (
         patch: { name?: string; branding?: TenantBranding; settings?: TenantSettings },
-        onMessage: (message: string) => void
+        onMessage: (state: FeedbackState | null) => void
     ) => {
         try {
             const updated = await api.updateTenant(patch);
             setCurrentBranding(updated.branding ?? {});
             await refresh();
-            onMessage('¡Guardado!');
+            onMessage({ tone: 'success', message: 'Guardado' });
         } catch (caught) {
-            onMessage(caught instanceof ApiError ? caught.message : 'Error al guardar. Intenta de nuevo.');
+            onMessage({
+                tone: 'error',
+                message: caught instanceof ApiError ? caught.message : 'Error al guardar. Intenta de nuevo.',
+            });
         } finally {
-            setTimeout(() => onMessage(''), 3000);
+            setTimeout(() => onMessage(null), 4000);
         }
     };
 
     const handleSaveInfo = async () => {
         setSaving(true);
-        setSaveMsg('');
+        setSaveMsg(null);
         try {
             let logoUrl = logoPreview;
             if (logoFile) {
@@ -136,8 +148,11 @@ export default function ProfilePage() {
                 setSaveMsg
             );
         } catch (caught) {
-            setSaveMsg(caught instanceof ApiError ? caught.message : 'No pudimos subir el logo.');
-            setTimeout(() => setSaveMsg(''), 3000);
+            setSaveMsg({
+                tone: 'error',
+                message: caught instanceof ApiError ? caught.message : 'No pudimos subir el logo.',
+            });
+            setTimeout(() => setSaveMsg(null), 4000);
         } finally {
             setSaving(false);
         }
@@ -145,7 +160,7 @@ export default function ProfilePage() {
 
     const handleSaveAppearance = async () => {
         setSaving(true);
-        setSaveMsg('');
+        setSaveMsg(null);
         await save({ branding: { palette_id: paletteId, typography: typographyId } }, setSaveMsg);
         setSaving(false);
     };
@@ -154,34 +169,36 @@ export default function ProfilePage() {
         const invalid = weeklySchedule.find(day => day.active && day.start >= day.end);
         if (invalid) {
             const label = WEEKDAYS.find(day => day.day === invalid.day)?.label ?? 'Un día';
-            setSaveMsg(`${label}: la hora de cierre debe ser posterior a la de apertura.`);
-            setTimeout(() => setSaveMsg(''), 4000);
+            setSaveMsg({
+                tone: 'error',
+                message: `${label}: la hora de cierre debe ser posterior a la de apertura.`,
+            });
+            setTimeout(() => setSaveMsg(null), 4000);
             return;
         }
 
         setSaving(true);
-        setSaveMsg('');
+        setSaveMsg(null);
         await save({ settings: { weekly_schedule: weeklySchedule } }, setSaveMsg);
         setSaving(false);
     };
 
     const handleChangePassword = async () => {
-        setPwError('');
-        setPwMsg('');
+        setPwMsg(null);
         if (!newPassword || !currentPassword) {
-            setPwError('Por favor llena todos los campos.');
+            setPwMsg({ tone: 'error', message: 'Por favor llena todos los campos.' });
             return;
         }
         if (newPassword.length < 6) {
-            setPwError('La nueva contraseña debe tener al menos 6 caracteres.');
+            setPwMsg({ tone: 'error', message: 'La nueva contraseña debe tener al menos 6 caracteres.' });
             return;
         }
         if (newPassword !== confirmPassword) {
-            setPwError('Las contraseñas no coinciden.');
+            setPwMsg({ tone: 'error', message: 'Las contraseñas no coinciden.' });
             return;
         }
         if (!user || !user.email) {
-            setPwError('No hay sesión activa.');
+            setPwMsg({ tone: 'error', message: 'No hay sesión activa.' });
             return;
         }
         setPwSaving(true);
@@ -189,20 +206,20 @@ export default function ProfilePage() {
             const credential = EmailAuthProvider.credential(user.email, currentPassword);
             await reauthenticateWithCredential(user, credential);
             await updatePassword(user, newPassword);
-            setPwMsg('¡Contraseña actualizada con éxito!');
+            setPwMsg({ tone: 'success', message: 'Contraseña actualizada' });
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
         } catch (e: unknown) {
             const firebaseError = e as { code?: string; message?: string };
             if (firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/invalid-credential') {
-                setPwError('La contraseña actual es incorrecta.');
+                setPwMsg({ tone: 'error', message: 'La contraseña actual es incorrecta.' });
             } else {
-                setPwError(firebaseError.message || 'Error al cambiar la contraseña.');
+                setPwMsg({ tone: 'error', message: 'No pudimos cambiar la contraseña.' });
             }
         } finally {
             setPwSaving(false);
-            setTimeout(() => setPwMsg(''), 3000);
+            setTimeout(() => setPwMsg(null), 4000);
         }
     };
 
@@ -227,7 +244,7 @@ export default function ProfilePage() {
 
     const handleSaveLoyalty = async () => {
         setLoyaltySaving(true);
-        setLoyaltyMsg('');
+        setLoyaltyMsg(null);
         await save(
             {
                 settings: {
@@ -356,11 +373,7 @@ export default function ProfilePage() {
                                     Guardar Configuración
                                 </Button>
 
-                                {saveMsg && (
-                                    <p className={`text-center text-[10px] font-bold uppercase tracking-widest animate-fade-in ${saveMsg.includes('éxito') ? 'text-green-500' : 'text-red-500'}`}>
-                                        {saveMsg}
-                                    </p>
-                                )}
+                                <Feedback state={saveMsg} />
                             </div>
                         </Card>
                     </div>
@@ -458,11 +471,7 @@ export default function ProfilePage() {
                                 Guardar apariencia
                             </Button>
 
-                            {saveMsg && (
-                                <p role="status" className="mt-4 text-center text-[10px] font-bold uppercase tracking-widest">
-                                    {saveMsg}
-                                </p>
-                            )}
+                            <Feedback state={saveMsg} />
                         </Card>
                     </div>
                 )}
@@ -545,11 +554,7 @@ export default function ProfilePage() {
                                 Guardar horarios
                             </Button>
 
-                            {saveMsg && (
-                                <p role="status" className="mt-4 text-center text-[10px] font-bold uppercase tracking-widest">
-                                    {saveMsg}
-                                </p>
-                            )}
+                            <Feedback state={saveMsg} />
                         </Card>
                     </div>
                 )}
@@ -593,16 +598,8 @@ export default function ProfilePage() {
                                     Guardar Nueva Contraseña
                                 </Button>
 
-                                {pwMsg && (
-                                    <p role="status" className="animate-fade-in text-center text-[10px] font-bold uppercase tracking-widest text-success">
-                                        {pwMsg}
-                                    </p>
-                                )}
-                                {pwError && (
-                                    <p role="alert" className="animate-fade-in text-center text-[10px] font-bold uppercase tracking-widest text-danger">
-                                        {pwError}
-                                    </p>
-                                )}
+                                <Feedback state={pwMsg} />
+                                
                             </div>
                         </Card>
                     </div>
@@ -739,13 +736,7 @@ export default function ProfilePage() {
                                         >
                                             Guardar Configuración
                                         </Button>
-                                        {loyaltyMsg && (
-                                            <p className={`text-center text-[10px] font-bold uppercase tracking-widest animate-fade-in mt-3 ${
-                                                loyaltyMsg.includes('éxito') ? 'text-green-500' : 'text-red-500'
-                                            }`}>
-                                                {loyaltyMsg}
-                                            </p>
-                                        )}
+                                        <Feedback state={loyaltyMsg} />
                                     </div>
                                 </div>
                             )}

@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session-context';
+import { formatMoney } from '@/lib/format';
 
-const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 150, 180];
+const DURATION_OPTIONS = [15, 30, 45, 60, 75, 90, 120, 150, 180];
 
-/** Suggested deposit, as a share of the price. The salon can override it. */
+/** Suggested when the owner has not set a deposit of her own. */
 const DEFAULT_DEPOSIT_RATE = 0.4;
 
-function NewServiceContent() {
+function ServiceEditor() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const id = searchParams.get('id');
@@ -27,12 +28,14 @@ function NewServiceContent() {
     const [category, setCategory] = useState('');
     const [active, setActive] = useState(true);
 
-    const [existingCategories, setExistingCategories] = useState<string[]>([]);
+    const [categories, setCategories] = useState<string[]>([]);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [saving, setSaving] = useState(false);
+    const [imageFile, setImageFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const currency = tenant?.settings?.currency;
 
     useEffect(() => {
         if (!tenant) return;
@@ -42,8 +45,8 @@ function NewServiceContent() {
             .then(services => {
                 if (cancelled) return;
 
-                setExistingCategories(
-                    [...new Set(services.map(service => service.category).filter(Boolean) as string[])].sort()
+                setCategories(
+                    [...new Set(services.map(item => item.category).filter(Boolean) as string[])].sort()
                 );
 
                 if (!id) return;
@@ -76,16 +79,17 @@ function NewServiceContent() {
     }, [id, tenant]);
 
     const numericPrice = Number(price) || 0;
-    const numericAdvance = advance === '' ? Math.round(numericPrice * DEFAULT_DEPOSIT_RATE) : Number(advance) || 0;
+    const suggestedAdvance = Math.round(numericPrice * DEFAULT_DEPOSIT_RATE);
+    const numericAdvance = advance.trim() === '' ? suggestedAdvance : Number(advance) || 0;
 
-    const validationError = useMemo(() => {
+    const validation = useMemo(() => {
         if (!name.trim()) return 'Ponle un nombre al servicio.';
         if (numericPrice < 0) return 'El precio no puede ser negativo.';
-        if (numericAdvance > numericPrice) return 'El anticipo no puede ser mayor que el precio.';
+        if (numericAdvance < 0) return 'El anticipo no puede ser negativo.';
+        if (numericAdvance > numericPrice) return 'El anticipo no puede superar el precio.';
         return null;
     }, [name, numericPrice, numericAdvance]);
 
-    /** Local preview only; the file reaches the CDN when the form is saved. */
     const handleImage = (files: FileList | null) => {
         const file = files?.[0];
         if (!file) return;
@@ -100,13 +104,13 @@ function NewServiceContent() {
         }
 
         setError(null);
-        setSelectedFile(file);
+        setImageFile(file);
         setImagePreview(URL.createObjectURL(file));
     };
 
     const handleSave = async () => {
-        if (validationError) {
-            setError(validationError);
+        if (validation) {
+            setError(validation);
             return;
         }
 
@@ -114,11 +118,8 @@ function NewServiceContent() {
         setSaving(true);
 
         try {
-            let imageUrl = selectedFile ? null : imagePreview;
-
-            if (selectedFile) {
-                imageUrl = await api.uploadImage(selectedFile, 'services');
-            }
+            let imageUrl = imageFile ? null : imagePreview;
+            if (imageFile) imageUrl = await api.uploadImage(imageFile, 'services');
 
             const payload = {
                 name: name.trim(),
@@ -131,11 +132,8 @@ function NewServiceContent() {
                 active,
             };
 
-            if (id) {
-                await api.updateService(id, payload);
-            } else {
-                await api.createService(payload);
-            }
+            if (id) await api.updateService(id, payload);
+            else await api.createService(payload);
 
             router.push('/admin/services');
             router.refresh();
@@ -150,171 +148,217 @@ function NewServiceContent() {
         }
     };
 
-    return (
-        <div className="min-h-full pb-24">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-8 border-b border-aesthetic-accent/20 bg-aesthetic-cream/50 backdrop-blur-md sticky top-0 z-10 transition-all duration-500">
-                <Link href="/admin/services" className="flex items-center justify-center size-10 rounded-full hover:bg-black/5 transition-colors">
-                    <span className="material-symbol text-aesthetic-muted font-light">arrow_back</span>
-                </Link>
-                <div className="flex-1 text-center">
-                    <h1 className="font-display text-xl font-medium tracking-tight text-aesthetic-taupe italic">
-                        {id ? 'Editar Servicio' : 'Nuevo Servicio'}
-                    </h1>
-                </div>
-                <div className="size-10" aria-hidden="true" />
+    if (loading) {
+        return (
+            <div className="mx-auto max-w-xl space-y-5 p-2" aria-busy="true">
+                <div className="skeleton aspect-[3/2] w-full" />
+                <div className="skeleton h-14 w-full" />
+                <div className="skeleton h-14 w-full" />
+                <div className="skeleton h-28 w-full" />
             </div>
+        );
+    }
 
-            {loading ? (
-                <div className="mx-auto w-full max-w-md space-y-6 px-6 py-8" aria-busy="true">
-                    <div className="skeleton aspect-square w-full max-w-[280px]" />
-                    <div className="skeleton h-14 w-full" />
-                    <div className="skeleton h-14 w-full" />
-                    <div className="skeleton h-32 w-full" />
+    return (
+        <div className="mx-auto max-w-xl pb-16">
+            <header className="mb-8 flex items-center gap-4">
+                <Link
+                    href="/admin/services"
+                    aria-label="Volver al catálogo"
+                    className="grid size-10 shrink-0 place-items-center rounded-full border border-line text-text-muted transition-colors hover:text-text-strong"
+                >
+                    <span className="material-symbol text-lg" aria-hidden="true">arrow_back</span>
+                </Link>
+                <div>
+                    <p className="t-label mb-1">Catálogo</p>
+                    <h1 className="t-title">{id ? 'Editar servicio' : 'Nuevo servicio'}</h1>
                 </div>
-            ) : (
-                <main className="max-w-md mx-auto w-full px-6 py-8 space-y-10">
-                    {/* Photo upload */}
-                    <section className="flex flex-col items-center gap-4">
-                        <div
-                            className="relative group cursor-pointer w-full aspect-square max-w-[280px] bg-white border border-dashed border-aesthetic-accent rounded-3xl flex flex-col items-center justify-center transition-all hover:bg-stone-50 overflow-hidden shadow-minimal"
-                            onClick={() => fileRef.current?.click()}
-                        >
-                            {imagePreview ? (
-                                <img
-                                    src={imagePreview.startsWith('blob:') ? imagePreview : api.getImageUrl(imagePreview)}
-                                    alt=""
-                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                />
-                            ) : (
-                                <div className="flex flex-col items-center gap-3 text-aesthetic-pink/40 group-hover:text-aesthetic-pink transition-colors">
-                                    <span className="material-symbol text-4xl font-light">photo_camera</span>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] font-display italic">Agregar Miniatura</p>
-                                </div>
-                            )}
-                        </div>
-                        <p className="text-[11px] text-aesthetic-muted/60 text-center px-8 leading-relaxed italic font-display">Sube una foto de alta calidad para destacar tu trabajo</p>
-                        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImage(e.target.files)} />
-                    </section>
+            </header>
 
-                    <div className="space-y-8">
-                        {/* Name */}
-                        <div className="space-y-2">
-                            <label htmlFor="service-name" className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Nombre del servicio</label>
-                            <input
-                                id="service-name"
-                                required
-                                className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 text-base font-display italic shadow-minimal transition-all placeholder:text-aesthetic-muted/30"
-                                placeholder="ej. Kapping Gel + Nail Art"
-                                value={name}
-                                onChange={e => setName(e.target.value)}
+            {error && (
+                <p role="alert" className="mb-6 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+                    {error}
+                </p>
+            )}
+
+            <div className="space-y-8">
+                <section>
+                    <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        className="group relative block aspect-[3/2] w-full overflow-hidden rounded-2xl border border-dashed border-line bg-surface-sunken/40 transition-colors hover:border-brand"
+                    >
+                        {imagePreview ? (
+                            <img
+                                src={imagePreview.startsWith('blob:') ? imagePreview : api.getImageUrl(imagePreview)}
+                                alt=""
+                                className="size-full object-cover"
                             />
-                        </div>
+                        ) : (
+                            <span className="grid size-full place-items-center gap-2 text-text-muted">
+                                <span className="material-symbol text-3xl" aria-hidden="true">add_photo_alternate</span>
+                                <span className="t-meta">Añadir una foto</span>
+                            </span>
+                        )}
+                    </button>
+                    <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={event => handleImage(event.target.files)}
+                    />
+                    <p className="t-meta mt-2 text-center">
+                        Es lo primero que ve tu clienta al elegir. JPG o PNG, hasta 8 MB.
+                    </p>
+                </section>
 
-                        {/* Category */}
-                        <div className="space-y-2">
-                            <label htmlFor="service-category" className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Categoría</label>
-                            <div className="relative">
-                                <input
-                                    id="service-category"
-                                    list="categories"
-                                    className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 text-base font-display italic shadow-minimal transition-all placeholder:text-aesthetic-muted/30"
-                                    placeholder="Selecciona o escribe una categoría"
-                                    value={category}
-                                    onChange={e => setCategory(e.target.value)}
-                                />
-                                <datalist id="categories">
-                                    {existingCategories.map(cat => (
-                                        <option key={cat} value={cat} />
-                                    ))}
-                                </datalist>
-                                <span className="material-symbol absolute right-4 top-1/2 -translate-y-1/2 text-aesthetic-muted/30 pointer-events-none">expand_more</span>
-                            </div>
-                        </div>
-
-                        {/* Description */}
-                        <div className="space-y-2">
-                            <label htmlFor="service-description" className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Descripción</label>
-                            <textarea
-                                id="service-description"
-                                rows={4}
-                                className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 text-base font-display italic shadow-minimal transition-all resize-none placeholder:text-aesthetic-muted/30"
-                                placeholder="Describe el procedimiento..."
-                                value={description}
-                                onChange={e => setDescription(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Price + Duration */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label htmlFor="service-price" className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Precio</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-aesthetic-muted/40 font-display italic">$</span>
-                                    <input
-                                        id="service-price"
-                                        className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 text-base font-display italic shadow-minimal transition-all pl-8"
-                                        placeholder="0.00"
-                                        value={price}
-                                        onChange={e => setPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                        inputMode="decimal"
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label htmlFor="service-duration" className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Duración</label>
-                                <div className="relative">
-                                    <select
-                                        id="service-duration"
-                                        className="w-full appearance-none bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-4 text-base font-display italic shadow-minimal transition-all pr-10"
-                                        value={duration}
-                                        onChange={e => setDuration(Number(e.target.value))}
-                                    >
-                                        {DURATION_OPTIONS.map(d => (
-                                            <option key={d} value={d}>{d} min</option>
-                                        ))}
-                                    </select>
-                                    <span className="material-symbol absolute right-3 top-1/2 -translate-y-1/2 text-aesthetic-muted/40 pointer-events-none text-xl">expand_more</span>
-                                </div>
-                            </div>
-                        </div>
-
+                <section className="space-y-5">
+                    <div>
+                        <label htmlFor="service-name" className="t-label mb-2 block">
+                            Nombre
+                        </label>
+                        <input
+                            id="service-name"
+                            required
+                            value={name}
+                            onChange={event => setName(event.target.value)}
+                            placeholder="Manicura rusa"
+                            className="input-field"
+                        />
                     </div>
 
-                    {error && (
-                        <p role="alert" className="animate-fade-in rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                            <span className="material-symbol mr-2 align-middle text-lg" aria-hidden="true">error</span>
-                            {error}
-                        </p>
-                    )}
+                    <div>
+                        <label htmlFor="service-category" className="t-label mb-2 block">
+                            Categoría
+                        </label>
+                        <input
+                            id="service-category"
+                            list="service-categories"
+                            value={category}
+                            onChange={event => setCategory(event.target.value)}
+                            placeholder="Manicura"
+                            className="input-field"
+                        />
+                        <datalist id="service-categories">
+                            {categories.map(item => (
+                                <option key={item} value={item} />
+                            ))}
+                        </datalist>
+                    </div>
 
-                    {/* CTA */}
-                    <section className="pt-4 pb-12">
-                        <button
-                            onClick={handleSave}
-                            disabled={saving || Boolean(validationError)}
-                            className="w-full bg-aesthetic-pink text-white hover:bg-aesthetic-taupe transition-all duration-500 py-5 rounded-3xl text-sm font-bold tracking-[0.3em] uppercase shadow-minimal active:scale-[0.98] border border-white/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    <div>
+                        <label htmlFor="service-description" className="t-label mb-2 block">
+                            Descripción
+                        </label>
+                        <textarea
+                            id="service-description"
+                            rows={3}
+                            value={description}
+                            onChange={event => setDescription(event.target.value)}
+                            placeholder="Qué incluye y qué puede esperar tu clienta."
+                            className="input-field resize-none"
+                        />
+                    </div>
+                </section>
+
+                <section className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label htmlFor="service-price" className="t-label mb-2 block">
+                            Precio
+                        </label>
+                        <input
+                            id="service-price"
+                            inputMode="decimal"
+                            value={price}
+                            onChange={event => setPrice(event.target.value.replace(/[^0-9.]/g, ''))}
+                            placeholder="0"
+                            className="input-field t-figure"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="service-duration" className="t-label mb-2 block">
+                            Duración
+                        </label>
+                        <select
+                            id="service-duration"
+                            value={duration}
+                            onChange={event => setDuration(Number(event.target.value))}
+                            className="input-field"
                         >
-                            {saving ? (
-                                <div className="size-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                            ) : (
-                                id ? 'Actualizar servicio' : 'Guardar servicio'
-                            )}
-                        </button>
-                        {validationError && !error && (
-                            <p className="mt-4 text-center text-[11px] text-aesthetic-muted">{validationError}</p>
-                        )}
-                    </section>
-                </main>
-            )}
+                            {DURATION_OPTIONS.map(minutes => (
+                                <option key={minutes} value={minutes}>
+                                    {minutes} min
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </section>
+
+                {/* The deposit had no control at all: every service silently charged
+                    40% of its price, and that figure flowed into checkout. */}
+                <section>
+                    <label htmlFor="service-advance" className="t-label mb-2 block">
+                        Anticipo para reservar
+                    </label>
+                    <input
+                        id="service-advance"
+                        inputMode="decimal"
+                        value={advance}
+                        onChange={event => setAdvance(event.target.value.replace(/[^0-9.]/g, ''))}
+                        placeholder={String(suggestedAdvance)}
+                        className="input-field t-figure"
+                    />
+                    <p className="t-meta mt-2">
+                        Lo que tu clienta paga por adelantado para apartar el lugar. Déjalo vacío
+                        para usar el {Math.round(DEFAULT_DEPOSIT_RATE * 100)}% sugerido
+                        {numericPrice > 0 && <> ({formatMoney(suggestedAdvance, currency)})</>}. Pon
+                        0 si no cobras anticipo.
+                    </p>
+                </section>
+
+                <section>
+                    <label className="sheet flex cursor-pointer items-start gap-3 p-4">
+                        <input
+                            type="checkbox"
+                            checked={active}
+                            onChange={event => setActive(event.target.checked)}
+                            className="mt-0.5 size-5 accent-[var(--brand-primary)]"
+                        />
+                        <span>
+                            <span className="t-body block font-medium text-text-strong">
+                                Visible en tu página de reservas
+                            </span>
+                            <span className="t-meta block">
+                                Desactívalo para dejar de ofrecerlo sin perder su historial.
+                            </span>
+                        </span>
+                    </label>
+                </section>
+
+                <div className="space-y-3">
+                    <button
+                        onClick={handleSave}
+                        disabled={saving || Boolean(validation)}
+                        className="btn-gradient w-full py-4 disabled:opacity-50"
+                    >
+                        {saving ? 'Guardando…' : id ? 'Guardar cambios' : 'Crear servicio'}
+                    </button>
+
+                    {validation && !error && (
+                        <p className="t-meta text-center">{validation}</p>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
 
 export default function NewServicePage() {
     return (
-        <Suspense fallback={<div className="skeleton m-6 h-96" aria-busy="true" />}>
-            <NewServiceContent />
+        <Suspense fallback={<div className="skeleton m-2 h-96" aria-busy="true" />}>
+            <ServiceEditor />
         </Suspense>
     );
 }

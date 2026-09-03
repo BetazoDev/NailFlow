@@ -1,45 +1,58 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
-import { Staff } from '@/lib/types';
 import { useSession } from '@/lib/session-context';
+import { initials, slugify } from '@/lib/format';
+import type { Staff, StaffRole } from '@/lib/types';
 
-const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+interface Draft {
+    name: string;
+    email: string;
+    role: StaffRole;
+    specialty: string;
+    slug: string;
+    photoFile: File | null;
+    photoPreview: string | null;
+}
+
+const EMPTY: Draft = {
+    name: '',
+    email: '',
+    role: 'staff',
+    specialty: '',
+    slug: '',
+    photoFile: null,
+    photoPreview: null,
+};
 
 export default function TeamPage() {
+    const { tenant } = useSession();
+
     const [team, setTeam] = useState<Staff[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
-    // Add/Edit member form
-    const [editingMember, setEditingMember] = useState<Staff | null>(null);
-    const [newName, setNewName] = useState('');
-    const [newEmail, setNewEmail] = useState('');
-    const [newRole, setNewRole] = useState<'staff' | 'owner'>('staff');
-    const [newSpecialty, setNewSpecialty] = useState('');
-    const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
-    const [newPhotoPreview, setNewPhotoPreview] = useState<string | undefined>(undefined);
+    const [editing, setEditing] = useState<Staff | null>(null);
+    const [showForm, setShowForm] = useState(false);
+    const [draft, setDraft] = useState<Draft>(EMPTY);
     const [saving, setSaving] = useState(false);
-    const [saveError, setSaveError] = useState<string | null>(null);
-    const photoInputRef = useRef<HTMLInputElement>(null);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [copied, setCopied] = useState<string | null>(null);
 
-    const { tenant } = useSession();
-    const domain = tenant?.domain ?? null;
+    const photoRef = useRef<HTMLInputElement>(null);
+    const domain = tenant?.domain ?? '';
 
     useEffect(() => {
         if (!tenant) return;
         let cancelled = false;
 
-        // The full list, including inactive members and their emails — the
-        // public `/staff` endpoint withholds both.
         api.getTeam()
             .then(members => {
                 if (!cancelled) setTeam(members);
             })
             .catch(() => {
-                if (!cancelled) setSaveError('No pudimos cargar tu equipo. Recarga la página.');
+                if (!cancelled) setLoadError('No pudimos cargar tu equipo. Recarga la página.');
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -50,97 +63,93 @@ export default function TeamPage() {
         };
     }, [tenant]);
 
-    /** The owner books at the salon's root URL; staff get `/book/<slug>` (spec §5). */
-    const getStaffUrl = (member: Staff) => {
-        const slug = member.slug ?? '';
-        const baseDomain = domain ?? '';
-        return member.role === 'owner' || !slug
-            ? { href: `https://${baseDomain}`, text: baseDomain }
-            : { href: `https://${baseDomain}/book/${slug}`, text: `${baseDomain}/book/${slug}` };
+    const openNew = () => {
+        setEditing(null);
+        setDraft(EMPTY);
+        setFormError(null);
+        setShowForm(true);
     };
 
-    const handleCopyLink = (member: Staff) => {
-        const { href } = getStaffUrl(member);
-        navigator.clipboard.writeText(href).catch(() => { });
-        setCopiedSlug(member.id);
-        setTimeout(() => setCopiedSlug(null), 2000);
+    const openEdit = (member: Staff) => {
+        setEditing(member);
+        setDraft({
+            name: member.name,
+            email: member.email ?? '',
+            role: member.role,
+            specialty: member.specialty ?? '',
+            slug: member.slug ?? '',
+            photoFile: null,
+            photoPreview: member.photo_url,
+        });
+        setFormError(null);
+        setShowForm(true);
     };
 
-    const resetForm = () => {
-        setNewName('');
-        setNewEmail('');
-        setNewRole('staff');
-        setNewSpecialty('');
-        setNewPhotoFile(null);
-        setNewPhotoPreview(undefined);
-        setEditingMember(null);
+    /**
+     * The slug is only ever proposed from the name for a *new* member.
+     *
+     * It used to be regenerated on every save, so correcting a typo in someone's
+     * surname silently broke the booking link she had already shared.
+     */
+    const proposedSlug = useMemo(
+        () => draft.slug.trim() || slugify(draft.name),
+        [draft.slug, draft.name]
+    );
+
+    const handlePhoto = (files: FileList | null) => {
+        const file = files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/') || file.size > 8 * 1024 * 1024) {
+            setFormError('Elige una imagen de 8 MB o menos.');
+            return;
+        }
+
+        setFormError(null);
+        setDraft(current => ({
+            ...current,
+            photoFile: file,
+            photoPreview: URL.createObjectURL(file),
+        }));
     };
 
-    const openAddModal = () => {
-        resetForm();
-        setShowAddModal(true);
-    };
+    const save = async () => {
+        if (!draft.name.trim()) {
+            setFormError('Escribe el nombre.');
+            return;
+        }
+        if (!proposedSlug) {
+            setFormError('Ese nombre no genera un link válido. Escribe uno a mano.');
+            return;
+        }
 
-    const openEditModal = (member: Staff) => {
-        setEditingMember(member);
-        setNewName(member.name);
-        setNewEmail(member.email || '');
-        setNewRole(member.role as 'staff' | 'owner');
-        setNewSpecialty(member.specialty || member.bio || '');
-        setNewPhotoPreview(member.photo_url || undefined);
-        setNewPhotoFile(null);
-        setShowAddModal(true);
-    };
-
-    const handleSaveMember = async () => {
-        if (!newName.trim()) return;
-        setSaveError(null);
         setSaving(true);
+        setFormError(null);
+
         try {
-            let photoUrl = editingMember?.photo_url ?? null;
-            if (newPhotoFile) {
-                photoUrl = await api.uploadImage(newPhotoFile, 'team');
-            }
+            let photoUrl = draft.photoFile ? null : draft.photoPreview;
+            if (draft.photoFile) photoUrl = await api.uploadImage(draft.photoFile, 'team');
 
-            if (editingMember) {
-                // Update existing member
-                const updatedData: Partial<Staff> = {
-                    name: newName.trim(),
-                    email: newEmail.trim(),
-                    role: newRole,
-                    bio: newSpecialty.trim(),
-                    specialty: newSpecialty.trim(),
-                    photo_url: photoUrl ?? undefined,
-                    slug: newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-                };
-                await api.updateStaffMember(editingMember.id, updatedData);
-                setTeam(prev => prev.map(m => m.id === editingMember.id ? { ...m, ...updatedData } : m));
+            const payload = {
+                name: draft.name.trim(),
+                email: draft.email.trim() || null,
+                role: draft.role,
+                specialty: draft.specialty.trim() || null,
+                photo_url: photoUrl ?? undefined,
+                slug: proposedSlug,
+            };
+
+            if (editing) {
+                const updated = await api.updateStaffMember(editing.id, payload);
+                setTeam(current => current.map(item => (item.id === editing.id ? updated : item)));
             } else {
-                // Add new member
-                const staffData = await api.createStaffMember({
-                    name: newName.trim(),
-                    email: newEmail.trim(),
-                    role: newRole,
-                    bio: newSpecialty.trim(),
-                    specialty: newSpecialty.trim(),
-                    photo_url: photoUrl ?? undefined,
-                    active: true,
-                    services_offered: [],
-                    weekly_schedule: [],
-                    color_identifier: '#C97794',
-                    slug: newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-                });
-                if (staffData) {
-                    setTeam(prev => [...prev, staffData as Staff]);
-                }
+                const created = await api.createStaffMember({ ...payload, active: true });
+                setTeam(current => [...current, created]);
             }
 
-            resetForm();
-            setShowAddModal(false);
+            setShowForm(false);
         } catch (caught) {
-            // An inline message rather than `alert()`: a modal dialog is a poor
-            // fit for a validation failure the owner has to act on in the form.
-            setSaveError(
+            setFormError(
                 caught instanceof ApiError ? caught.message : 'No pudimos guardar. Intenta de nuevo.'
             );
         } finally {
@@ -148,310 +157,273 @@ export default function TeamPage() {
         }
     };
 
-    const handlePhotoSelect = (files: FileList | null) => {
-        if (!files || files.length === 0) return;
-        const file = files[0];
-        setNewPhotoFile(file);
-        setNewPhotoPreview(URL.createObjectURL(file));
+    const bookingUrl = (member: Staff) =>
+        member.role === 'owner' || !member.slug
+            ? `https://${domain}`
+            : `https://${domain}/book/${member.slug}`;
+
+    const copyLink = async (member: Staff) => {
+        try {
+            await navigator.clipboard.writeText(bookingUrl(member));
+            setCopied(member.id);
+            setTimeout(() => setCopied(null), 2000);
+        } catch {
+            setLoadError('Tu navegador bloqueó el portapapeles. Copia el link a mano.');
+        }
     };
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-aesthetic-accent border-t-aesthetic-pink rounded-full animate-spin" />
+            <div className="space-y-4 p-2" aria-busy="true" aria-label="Cargando equipo">
+                <div className="skeleton h-12 w-64" />
+                {Array.from({ length: 3 }, (_, i) => (
+                    <div key={i} className="skeleton h-20 w-full" />
+                ))}
             </div>
         );
     }
 
     return (
-        <div className="animate-fade-in min-h-full pb-20">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-6 pt-16 pb-10">
-                <div className="space-y-1">
-                    <p className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase font-display italic font-medium">Gestión de Talento</p>
-                    <h1 className="font-display text-4xl font-medium tracking-tight text-aesthetic-taupe italic">Especialistas</h1>
+        <div className="pb-16">
+            {loadError && (
+                <p role="alert" className="mb-6 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+                    {loadError}
+                </p>
+            )}
+
+            <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                    <p className="t-label mb-2">Especialistas</p>
+                    <h1 className="t-display">Equipo</h1>
                 </div>
-                <button
-                    onClick={openAddModal}
-                    className="bg-aesthetic-taupe text-white px-8 py-4 rounded-full font-bold text-[10px] tracking-[0.2em] uppercase flex items-center justify-center gap-3 hover:bg-black transition-all shadow-minimal active:scale-95 group"
-                >
-                    <span className="material-symbol text-lg group-hover:rotate-90 transition-transform duration-500">add</span>
-                    Añadir Miembro
+                <button onClick={openNew} className="btn-gradient flex items-center gap-2 px-5 py-3 text-sm">
+                    <span className="material-symbol text-lg" aria-hidden="true">person_add</span>
+                    Añadir
                 </button>
-            </div>
+            </header>
 
-            {/* Desktop Table View */}
-            <div className="hidden lg:block px-6">
-                <div className="bg-white/40 backdrop-blur-sm rounded-[2rem] border border-aesthetic-accent overflow-hidden shadow-minimal">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="border-b border-aesthetic-accent/50 bg-aesthetic-cream/30">
-                                <th className="py-6 px-8 font-display italic font-medium text-aesthetic-muted text-xs tracking-widest uppercase">Especialista</th>
-                                <th className="py-6 px-8 font-display italic font-medium text-aesthetic-muted text-xs tracking-widest uppercase text-center">Rol</th>
-                                <th className="py-6 px-8 font-display italic font-medium text-aesthetic-muted text-xs tracking-widest uppercase">Especialidad</th>
-                                <th className="py-6 px-8 font-display italic font-medium text-aesthetic-muted text-xs tracking-widest uppercase">Perfil Público</th>
-                                <th className="py-6 px-8 font-display italic font-medium text-aesthetic-muted text-xs tracking-widest uppercase">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-aesthetic-accent/30">
-                            {team.map((member) => {
-                                const initials = member.name.split(' ').map(n => n[0]).join('').slice(0, 2);
-                                const { href: linkHref, text: linkText } = getStaffUrl(member);
-                                return (
-                                    <tr key={member.id} className="hover:bg-aesthetic-soft-pink/10 transition-colors group">
-                                        <td className="py-6 px-8">
-                                            <div className="flex items-center gap-4">
-                                                <div className="size-12 rounded-full flex items-center justify-center text-sm font-display italic bg-white border border-aesthetic-accent text-aesthetic-taupe shadow-minimal transition-transform group-hover:scale-110 overflow-hidden">
-                                                    {member.photo_url ? (
-                                                        <img src={api.getImageUrl(member.photo_url)} alt={member.name} className="w-full h-full object-cover" />
-                                                    ) : initials}
-                                                </div>
-                                                <div>
-                                                    <span className="block font-display text-lg italic text-aesthetic-taupe leading-tight">{member.name}</span>
-                                                    <span className="block text-[11px] text-aesthetic-muted font-medium tracking-wide opacity-60 uppercase">{member.email}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="py-6 px-8 text-center">
-                                            <span className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-[0.15em] ${member.role === 'owner' ? 'bg-aesthetic-pink/20 text-aesthetic-taupe border border-aesthetic-pink/30' : 'bg-white border border-aesthetic-accent text-aesthetic-muted'}`}>
-                                                {member.role === 'owner' ? 'Dirección' : 'Staff'}
-                                            </span>
-                                        </td>
-                                        <td className="py-6 px-8">
-                                            <span className="text-sm font-display italic text-aesthetic-taupe">
-                                                {member.specialty || member.bio || '—'}
-                                            </span>
-                                        </td>
-                                        <td className="py-6 px-8">
-                                            <div className="flex items-center gap-3 max-w-[240px]">
-                                                <a
-                                                    href={linkHref}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="bg-white border border-aesthetic-accent text-aesthetic-muted text-[10px] px-4 py-2 rounded-full font-display italic flex-1 truncate shadow-minimal group-hover:border-aesthetic-pink/30 transition-all hover:text-aesthetic-pink"
-                                                >
-                                                    {linkText}
-                                                </a>
-                                                <button
-                                                    onClick={() => handleCopyLink(member)}
-                                                    className={`size-8 rounded-full border flex items-center justify-center transition-all ${copiedSlug === member.id ? 'border-[#88C999] bg-[#88C999]/10 text-[#88C999]' : 'border-aesthetic-accent text-aesthetic-muted hover:bg-aesthetic-pink hover:text-white hover:border-aesthetic-pink'}`}
-                                                >
-                                                    <span className="material-symbol text-base">{copiedSlug === member.id ? 'check' : 'content_copy'}</span>
-                                                </button>
-                                            </div>
-                                        </td>
-                                        <td className="py-6 px-8">
-                                            <button
-                                                onClick={() => openEditModal(member)}
-                                                className="size-9 rounded-full border border-aesthetic-accent flex items-center justify-center text-aesthetic-muted hover:bg-aesthetic-pink hover:text-white hover:border-aesthetic-pink transition-all"
-                                            >
-                                                <span className="material-symbol text-base">edit</span>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+            {team.length === 0 ? (
+                <div className="blank-slate">
+                    <span className="material-symbol text-3xl opacity-40" aria-hidden="true">groups</span>
+                    <p className="t-body">Aún no hay nadie en el equipo.</p>
+                    <p className="t-meta">
+                        Cada especialista recibe su propio link de reservas al añadirla.
+                    </p>
                 </div>
-            </div>
+            ) : (
+                <ul className="space-y-3">
+                    {team.map(member => {
+                        const url = bookingUrl(member);
+                        const isCopied = copied === member.id;
 
-            {/* Mobile Cards View */}
-            <div className="px-6 space-y-6 lg:hidden pb-10">
-                {team.map((member) => {
-                    const initials = member.name.split(' ').map(n => n[0]).join('').slice(0, 2);
-                    const { href: linkHref, text: linkText } = getStaffUrl(member);
-                    return (
-                        <div key={member.id} className="bg-white rounded-[2.5rem] p-8 shadow-minimal border border-aesthetic-accent relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-4 flex items-center gap-2">
-                                <button
-                                    onClick={() => openEditModal(member)}
-                                    className="size-9 rounded-full bg-aesthetic-cream/60 border border-aesthetic-accent flex items-center justify-center text-aesthetic-muted hover:bg-aesthetic-pink hover:text-white transition-all"
-                                >
-                                    <span className="material-symbol text-base">edit</span>
-                                </button>
-                                <span className={`px-4 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-[0.15em] ${member.role === 'owner' ? 'bg-aesthetic-pink/20 text-aesthetic-taupe border border-aesthetic-pink/30' : 'bg-aesthetic-cream border border-aesthetic-accent text-aesthetic-muted'}`}>
-                                    {member.role === 'owner' ? 'Dirección' : 'Staff'}
-                                </span>
-                            </div>
-
-                            <div className="flex items-center gap-5 mb-4">
-                                <div className="size-16 rounded-full flex items-center justify-center text-lg font-display italic bg-aesthetic-cream border-2 border-white shadow-soft text-aesthetic-taupe overflow-hidden">
+                        return (
+                            <li
+                                key={member.id}
+                                className={`sheet flex flex-wrap items-center gap-4 p-4 ${member.active ? '' : 'opacity-60'}`}
+                            >
+                                <span className="size-12 shrink-0 overflow-hidden rounded-full border border-line">
                                     {member.photo_url ? (
-                                        <img src={api.getImageUrl(member.photo_url)} alt={member.name} className="w-full h-full object-cover" />
-                                    ) : initials}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="font-display text-2xl italic text-aesthetic-taupe leading-tight">{member.name}</h3>
-                                    <p className="text-[11px] text-aesthetic-muted opacity-60 font-medium tracking-wide mt-1">{member.email}</p>
-                                </div>
-                            </div>
-
-                            {/* Specialty */}
-                            {(member.specialty || member.bio) && (
-                                <div className="mb-4 px-4 py-3 bg-aesthetic-soft-pink/20 rounded-2xl border border-aesthetic-accent/20">
-                                    <p className="text-[9px] uppercase tracking-[0.2em] font-medium text-aesthetic-muted mb-1">Especialidad</p>
-                                    <p className="text-sm font-display italic text-aesthetic-taupe">{member.specialty || member.bio}</p>
-                                </div>
-                            )}
-
-                            {/* Schedule */}
-                            {member.weekly_schedule && member.weekly_schedule.length > 0 && (
-                                <div className="mb-4 px-4 py-3 bg-white/50 rounded-2xl border border-aesthetic-accent/20">
-                                    <p className="text-[9px] uppercase tracking-[0.2em] font-medium text-aesthetic-muted mb-2">Horario</p>
-                                    <div className="space-y-1">
-                                        {member.weekly_schedule.map((s, i) => (
-                                            <p key={i} className="text-xs text-aesthetic-taupe font-display italic">
-                                                {DAY_NAMES[s.day_of_week]}: {s.start_time} - {s.end_time}
-                                            </p>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="bg-aesthetic-cream/30 rounded-3xl p-5 border border-aesthetic-accent/50 space-y-4">
-                                <div>
-                                    <p className="text-[9px] uppercase tracking-[0.2em] font-medium text-aesthetic-muted mb-3 opacity-60">Perfil Público</p>
-                                    <div className="flex items-center justify-between gap-3 bg-white border border-aesthetic-accent rounded-2xl py-3 px-5 shadow-minimal">
-                                        <a
-                                            href={linkHref}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-[11px] font-display italic text-aesthetic-taupe truncate hover:text-aesthetic-pink transition-colors"
-                                        >
-                                            {linkText}
-                                        </a>
-                                        <button
-                                            onClick={() => handleCopyLink(member)}
-                                            className="text-aesthetic-pink hover:scale-110 active:scale-95 transition-all outline-none"
-                                        >
-                                            <span className="material-symbol text-lg">{copiedSlug === member.id ? 'check' : 'share'}</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Add/Edit Member Modal */}
-            {showAddModal && (
-                <div
-                    className="fixed inset-0 bg-aesthetic-taupe/40 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-fade-in"
-                    onClick={(e) => { if (e.target === e.currentTarget) { setShowAddModal(false); resetForm(); } }}
-                >
-                    <div className="bg-aesthetic-cream rounded-[3rem] p-10 w-full max-w-lg shadow-2xl relative border border-white/50 overflow-hidden max-h-[90vh] overflow-y-auto">
-                        {/* Decorative background */}
-                        <div className="absolute top-0 right-0 size-40 bg-aesthetic-pink/10 blur-3xl rounded-full -mr-20 -mt-20" />
-
-                        <button
-                            onClick={() => { setShowAddModal(false); resetForm(); }}
-                            className="absolute top-10 right-10 size-10 rounded-full bg-white/50 flex items-center justify-center hover:bg-white transition-colors z-10"
-                        >
-                            <span className="material-symbol text-aesthetic-muted">close</span>
-                        </button>
-
-                        <div className="relative mb-8">
-                            <p className="text-[10px] tracking-[0.4em] text-aesthetic-muted uppercase mb-2 font-display italic font-medium">
-                                {editingMember ? 'Editar Miembro' : 'Nuevo Miembro'}
-                            </p>
-                            <h2 className="font-display text-4xl italic text-aesthetic-taupe leading-tight">
-                                {editingMember ? 'Actualizar Perfil' : 'Agregar Talento'}
-                            </h2>
-                        </div>
-
-                        <div className="space-y-6 relative">
-                            {/* Photo upload */}
-                            <div className="flex flex-col items-center gap-3">
-                                <div
-                                    className="size-24 rounded-full bg-white border-2 border-dashed border-aesthetic-accent flex items-center justify-center cursor-pointer hover:border-aesthetic-pink/50 transition-colors overflow-hidden"
-                                    onClick={() => photoInputRef.current?.click()}
-                                >
-                                    {newPhotoPreview ? (
-                                        <img src={api.getImageUrl(newPhotoPreview)} alt="preview" className="w-full h-full object-cover" />
+                                        <img src={api.getImageUrl(member.photo_url)} alt="" className="size-full object-cover" />
                                     ) : (
-                                        <span className="material-symbol text-3xl text-aesthetic-muted/30">add_a_photo</span>
+                                        <span className="grid size-full place-items-center bg-brand-tint text-sm font-semibold text-text-strong">
+                                            {initials(member.name)}
+                                        </span>
                                     )}
-                                </div>
-                                <p className="text-[10px] text-aesthetic-muted font-display italic">Foto de perfil (opcional)</p>
-                                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={e => handlePhotoSelect(e.target.files)} />
-                            </div>
+                                </span>
 
-                            {/* Name */}
-                            <div className="space-y-3">
-                                <label className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Nombre Completo</label>
+                                <div className="min-w-[160px] flex-1">
+                                    <p className="t-body font-semibold text-text-strong">
+                                        {member.name}
+                                        {member.role === 'owner' && <span className="t-meta ml-2">Dirección</span>}
+                                        {!member.active && <span className="t-meta ml-2">· Inactiva</span>}
+                                    </p>
+                                    <p className="t-meta truncate">
+                                        {member.specialty || member.email || 'Sin especialidad'}
+                                    </p>
+                                </div>
+
+                                <p className="t-meta hidden min-w-0 flex-1 truncate lg:block">{url}</p>
+
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <button
+                                        onClick={() => copyLink(member)}
+                                        aria-label={`Copiar el link de ${member.name}`}
+                                        className={`grid size-10 place-items-center rounded-xl border transition-colors ${
+                                            isCopied
+                                                ? 'border-success/40 bg-success/10 text-success'
+                                                : 'border-line text-text-muted hover:text-text-strong'
+                                        }`}
+                                    >
+                                        <span className="material-symbol text-lg" aria-hidden="true">
+                                            {isCopied ? 'check' : 'link'}
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => openEdit(member)}
+                                        aria-label={`Editar a ${member.name}`}
+                                        className="grid size-10 place-items-center rounded-xl border border-line text-text-muted transition-colors hover:text-text-strong"
+                                    >
+                                        <span className="material-symbol text-lg" aria-hidden="true">edit</span>
+                                    </button>
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+
+            {showForm && (
+                <div
+                    className="animate-fade-in fixed inset-0 z-50 grid place-items-end sm:place-items-center"
+                    onClick={() => !saving && setShowForm(false)}
+                >
+                    <div className="absolute inset-0 bg-text-strong/25 backdrop-blur-sm" />
+
+                    <div
+                        role="dialog"
+                        aria-label={editing ? 'Editar especialista' : 'Añadir especialista'}
+                        className="relative max-h-[92vh] w-full overflow-y-auto rounded-t-[2rem] bg-surface-raised p-7 shadow-lg sm:max-w-lg sm:rounded-[2rem]"
+                        onClick={event => event.stopPropagation()}
+                    >
+                        <div className="mb-7 flex items-start justify-between gap-4">
+                            <h2 className="t-title">
+                                {editing ? 'Editar especialista' : 'Nueva especialista'}
+                            </h2>
+                            <button
+                                onClick={() => setShowForm(false)}
+                                aria-label="Cerrar"
+                                className="grid size-9 shrink-0 place-items-center rounded-full text-text-muted hover:bg-surface-sunken"
+                            >
+                                <span className="material-symbol text-xl" aria-hidden="true">close</span>
+                            </button>
+                        </div>
+
+                        <div className="space-y-5">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => photoRef.current?.click()}
+                                    className="size-20 shrink-0 overflow-hidden rounded-full border border-dashed border-line transition-colors hover:border-brand"
+                                >
+                                    {draft.photoPreview ? (
+                                        <img
+                                            src={
+                                                draft.photoPreview.startsWith('blob:')
+                                                    ? draft.photoPreview
+                                                    : api.getImageUrl(draft.photoPreview)
+                                            }
+                                            alt=""
+                                            className="size-full object-cover"
+                                        />
+                                    ) : (
+                                        <span className="grid size-full place-items-center text-text-subtle">
+                                            <span className="material-symbol" aria-hidden="true">add_a_photo</span>
+                                        </span>
+                                    )}
+                                </button>
+                                <p className="t-meta">Una foto ayuda a que la clienta reconozca con quién reserva.</p>
                                 <input
-                                    type="text"
-                                    placeholder="Ej. Sofia Thompson"
-                                    value={newName}
-                                    onChange={e => setNewName(e.target.value)}
-                                    className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-5 text-lg font-display italic shadow-minimal transition-all"
+                                    ref={photoRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={event => handlePhoto(event.target.files)}
                                 />
                             </div>
 
-                            {/* Email */}
-                            <div className="space-y-3">
-                                <label className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">E-mail (opcional)</label>
+                            <div>
+                                <label htmlFor="staff-name" className="t-label mb-2 block">Nombre</label>
                                 <input
+                                    id="staff-name"
+                                    value={draft.name}
+                                    onChange={event => setDraft({ ...draft, name: event.target.value })}
+                                    placeholder="Sofía Quinn"
+                                    className="input-field"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="staff-email" className="t-label mb-2 block">
+                                    Correo electrónico
+                                </label>
+                                <input
+                                    id="staff-email"
                                     type="email"
-                                    placeholder="hola@studio.com"
-                                    value={newEmail}
-                                    onChange={e => setNewEmail(e.target.value)}
-                                    className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-5 text-lg font-display italic shadow-minimal transition-all"
+                                    value={draft.email}
+                                    onChange={event => setDraft({ ...draft, email: event.target.value })}
+                                    placeholder="sofia@correo.com"
+                                    className="input-field"
                                 />
+                                <p className="t-meta mt-2">
+                                    Con este correo entra al panel. Debe coincidir con su cuenta.
+                                </p>
                             </div>
 
-                            {/* Specialty */}
-                            <div className="space-y-3">
-                                <label className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Especialidad</label>
+                            <div>
+                                <label htmlFor="staff-specialty" className="t-label mb-2 block">Especialidad</label>
                                 <input
-                                    type="text"
-                                    placeholder="Ej. Manicura Rusa, Nail Art..."
-                                    value={newSpecialty}
-                                    onChange={e => setNewSpecialty(e.target.value)}
-                                    className="w-full bg-white border-none ring-1 ring-aesthetic-accent focus:ring-aesthetic-pink/30 rounded-2xl p-5 text-lg font-display italic shadow-minimal transition-all"
+                                    id="staff-specialty"
+                                    value={draft.specialty}
+                                    onChange={event => setDraft({ ...draft, specialty: event.target.value })}
+                                    placeholder="Manicura rusa"
+                                    className="input-field"
                                 />
                             </div>
 
-                            {/* Role */}
-                            <div className="space-y-3">
-                                <label className="font-display text-xs font-medium tracking-wider text-aesthetic-muted ml-1 italic">Rol</label>
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setNewRole('staff')}
-                                        className={`flex-1 py-4 rounded-2xl text-sm font-bold tracking-[0.15em] uppercase transition-all ${newRole === 'staff' ? 'bg-aesthetic-taupe text-white shadow-minimal' : 'bg-white ring-1 ring-aesthetic-accent text-aesthetic-muted'}`}
-                                    >
-                                        Staff
-                                    </button>
-                                    <button
-                                        onClick={() => setNewRole('owner')}
-                                        className={`flex-1 py-4 rounded-2xl text-sm font-bold tracking-[0.15em] uppercase transition-all ${newRole === 'owner' ? 'bg-aesthetic-taupe text-white shadow-minimal' : 'bg-white ring-1 ring-aesthetic-accent text-aesthetic-muted'}`}
-                                    >
-                                        Dirección
-                                    </button>
+                            <div>
+                                <label htmlFor="staff-slug" className="t-label mb-2 block">Link de reservas</label>
+                                <div className="flex items-center gap-2">
+                                    <span className="t-meta shrink-0">{domain}/book/</span>
+                                    <input
+                                        id="staff-slug"
+                                        value={draft.slug}
+                                        onChange={event =>
+                                            setDraft({ ...draft, slug: slugify(event.target.value) })
+                                        }
+                                        placeholder={slugify(draft.name) || 'sofia'}
+                                        className="input-field"
+                                    />
                                 </div>
+                                <p className="t-meta mt-2">
+                                    {editing
+                                        ? 'Si lo cambias, los links que ya compartió dejarán de funcionar.'
+                                        : 'Se propone a partir del nombre. Puedes escribir otro.'}
+                                </p>
                             </div>
 
-                            {saveError && (
-                                <p role="alert" className="mt-4 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
-                                    {saveError}
+                            <fieldset>
+                                <legend className="t-label mb-2">Rol</legend>
+                                <div className="flex gap-2">
+                                    {(['staff', 'owner'] as StaffRole[]).map(role => (
+                                        <button
+                                            key={role}
+                                            type="button"
+                                            onClick={() => setDraft({ ...draft, role })}
+                                            aria-pressed={draft.role === role}
+                                            className={`flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors ${
+                                                draft.role === role
+                                                    ? 'border-transparent bg-text-strong text-white'
+                                                    : 'border-line text-text-muted hover:text-text-strong'
+                                            }`}
+                                        >
+                                            {role === 'staff' ? 'Especialista' : 'Dirección'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            {formError && (
+                                <p role="alert" className="rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+                                    {formError}
                                 </p>
                             )}
 
                             <button
-                                onClick={handleSaveMember}
-                                disabled={saving || !newName.trim()}
-                                className="w-full bg-aesthetic-taupe text-white py-6 rounded-full font-bold text-[10px] tracking-[0.3em] uppercase mt-4 shadow-minimal hover:shadow-2xl transition-all active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                                onClick={save}
+                                disabled={saving || !draft.name.trim()}
+                                className="btn-gradient w-full py-4 disabled:opacity-50"
                             >
-                                {saving ? (
-                                    <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        {editingMember ? 'GUARDAR CAMBIOS' : 'AGREGAR MIEMBRO'}
-                                        <span className="material-symbol text-base group-hover:translate-x-2 transition-transform" aria-hidden="true">arrow_forward</span>
-                                    </>
-                                )}
+                                {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Añadir al equipo'}
                             </button>
                         </div>
                     </div>
