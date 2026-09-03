@@ -63,7 +63,9 @@ COPY --from=builder --chown=node:node /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+# See the API Dockerfile: a slow first check makes Dokploy report a healthy
+# deploy as failed.
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=5 \
     CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)).then(()=>process.exit(0)).catch(()=>process.exit(1))"
 
 CMD ["node", "apps/web/server.js"]

@@ -39,7 +39,10 @@ COPY --from=builder --chown=node:node /app/apps/api/package.json ./apps/api/pack
 EXPOSE 3000
 
 # Dokploy and Docker both use this to tell "started" from "healthy".
-HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+# Checked often and early: Swarm only marks the task healthy after the first
+# success, and Dokploy stops waiting before a 20s start period plus a 30s
+# interval elapses — which made successful deploys report as failed.
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=5 \
     CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "apps/api/dist/index.js"]
