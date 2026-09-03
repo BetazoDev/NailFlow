@@ -1,5 +1,5 @@
 import type { Server } from 'node:http';
-import { env } from './config/env';
+import { env, describeConfig } from './config/env';
 import { createApp } from './app';
 import { initDb } from './db/schema';
 import { closePool } from './db/pool';
@@ -17,6 +17,10 @@ const log = createLogger('server');
  * tables that did not exist yet.
  */
 async function main(): Promise<void> {
+    // Names only, never values: makes "the variable is set but the app says
+    // otherwise" a one-glance answer instead of an SSH session.
+    log.info('Configuration seen by this container', describeConfig());
+
     if (!env.cdn.systemToken && !env.cdn.referenceToken) {
         log.warn(
             'No CDN token configured (CDN_UPLOAD_TOKEN / CDN_API_KEY_REFERENCES). ' +

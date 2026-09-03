@@ -13,8 +13,30 @@ type NodeEnv = 'development' | 'test' | 'production';
 const nodeEnv = (process.env.NODE_ENV ?? 'development') as NodeEnv;
 const isProduction = nodeEnv === 'production';
 
+/**
+ * Reads a variable, trimming whitespace and stripping surrounding quotes.
+ *
+ * Deployment panels vary in how they store values: some keep the quotes you
+ * typed, some keep a trailing space. Comparing the raw string then fails
+ * silently — `DB_AUTO_MIGRATE="true"` would read as false and skip the schema
+ * bootstrap without a word.
+ */
+function read(name: string): string | undefined {
+    const raw = process.env[name];
+    if (raw === undefined) return undefined;
+
+    const trimmed = raw.trim();
+    const unquoted =
+        (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed.startsWith("'") && trimmed.endsWith("'"))
+            ? trimmed.slice(1, -1).trim()
+            : trimmed;
+
+    return unquoted || undefined;
+}
+
 function required(name: string): string {
-    const value = process.env[name];
+    const value = read(name);
     if (!value) {
         throw new Error(
             `Missing required environment variable ${name}. ` +
@@ -25,26 +47,26 @@ function required(name: string): string {
 }
 
 function optional(name: string): string | undefined {
-    return process.env[name] || undefined;
+    return read(name);
 }
 
 function list(name: string, fallback: string[] = []): string[] {
-    const raw = process.env[name];
+    const raw = read(name);
     if (!raw) return fallback;
-    return raw.split(',').map(s => s.trim()).filter(Boolean);
+    return raw.split(',').map(item => item.trim()).filter(Boolean);
 }
 
 function int(name: string, fallback: number): number {
-    const raw = process.env[name];
+    const raw = read(name);
     if (!raw) return fallback;
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function bool(name: string, fallback = false): boolean {
-    const raw = process.env[name];
+    const raw = read(name)?.toLowerCase();
     if (raw === undefined) return fallback;
-    return raw === 'true' || raw === '1';
+    return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on';
 }
 
 export const env = {
@@ -128,3 +150,41 @@ export const env = {
 } as const;
 
 export type Env = typeof env;
+
+/**
+ * What the process can actually see, by name.
+ *
+ * Logged once at startup. Diagnosing "I set the variable but the app disagrees"
+ * otherwise means SSH-ing to the host and running `docker exec … env`, and a
+ * panel that shows a value saved is no proof the container received it.
+ *
+ * Names only — a value is never printed, so this is safe in any log sink.
+ */
+export interface ConfigReport {
+    present: string[];
+    missing: string[];
+}
+
+/** Grouped so the report reads as "what breaks if this is absent". */
+const EXPECTED: Record<string, string[]> = {
+    'required to start': ['DATABASE_URL'],
+    'browser access': ['CORS_ORIGINS'],
+    'admin sign-in': ['FIREBASE_SERVICE_ACCOUNT', 'GOOGLE_APPLICATION_CREDENTIALS'],
+    'images': ['CDN_UPLOAD_TOKEN', 'CDN_API_KEY_REFERENCES'],
+    'online payment': ['MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET'],
+    'schema bootstrap': ['DB_AUTO_MIGRATE'],
+    'automation': ['N8N_WEBHOOK_URL'],
+};
+
+export function describeConfig(): Record<string, ConfigReport> {
+    const report: Record<string, ConfigReport> = {};
+
+    for (const [group, names] of Object.entries(EXPECTED)) {
+        report[group] = {
+            present: names.filter(name => read(name) !== undefined),
+            missing: names.filter(name => read(name) === undefined),
+        };
+    }
+
+    return report;
+}
