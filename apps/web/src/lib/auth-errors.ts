@@ -19,6 +19,10 @@ const MESSAGES: Record<string, string> = {
     'auth/popup-closed-by-user': '',
     'auth/network-request-failed': 'Sin conexión. Revisa tu internet.',
     'auth/requires-recent-login': 'Vuelve a iniciar sesión para hacer este cambio.',
+    'auth/missing-email': 'Escribe tu correo electrónico.',
+    // The reset link has a lifetime; both of these mean "ask for a new one".
+    'auth/expired-action-code': 'Ese enlace ya caducó. Pide uno nuevo.',
+    'auth/invalid-action-code': 'Ese enlace ya no es válido. Pide uno nuevo.',
 };
 
 /** Returns a message to show, or an empty string when the error is not worth surfacing. */

@@ -100,6 +100,15 @@ export default function LoginPage() {
                         </Button>
                     </form>
 
+                    <p className="mt-5 text-center">
+                        <Link
+                            href="/forgot-password"
+                            className="text-xs font-semibold text-text-muted underline-offset-4 hover:text-brand hover:underline"
+                        >
+                            ¿Olvidaste tu contraseña?
+                        </Link>
+                    </p>
+
                     <div className="relative my-8">
                         <span className="absolute inset-0 flex items-center" aria-hidden="true">
                             <span className="w-full border-t border-line" />
