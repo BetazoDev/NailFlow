@@ -186,7 +186,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     return (
         <SessionContext.Provider value={session}>
-            <div className="flex h-dvh flex-col overflow-hidden bg-surface lg:flex-row">
+            {/*
+                The shell is taken out of the document flow on purpose.
+
+                As an in-flow `h-dvh` block it was exactly the viewport tall, so
+                anything that added height to the body — a browser extension's
+                injected node, for instance — made the document scrollable, and
+                scrolling carried the whole shell up and left a blank band below
+                it. Out of flow the shell always covers the viewport and the
+                document has nothing to scroll.
+            */}
+            <div className="fixed inset-0 flex flex-col overflow-hidden bg-surface lg:flex-row">
                 <aside className="hidden w-72 shrink-0 lg:flex lg:flex-col">{sidebar}</aside>
 
                 <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface-raised px-5 py-4 lg:hidden">
@@ -228,7 +238,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </div>
                 )}
 
-                <main className="flex-1 overflow-y-auto lg:p-8">
+                <main className="flex-1 overflow-y-auto overscroll-contain lg:p-8">
                     <div className="mx-auto min-h-full w-full max-w-[1240px] lg:rounded-[2rem] lg:border lg:border-line lg:bg-surface-raised lg:p-8 lg:shadow-soft">
                         {children}
                     </div>
