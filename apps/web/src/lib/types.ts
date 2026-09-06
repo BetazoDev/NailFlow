@@ -17,6 +17,7 @@ export type {
     LoyaltySettings,
     PaymentMethod,
     Service,
+    SocialLinks,
     Staff,
     StaffDaySchedule,
     StaffRole,

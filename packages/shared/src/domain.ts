@@ -61,11 +61,29 @@ export interface TenantBranding {
     tagline?: string;
 }
 
+/**
+ * Where a salon can be found outside her booking page.
+ *
+ * Handles are stored bare — "bellanails", not a full URL — so the salon types
+ * what she knows and the link is built where it is shown. WhatsApp is a phone
+ * number for the same reason.
+ */
+export interface SocialLinks {
+    instagram?: string;
+    facebook?: string;
+    tiktok?: string;
+    whatsapp?: string;
+    website?: string;
+}
+
 export interface TenantSettings {
     currency?: string;
     timezone?: string;
     weekly_schedule?: DaySchedule[];
     loyalty?: LoyaltySettings;
+    /** Shown at the top of the booking page, above the catalogue. */
+    description?: string;
+    social?: SocialLinks;
 }
 
 export interface Tenant {

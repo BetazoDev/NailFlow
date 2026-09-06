@@ -6,8 +6,9 @@ import { useSession } from '@/lib/session-context';
 import { applyBranding, clearBrandingPreview } from '@/lib/theme';
 import { Feedback, type FeedbackState } from '@/components/admin/Feedback';
 import { GatewayPanel } from '@/components/admin/GatewayPanel';
+import { SharePanel } from '@/components/admin/SharePanel';
 import { DEFAULT_PALETTE_ID, DEFAULT_TYPOGRAPHY_ID, PALETTES, TYPOGRAPHY, WEEKDAYS } from '@/lib/constants';
-import type { DaySchedule, TenantBranding, TenantSettings } from '@/lib/types';
+import type { DaySchedule, SocialLinks, TenantBranding, TenantSettings } from '@/lib/types';
 import {
     updatePassword,
     EmailAuthProvider,
@@ -29,10 +30,20 @@ const DEFAULT_SCHEDULE: DaySchedule[] = [
     { day: 0, active: false, start: '09:00', end: '09:00' },
 ];
 
+/** Handles, not URLs: she types what she knows and we build the link. */
+const SOCIAL_FIELDS = [
+    { key: 'instagram', label: 'Instagram', icon: 'photo_camera', placeholder: 'tusalon' },
+    { key: 'tiktok', label: 'TikTok', icon: 'music_note', placeholder: 'tusalon' },
+    { key: 'facebook', label: 'Facebook', icon: 'thumb_up', placeholder: 'tusalon' },
+    { key: 'whatsapp', label: 'WhatsApp', icon: 'chat', placeholder: '+52 55 1234 5678' },
+    { key: 'website', label: 'Sitio web', icon: 'language', placeholder: 'https://…' },
+] as const satisfies readonly { key: keyof SocialLinks; label: string; icon: string; placeholder: string }[];
+
 const TABS = [
     ['info', 'Negocio', 'storefront'],
     ['apariencia', 'Apariencia', 'palette'],
     ['horarios', 'Horarios', 'schedule'],
+    ['compartir', 'Comparte', 'qr_code_2'],
     ['cobros', 'Cobros', 'payments'],
     ['fidelizacion', 'Fidelización', 'card_giftcard'],
     ['password', 'Seguridad', 'shield'],
@@ -44,6 +55,8 @@ export default function ProfilePage() {
 
     const [salonName, setSalonName] = useState('');
     const [tagline, setTagline] = useState('');
+    const [description, setDescription] = useState('');
+    const [social, setSocial] = useState<SocialLinks>({});
     const [currentBranding, setCurrentBranding] = useState<TenantBranding>({});
     const [paletteId, setPaletteId] = useState(DEFAULT_PALETTE_ID);
     const [typographyId, setTypographyId] = useState(DEFAULT_TYPOGRAPHY_ID);
@@ -78,6 +91,8 @@ export default function ProfilePage() {
 
         setSalonName(tenant.name ?? '');
         setTagline(tenant.branding?.tagline ?? '');
+        setDescription(tenant.settings?.description ?? '');
+        setSocial(tenant.settings?.social ?? {});
         setLogoPreview(tenant.branding?.logo_url ?? null);
         setCurrentBranding(tenant.branding ?? {});
         setPaletteId(tenant.branding?.palette_id ?? DEFAULT_PALETTE_ID);
@@ -155,7 +170,20 @@ export default function ProfilePage() {
             }
 
             await save(
-                { name: salonName.trim(), branding: { logo_url: logoUrl ?? undefined, tagline: tagline.trim() } },
+                {
+                    name: salonName.trim(),
+                    branding: { logo_url: logoUrl ?? undefined, tagline: tagline.trim() },
+                    settings: {
+                        description: description.trim(),
+                        // Blank handles are dropped rather than stored empty, so
+                        // the booking page can simply show what is present.
+                        social: Object.fromEntries(
+                            Object.entries(social)
+                                .map(([key, value]) => [key, value?.trim() ?? ''])
+                                .filter(([, value]) => value)
+                        ),
+                    },
+                },
                 setSaveMsg
             );
         } catch (caught) {
@@ -374,6 +402,46 @@ export default function ProfilePage() {
                                     onChange={(e) => setTagline(e.target.value)}
                                     leftIcon="auto_awesome"
                                 />
+
+                                <div>
+                                    <label
+                                        htmlFor="salon-description"
+                                        className="t-label mb-2 block"
+                                    >
+                                        Sobre tu salón
+                                    </label>
+                                    <textarea
+                                        id="salon-description"
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        rows={4}
+                                        maxLength={1200}
+                                        placeholder="Cuéntale a tus clientas qué haces y qué te distingue."
+                                        className="w-full rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-text-strong placeholder:text-text-subtle"
+                                    />
+                                    <p className="t-meta mt-1.5">
+                                        Aparece arriba de tu página de reservas.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <p className="t-label">Tus redes</p>
+                                    {SOCIAL_FIELDS.map(({ key, label, icon, placeholder }) => (
+                                        <Input
+                                            key={key}
+                                            label={label}
+                                            leftIcon={icon}
+                                            placeholder={placeholder}
+                                            value={social[key] ?? ''}
+                                            onChange={(e) =>
+                                                setSocial(current => ({
+                                                    ...current,
+                                                    [key]: e.target.value,
+                                                }))
+                                            }
+                                        />
+                                    ))}
+                                </div>
 
                                 <Button
                                     variant="primary"
@@ -615,6 +683,8 @@ export default function ProfilePage() {
                         </Card>
                     </div>
                 )}
+
+                {tab === 'compartir' && <SharePanel domain={tenant?.domain} />}
 
                 {tab === 'cobros' && <GatewayPanel />}
 

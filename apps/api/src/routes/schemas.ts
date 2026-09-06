@@ -91,6 +91,13 @@ export const salonScheduleSchema = z.array(
     })
 );
 
+/** A social handle: letters, digits, dots, underscores and dashes. */
+const handleSchema = z
+    .string()
+    .trim()
+    .max(60)
+    .regex(/^[A-Za-z0-9._-]*$/, 'Ese usuario tiene caracteres que no admitimos');
+
 export const tenantUpdateSchema = z.object({
     name: z.string().trim().min(1).max(120).optional(),
     branding: z.object({
@@ -112,6 +119,17 @@ export const tenantUpdateSchema = z.object({
             reward_type: z.enum(['discount', 'free_service']),
             discount_value: z.coerce.number().min(0).max(100).optional(),
         }).optional(),
+        description: z.string().trim().max(1200).optional(),
+        // Handles, not URLs: the salon types what she knows and the link is
+        // built where it is shown. Anything that looks like markup or a scheme
+        // is refused, so a handle can never become a link somewhere else.
+        social: z.object({
+            instagram: handleSchema.optional(),
+            facebook: handleSchema.optional(),
+            tiktok: handleSchema.optional(),
+            whatsapp: z.string().trim().max(40).regex(/^[+0-9()\s-]*$/).optional(),
+            website: z.string().trim().max(200).url().optional().or(z.literal('')),
+        }).partial().optional(),
     }).partial().optional(),
 });
 

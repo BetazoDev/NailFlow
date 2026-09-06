@@ -6,6 +6,7 @@ import { applyBranding } from '@/lib/theme';
 import type { BookingStep, Tenant } from '@/lib/types';
 import SplashScreen from '@/components/SplashScreen';
 import BookingWizard from './BookingWizard';
+import { SalonPresence } from './SalonPresence';
 import { BOOKING_STEPS } from './BookingContext';
 
 interface Props {
@@ -97,6 +98,11 @@ export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, 
                             <p className="truncate text-sm font-medium text-white">{staffName}</p>
                         </div>
                     </div>
+
+                    <SalonPresence
+                        description={tenant.settings?.description}
+                        social={tenant.settings?.social}
+                    />
 
                     <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">
                         Tu reserva
