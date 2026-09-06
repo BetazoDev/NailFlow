@@ -6,7 +6,7 @@ import { tenantOf } from '../middleware/tenant';
 import { validateBody } from '../middleware/validate';
 import { createBookingSchema } from './schemas';
 import { createAppointment, depositFor, prepareBooking } from '../services/bookings';
-import { createDepositCheckout, paymentsEnabled } from '../services/payments';
+import { canCharge, createDepositCheckout, GatewayUnavailable } from '../services/payments';
 import { triggerAutomation } from '../services/notifications';
 import { createLogger } from '../lib/logger';
 
@@ -18,8 +18,11 @@ export const bookingsRouter: Router = Router();
  *
  * Prices and durations are computed server-side from the tenant's own service
  * rows — the request only says which services were chosen. When a deposit is
- * required the appointment starts as `pending_payment`, and only the Mercado
- * Pago webhook may promote it to `confirmed`.
+ * required the appointment starts as `pending_payment`, and only the gateway's
+ * webhook may promote it to `confirmed`.
+ *
+ * The deposit is charged on the salon's own connected account, so whether
+ * online payment works is a question about *this* salon, not about the server.
  */
 bookingsRouter.post(
     '/bookings',
@@ -32,8 +35,8 @@ bookingsRouter.post(
         const deposit = depositFor(prepared);
         const wantsGateway = request.payment_method === 'mercado';
 
-        if (wantsGateway && !paymentsEnabled) {
-            throw new ApiError(503, 'Online payment is not available for this salon');
+        if (wantsGateway && !(await canCharge(tenant.id))) {
+            throw new ApiError(503, 'Este salón todavía no acepta pagos en línea');
         }
 
         const needsPayment = wantsGateway && deposit > 0;
@@ -52,15 +55,25 @@ bookingsRouter.post(
 
         if (needsPayment) {
             const origin = req.headers.origin ?? `https://${tenant.domain}`;
-            const { initPoint } = await createDepositCheckout({
-                appointmentId: appointment.id,
-                description: prepared.services.map(service => service.name).join(' + '),
-                amount: deposit,
-                currency: tenant.settings?.currency ?? env.defaults.currency,
-                successUrl: `${origin}/book/success?appointment=${appointment.id}`,
-                failureUrl: `${origin}/book/error?appointment=${appointment.id}`,
-            });
-            response.init_point = initPoint;
+            try {
+                const { redirectUrl } = await createDepositCheckout(tenant.id, {
+                    appointmentId: appointment.id,
+                    description: prepared.services.map(service => service.name).join(' + '),
+                    amount: deposit,
+                    currency: tenant.settings?.currency ?? env.defaults.currency,
+                    successUrl: `${origin}/book/success?appointment=${appointment.id}`,
+                    failureUrl: `${origin}/book/error?appointment=${appointment.id}`,
+                });
+                response.init_point = redirectUrl;
+            } catch (error) {
+                // The appointment already exists and holds the slot. Telling the
+                // client the gateway is down is honest; leaving her with a
+                // confirmed-looking booking she never paid for is not.
+                if (error instanceof GatewayUnavailable) {
+                    throw new ApiError(503, error.message);
+                }
+                throw error;
+            }
         }
 
         await triggerAutomation(tenant.id, 'booking.initiated', {

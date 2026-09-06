@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session-context';
 import { applyBranding, clearBrandingPreview } from '@/lib/theme';
 import { Feedback, type FeedbackState } from '@/components/admin/Feedback';
+import { GatewayPanel } from '@/components/admin/GatewayPanel';
 import { DEFAULT_PALETTE_ID, DEFAULT_TYPOGRAPHY_ID, PALETTES, TYPOGRAPHY, WEEKDAYS } from '@/lib/constants';
 import type { DaySchedule, TenantBranding, TenantSettings } from '@/lib/types';
 import {
@@ -32,13 +33,14 @@ const TABS = [
     ['info', 'Negocio', 'storefront'],
     ['apariencia', 'Apariencia', 'palette'],
     ['horarios', 'Horarios', 'schedule'],
+    ['cobros', 'Cobros', 'payments'],
     ['fidelizacion', 'Fidelización', 'card_giftcard'],
     ['password', 'Seguridad', 'shield'],
 ] as const;
 
 export default function ProfilePage() {
     const { tenant, refresh } = useSession();
-    const [tab, setTab] = useState<'info' | 'apariencia' | 'horarios' | 'password' | 'fidelizacion'>('info');
+    const [tab, setTab] = useState<(typeof TABS)[number][0]>('info');
 
     const [salonName, setSalonName] = useState('');
     const [tagline, setTagline] = useState('');
@@ -613,6 +615,8 @@ export default function ProfilePage() {
                         </Card>
                     </div>
                 )}
+
+                {tab === 'cobros' && <GatewayPanel />}
 
                 {tab === 'fidelizacion' && (
                     <div className="space-y-6 animate-fade-in">

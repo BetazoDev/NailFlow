@@ -98,6 +98,35 @@ const TABLES = `
         expires_at  TIMESTAMPTZ NOT NULL,
         PRIMARY KEY (tenant_id, staff_id, slot_time)
     );
+
+    -- Each salon collects into her own gateway account, so deposits never pass
+    -- through Diabolical. One row per salon: a salon uses one gateway at a
+    -- time, and switching replaces the row rather than accumulating accounts.
+    --
+    -- Every column holding a credential stores a sealed value (see
+    -- lib/secretbox.ts), never the token itself.
+    CREATE TABLE IF NOT EXISTS payment_accounts (
+        tenant_id          TEXT PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+        provider           TEXT NOT NULL CHECK (provider IN ('mercadopago', 'stripe')),
+
+        -- Mercado Pago Connect: tokens belong to the salon's MP user.
+        mp_user_id         TEXT,
+        access_token       TEXT,
+        refresh_token      TEXT,
+        access_expires_at  TIMESTAMPTZ,
+        -- Her own webhook signing secret; MP signs each salon's notifications
+        -- with the secret of the account that received the payment.
+        webhook_secret     TEXT,
+
+        -- Stripe Connect: charges are created against this account id.
+        stripe_account_id  TEXT UNIQUE,
+
+        -- False until the gateway says the account may actually take money.
+        -- A salon can finish authorising and still be pending verification.
+        charges_enabled    BOOLEAN NOT NULL DEFAULT FALSE,
+        connected_at       TIMESTAMPTZ,
+        updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
 `;
 
 /**
@@ -115,6 +144,9 @@ const INDEXES = [
     'CREATE INDEX IF NOT EXISTS idx_appointments_tenant_phone ON appointments (tenant_id, client_phone)',
     'CREATE INDEX IF NOT EXISTS idx_appointments_created_at ON appointments (created_at)',
     'CREATE INDEX IF NOT EXISTS idx_slot_locks_expiry ON slot_locks (expires_at)',
+    // Stripe Connect delivers every account's events to one endpoint, so the
+    // webhook looks the salon up by connected account id on every call.
+    "CREATE INDEX IF NOT EXISTS idx_payment_accounts_stripe ON payment_accounts (stripe_account_id) WHERE stripe_account_id IS NOT NULL",
 ];
 
 /**

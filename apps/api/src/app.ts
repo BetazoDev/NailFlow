@@ -7,6 +7,7 @@ import { errorHandler, notFoundHandler } from './middleware/errors';
 import { resolveTenant } from './middleware/tenant';
 import { imagesRouter } from './routes/images';
 import { webhooksRouter } from './routes/webhooks';
+import { gatewayRouter } from './routes/gateway';
 import { tenantRouter } from './routes/tenant';
 import { sessionRouter } from './routes/session';
 import { servicesRouter } from './routes/services';
@@ -68,7 +69,16 @@ export function createApp(): Express {
 
     // A booking payload is a little JSON and a handful of URLs; anything larger
     // is a mistake or an attempt to exhaust memory.
-    app.use(express.json({ limit: '256kb' }));
+    //
+    // Stripe is the one exception: it signs the exact bytes it sent, so a body
+    // that has been parsed and re-serialised no longer matches its signature.
+    // That route reads the raw buffer itself, and parsing here would consume
+    // the stream before it ever gets the chance.
+    const parseJson = express.json({ limit: '256kb' });
+    app.use((req, res, next) => {
+        if (req.path === '/api/webhooks/stripe') return next();
+        parseJson(req, res, next);
+    });
     app.use(express.urlencoded({ extended: false, limit: '256kb' }));
 
     // ── Tier 1: infrastructure ───────────────────────────────────────────────
@@ -109,6 +119,7 @@ export function createApp(): Express {
     api.use(resolveTenant);
     api.use(sessionRouter);
     api.use(tenantRouter);
+    api.use(gatewayRouter);
     api.use(servicesRouter);
     api.use(staffRouter);
     api.use(appointmentsRouter);

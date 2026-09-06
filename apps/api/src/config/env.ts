@@ -113,12 +113,44 @@ export const env = {
         closingTime: process.env.DEFAULT_CLOSING_TIME ?? '21:00',
     },
 
+    /**
+     * Key that seals the payment credentials each salon entrusts to us.
+     *
+     * 32 bytes as hex or base64. Without it a salon cannot connect a gateway,
+     * but everything else — bookings, availability, the panel — keeps working,
+     * so it is optional at boot like the rest.
+     */
+    credentialsKey: optional('CREDENTIALS_KEY'),
+
+    /**
+     * Our Mercado Pago application, used to ask each salon for authorisation.
+     *
+     * These identify Diabolical as the integrator; the money always moves with
+     * the salon's own credentials, obtained through this app and stored per
+     * salon. There is deliberately no platform-wide access token any more: one
+     * would mean every salon's deposits landing in a single account.
+     */
     mercadoPago: {
-        accessToken: optional('MP_ACCESS_TOKEN'),
-        /** Secret from the MP dashboard used to verify `x-signature` on webhooks. */
-        webhookSecret: optional('MP_WEBHOOK_SECRET'),
+        clientId: optional('MP_CLIENT_ID'),
+        clientSecret: optional('MP_CLIENT_SECRET'),
         get enabled() {
-            return Boolean(this.accessToken);
+            return Boolean(this.clientId && this.clientSecret);
+        },
+    },
+
+    /**
+     * Our Stripe platform account, used for Connect onboarding.
+     *
+     * Charges are created against each salon's connected account, so the funds
+     * never touch the platform balance. The webhook secret is ours, not the
+     * salon's: Connect delivers every connected account's events to one
+     * endpoint and names the account in the event itself.
+     */
+    stripe: {
+        secretKey: optional('STRIPE_SECRET_KEY'),
+        webhookSecret: optional('STRIPE_WEBHOOK_SECRET'),
+        get enabled() {
+            return Boolean(this.secretKey);
         },
     },
 
@@ -171,7 +203,9 @@ const EXPECTED: Record<string, string[]> = {
     'browser access': ['CORS_ORIGINS'],
     'admin sign-in': ['FIREBASE_SERVICE_ACCOUNT', 'GOOGLE_APPLICATION_CREDENTIALS'],
     'images': ['CDN_UPLOAD_TOKEN', 'CDN_API_KEY_REFERENCES'],
-    'online payment': ['MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET'],
+    'connecting a gateway': ['CREDENTIALS_KEY'],
+    'Mercado Pago onboarding': ['MP_CLIENT_ID', 'MP_CLIENT_SECRET'],
+    'Stripe onboarding': ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
     'schema bootstrap': ['DB_AUTO_MIGRATE'],
     'automation': ['N8N_WEBHOOK_URL'],
 };

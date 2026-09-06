@@ -35,6 +35,23 @@ function tenantDomain(explicit?: string): string | undefined {
     return undefined;
 }
 
+/** A salon's connected payment gateway, as the panel is allowed to see it. */
+export interface GatewayAccount {
+    provider: 'mercadopago' | 'stripe';
+    connected: boolean;
+    /** The gateway will accept charges. False while verification is pending. */
+    chargesEnabled: boolean;
+    /** Mercado Pago only: without it her payments can never be verified. */
+    webhookSecretSet: boolean;
+    connectedAt: string | null;
+}
+
+export interface GatewayState {
+    account: GatewayAccount | null;
+    /** Which gateways this server is configured to offer at all. */
+    available: { mercadopago: boolean; stripe: boolean };
+}
+
 /** Answer from `GET /api/session`: the caller's role in the current salon. */
 export interface SessionInfo {
     uid: string;
@@ -139,6 +156,35 @@ export const api = {
 
     updateTenant: (data: Partial<Pick<Tenant, 'name' | 'branding' | 'settings'>>) =>
         request<Tenant>('/tenant', { method: 'PUT', body: data }),
+
+    // ── Cobros ───────────────────────────────────────────────────────────────
+
+    /**
+     * The salon's own payment account.
+     *
+     * Deposits are charged against whatever is connected here, so the money
+     * lands with the salon. Nothing on this endpoint returns a credential —
+     * only whether one exists and whether the gateway will accept charges.
+     */
+    getGateway: () => request<GatewayState>('/gateway'),
+
+    connectMercadoPago: () =>
+        request<{ url: string }>('/gateway/mercadopago/authorize', { method: 'POST' }),
+
+    connectStripe: () =>
+        request<{ url: string }>('/gateway/stripe/authorize', { method: 'POST' }),
+
+    /** Copied by the owner from her Mercado Pago dashboard; we cannot read it. */
+    setMercadoPagoWebhookSecret: (secret: string) =>
+        request<GatewayAccount>('/gateway/mercadopago/webhook-secret', {
+            method: 'PUT',
+            body: { secret },
+        }),
+
+    /** Re-asks Stripe whether verification finished, without waiting for a webhook. */
+    refreshStripe: () => request<GatewayAccount>('/gateway/stripe/refresh', { method: 'POST' }),
+
+    disconnectGateway: () => request<void>('/gateway', { method: 'DELETE' }),
 
     /** First sign-up on a fresh deployment takes ownership of the salon. */
 
