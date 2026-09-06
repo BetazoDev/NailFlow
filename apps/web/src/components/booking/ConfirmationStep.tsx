@@ -1,6 +1,9 @@
 'use client';
 
+import { useRef, useState } from 'react';
+import { toPng } from 'html-to-image';
 import { api } from '@/lib/api';
+import { formatMoney } from '@/lib/format';
 import { useBooking } from './BookingContext';
 
 function formatFullDate(dateStr: string | null) {
@@ -31,6 +34,44 @@ function calendarStamp(date: string, time: string, addMinutes = 0): string {
 
 export default function ConfirmationStep() {
     const { draft, totals, salonName, confirmedAppointmentId } = useBooking();
+    const receiptRef = useRef<HTMLDivElement>(null);
+    const [downloading, setDownloading] = useState(false);
+    const [downloadFailed, setDownloadFailed] = useState(false);
+
+    /**
+     * Saves the receipt as a picture.
+     *
+     * A client who books on her phone wants this in her camera roll, not in a
+     * browser tab she will close. Rendered at twice the size so it stays legible
+     * when she zooms in or shows it at the counter.
+     */
+    const download = async () => {
+        if (!receiptRef.current) return;
+        setDownloading(true);
+        setDownloadFailed(false);
+        try {
+            const dataUrl = await toPng(receiptRef.current, {
+                pixelRatio: 2,
+                backgroundColor: '#FFFFFF',
+                // Reference photos come from the CDN, and a tainted canvas
+                // cannot be exported at all — better a receipt without them
+                // than no receipt.
+                filter: node => !(node instanceof HTMLImageElement && node.dataset.remote === 'true'),
+            });
+
+            const link = document.createElement('a');
+            link.download = `cita-${salonName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${draft.date ?? ''}.png`;
+            link.href = dataUrl;
+            link.click();
+        } catch {
+            setDownloadFailed(true);
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    const paidNow = draft.paymentMethod === 'mercado' ? totals.requiredAdvance : 0;
+    const balance = Math.max(0, totals.price - paidNow);
 
     const serviceNames = draft.services.map(service => service.name).join(' + ');
     const canAddToCalendar = Boolean(draft.date && draft.time);
@@ -61,7 +102,10 @@ export default function ConfirmationStep() {
                 </p>
             </div>
 
-            <div className="animate-fade-in-up mb-10 w-full max-w-sm rounded-[2rem] border border-line bg-surface-raised p-8 shadow-lg">
+            <div
+                ref={receiptRef}
+                className="animate-fade-in-up mb-10 w-full max-w-sm rounded-[2rem] border border-line bg-surface-raised p-8 shadow-lg"
+            >
                 <div className="mb-6 flex items-center justify-between border-b border-line pb-4">
                     <div className="min-w-0">
                         <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-text-muted">
@@ -101,8 +145,24 @@ export default function ConfirmationStep() {
                     </ul>
                     <p className="mt-3 flex justify-between border-t border-line pt-3 text-sm font-bold text-text-strong">
                         <span>Total</span>
-                        <span>${totals.price.toFixed(2)}</span>
+                        <span>{formatMoney(totals.price)}</span>
                     </p>
+
+                    {paidNow > 0 && (
+                        <>
+                            <p className="mt-2 flex justify-between text-sm text-success">
+                                <span>Anticipo pagado</span>
+                                <span>−{formatMoney(paidNow)}</span>
+                            </p>
+                            {/* What she still owes, said plainly. Leaving it to
+                                be worked out at the counter is how a client
+                                arrives expecting to owe nothing. */}
+                            <p className="mt-2 flex justify-between text-sm font-bold text-text-strong">
+                                <span>Por pagar en el salón</span>
+                                <span>{formatMoney(balance)}</span>
+                            </p>
+                        </>
+                    )}
                 </div>
 
                 <div className="mt-6 flex items-center justify-between border-t border-line pt-4">
@@ -128,6 +188,7 @@ export default function ConfirmationStep() {
                                     key={url}
                                     src={api.getImageUrl(url)}
                                     alt={`Referencia ${index + 1}`}
+                                    data-remote="true"
                                     className="size-12 shrink-0 rounded-xl border border-line object-cover"
                                 />
                             ))}
@@ -153,6 +214,21 @@ export default function ConfirmationStep() {
                         <span className="material-symbol text-xl" aria-hidden="true">calendar_add_on</span>
                         Añadir al calendario
                     </a>
+                )}
+
+                <button
+                    onClick={download}
+                    disabled={downloading}
+                    className="flex w-full items-center justify-center gap-3 rounded-2xl border border-line bg-surface-raised py-5 text-base font-medium text-text-strong transition-colors hover:bg-surface-sunken disabled:opacity-50"
+                >
+                    <span className="material-symbol text-xl" aria-hidden="true">download</span>
+                    {downloading ? 'Preparando…' : 'Descargar comprobante'}
+                </button>
+
+                {downloadFailed && (
+                    <p role="alert" className="text-center text-xs text-danger">
+                        No pudimos guardar la imagen. Puedes tomar una captura de pantalla.
+                    </p>
                 )}
 
                 <button

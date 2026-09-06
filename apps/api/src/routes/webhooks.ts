@@ -37,6 +37,10 @@ async function applyPayment(payment: PaymentStatus): Promise<void> {
         appointment_id: payment.appointmentId,
         client_name: appointment.client_name,
         client_phone: appointment.client_phone,
+        client_email: appointment.client_email,
+        starts_at: appointment.datetime_start.toISOString(),
+        ends_at: appointment.datetime_end.toISOString(),
+        total: appointment.price ? Number(appointment.price) : null,
         payment_id: payment.paymentId,
     });
 }

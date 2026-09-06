@@ -5,6 +5,7 @@ import { requireTenantOwner } from '../middleware/auth';
 import { tenantOf } from '../middleware/tenant';
 import { validateBody } from '../middleware/validate';
 import { tenantUpdateSchema } from './schemas';
+import { forgetRecipients } from '../services/notifications';
 export const tenantRouter: Router = Router();
 
 /**
@@ -43,6 +44,10 @@ tenantRouter.put(
                 id,
             ]
         );
+
+        // Notifications carry the salon's contact details, cached for a few
+        // minutes; a rename that keeps sending the old name reads as a bug.
+        forgetRecipients(id);
 
         res.json(result.rows[0]);
     })

@@ -154,15 +154,28 @@ export async function createAppointment(params: {
 }
 
 /** Marks a booking paid. Returns null when the appointment no longer exists. */
+export interface ConfirmedAppointment {
+    tenant_id: string;
+    client_name: string;
+    client_phone: string | null;
+    client_email: string | null;
+    datetime_start: Date;
+    datetime_end: Date;
+    price: string | null;
+}
+
 export async function confirmPayment(
     appointmentId: string,
     paymentRef: string
-): Promise<{ tenant_id: string; client_name: string; client_phone: string | null } | null> {
-    const result = await query<{ tenant_id: string; client_name: string; client_phone: string | null }>(
+): Promise<ConfirmedAppointment | null> {
+    // Returns enough to write the confirmation both sides receive. Reading it
+    // back in a second query would race with anything else touching the row.
+    const result = await query<ConfirmedAppointment>(
         `UPDATE appointments
          SET status = 'confirmed', advance_paid = TRUE, payment_ref = $2
          WHERE id = $1 AND status = 'pending_payment'
-         RETURNING tenant_id, client_name, client_phone`,
+         RETURNING tenant_id, client_name, client_phone, client_email,
+                   datetime_start, datetime_end, price`,
         [appointmentId, paymentRef]
     );
     return result.rows[0] ?? null;

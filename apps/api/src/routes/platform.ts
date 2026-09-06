@@ -8,6 +8,7 @@ import { validateBody } from '../middleware/validate';
 import { firebaseAuth } from '../lib/firebase';
 import { newId } from '../services/bookings';
 import { summaryFor } from '../services/payments/accounts';
+import { forgetRecipients } from '../services/notifications';
 import { createLogger, errorContext } from '../lib/logger';
 
 const log = createLogger('platform');
@@ -304,6 +305,8 @@ platformRouter.patch(
 
         const tenant = result.rows[0];
         if (!tenant) throw ApiError.notFound('Ese salón no existe');
+
+        forgetRecipients(req.params.id);
 
         await audit(req.user!.email!, 'tenant.updated', req.params.id, {
             fields: Object.keys(body),

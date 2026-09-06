@@ -13,6 +13,7 @@
   "dependencies": {
     "@nailflow/shared": "*",
     "firebase": "^12.10.0",
+    "html-to-image": "^1.11.13",
     "next": "14.2.15",
     "qrcode": "^1.5.4",
     "react": "18.3.1",

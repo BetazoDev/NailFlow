@@ -217,7 +217,9 @@ export default function AppointmentDrawer({
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between bg-surface-sunken/50 p-4">
-                                    <span className="t-body font-semibold text-text-strong">Saldo</span>
+                                    <span className="t-body font-semibold text-text-strong">
+                                        {balance > 0 ? 'Por cobrar en el salón' : 'Saldo'}
+                                    </span>
                                     <span className="t-figure text-lg font-semibold text-text-strong">
                                         {formatMoney(balance, currency)}
                                     </span>
