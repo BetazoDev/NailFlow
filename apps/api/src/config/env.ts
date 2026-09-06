@@ -191,6 +191,8 @@ export const env = {
         /** Spec §10: reference photos are purged this many days after the booking. */
         referenceImageDays: int('REFERENCE_IMAGE_RETENTION_DAYS', 14),
         cleanupCron: process.env.CLEANUP_CRON ?? '0 2 * * *',
+        /** Hourly: a daily run would remind a 9am client 23h ahead and a 9pm one 11h ahead. */
+        reminderCron: process.env.REMINDER_CRON ?? '5 * * * *',
     },
 } as const;
 

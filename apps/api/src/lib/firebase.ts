@@ -1,11 +1,13 @@
-import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
+import { applicationDefault, cert, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getAuth, type Auth } from 'firebase-admin/auth';
+import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 import { createLogger, errorContext } from './logger';
 
 const log = createLogger('firebase');
 
 /**
- * Firebase Admin, used only to verify the ID tokens the browser sends.
+ * Firebase Admin: verifying the ID tokens the browser sends, and pushing
+ * notifications to the salon's devices.
  *
  * Credentials come from either `FIREBASE_SERVICE_ACCOUNT` (the JSON blob, handy
  * on platforms that only offer env vars) or the standard
@@ -16,17 +18,17 @@ const log = createLogger('firebase');
  * salon page offline over a credential only the admin panel uses. Authenticated
  * routes answer 503 instead, and the reason is logged once at startup.
  */
-let resolved: Auth | null | undefined;
+let resolved: App | null | undefined;
 
-function initialise(): Auth | null {
+function initialise(): App | null {
     const existing = getApps()[0];
-    if (existing) return getAuth(existing);
+    if (existing) return existing;
 
     const inline = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
 
     if (inline) {
         try {
-            return getAuth(initializeApp({ credential: cert(JSON.parse(inline)) }));
+            return initializeApp({ credential: cert(JSON.parse(inline)) });
         } catch (error) {
             log.error(
                 'FIREBASE_SERVICE_ACCOUNT is set but could not be used. It must be the ' +
@@ -48,15 +50,31 @@ function initialise(): Auth | null {
     }
 
     try {
-        return getAuth(initializeApp({ credential: applicationDefault() }));
+        return initializeApp({ credential: applicationDefault() });
     } catch (error) {
         log.error('Could not load GOOGLE_APPLICATION_CREDENTIALS', errorContext(error));
         return null;
     }
 }
 
-/** The verifier, or null when no usable credential was configured. */
-export function firebaseAuth(): Auth | null {
+function app(): App | null {
     if (resolved === undefined) resolved = initialise();
     return resolved;
+}
+
+/** The verifier, or null when no usable credential was configured. */
+export function firebaseAuth(): Auth | null {
+    const instance = app();
+    return instance ? getAuth(instance) : null;
+}
+
+/**
+ * The push sender, or null when no usable credential was configured.
+ *
+ * Same credential as the verifier, so a salon that can sign in can be notified;
+ * there is no case where one works and the other does not.
+ */
+export function firebaseMessaging(): Messaging | null {
+    const instance = app();
+    return instance ? getMessaging(instance) : null;
 }

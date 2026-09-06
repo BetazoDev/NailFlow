@@ -7,7 +7,11 @@ import { verifySignature } from '../services/payments/mercadopago';
 import { constructEvent } from '../services/payments/stripe';
 import { confirmPayment } from '../services/bookings';
 import { triggerAutomation } from '../services/notifications';
+import { checkReward } from '../services/loyalty';
+import { notifySalon } from '../services/push';
+import { query } from '../db/pool';
 import { createLogger, errorContext } from '../lib/logger';
+import type { LoyaltySettings } from '@nailflow/shared';
 import type { PaymentAccount, PaymentStatus } from '../services/payments/types';
 
 const log = createLogger('webhooks');
@@ -42,6 +46,36 @@ async function applyPayment(payment: PaymentStatus): Promise<void> {
         ends_at: appointment.datetime_end.toISOString(),
         total: appointment.price ? Number(appointment.price) : null,
         payment_id: payment.paymentId,
+    });
+
+    // A paid booking is the visit that can complete a loyalty card, so this is
+    // the moment to check — not a nightly sweep the salon hears about a day late.
+    const settings = await query<{ settings: { loyalty?: LoyaltySettings } }>(
+        'SELECT settings FROM tenants WHERE id = $1',
+        [appointment.tenant_id]
+    );
+
+    await checkReward(
+        appointment.tenant_id,
+        payment.appointmentId,
+        appointment.client_phone,
+        settings.rows[0]?.settings?.loyalty
+    );
+
+    // The salon is doing someone's nails, not watching the panel. Without this
+    // she finds out about a new booking whenever she next opens it.
+    const when = appointment.datetime_start.toLocaleString('es-MX', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+
+    await notifySalon(appointment.tenant_id, {
+        title: 'Nueva cita',
+        body: `${appointment.client_name} · ${when}`,
+        link: '/admin/agenda',
     });
 }
 

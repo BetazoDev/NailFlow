@@ -222,6 +222,15 @@ export const api = {
 
     disconnectGateway: () => request<void>('/gateway', { method: 'DELETE' }),
 
+    // ── Avisos ───────────────────────────────────────────────────────────────
+
+    /** Registers this browser to receive the salon's push notifications. */
+    registerDevice: (token: string) =>
+        request<void>('/devices', { method: 'POST', body: { token } }),
+
+    forgetDevice: (token: string) =>
+        request<void>('/devices', { method: 'DELETE', body: { token } }),
+
     // ── Plataforma (Diabolical) ──────────────────────────────────────────────
 
     /**

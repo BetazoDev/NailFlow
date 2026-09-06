@@ -4,6 +4,7 @@ import { createApp } from './app';
 import { initDb } from './db/schema';
 import { closePool } from './db/pool';
 import { scheduleCleanupJobs } from './jobs/cleanup';
+import { scheduleReminderJob } from './jobs/reminders';
 import { createLogger, errorContext } from './lib/logger';
 
 const log = createLogger('server');
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
 
     const app = createApp();
     const cleanupTask = scheduleCleanupJobs();
+    const reminderTask = scheduleReminderJob();
 
     const server: Server = app.listen(env.port, () => {
         log.info('NailFlow API listening', {
@@ -44,6 +46,7 @@ async function main(): Promise<void> {
     const shutdown = (signal: string) => {
         log.info('Shutting down', { signal });
         cleanupTask.stop();
+        reminderTask.stop();
         server.close(async () => {
             await closePool().catch(error => log.error('Failed to close pool', errorContext(error)));
             process.exit(0);

@@ -6,6 +6,7 @@ import { useSession } from '@/lib/session-context';
 import { dayKeyInZone, formatMoney, formatTime, initials, todayKeyInZone } from '@/lib/format';
 import { STATUS_PRESENTATION } from '@/lib/constants';
 import AppointmentDrawer from '@/components/admin/AppointmentDrawer';
+import { PushToggle } from '@/components/admin/PushToggle';
 import type { Appointment, Service, Staff } from '@/lib/types';
 
 type Period = 'day' | 'week' | 'month';
@@ -212,6 +213,12 @@ export default function DashboardPage() {
                     </div>
                 )}
             </header>
+
+            {/* Offered on the first screen she opens, where a salon who has not
+                turned notifications on will actually see it. */}
+            <div className="mb-10">
+                <PushToggle />
+            </div>
 
             <section className="mb-12">
                 <div className="mb-5 flex items-center justify-between gap-4">

@@ -99,6 +99,16 @@ const TABLES = `
         PRIMARY KEY (tenant_id, staff_id, slot_time)
     );
 
+    -- Devices that receive a salon's notifications. Keyed by token because
+    -- that is what the push service addresses, and one person may have several
+    -- (phone, laptop, a second browser).
+    CREATE TABLE IF NOT EXISTS push_devices (
+        token       TEXT PRIMARY KEY,
+        tenant_id   TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        uid         TEXT NOT NULL,
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     -- Who at Diabolical may administer the platform itself: create salons,
     -- see every salon's status, change a subscription. Deliberately separate
     -- from a salon's own owner/staff roles — being the owner of one salon must
@@ -173,6 +183,10 @@ const INDEXES = [
     // webhook looks the salon up by connected account id on every call.
     "CREATE INDEX IF NOT EXISTS idx_payment_accounts_stripe ON payment_accounts (stripe_account_id) WHERE stripe_account_id IS NOT NULL",
     'CREATE INDEX IF NOT EXISTS idx_platform_audit_created ON platform_audit (created_at DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_push_devices_tenant ON push_devices (tenant_id)',
+    // The reminder job scans for confirmed appointments a day out; without this
+    // it walks every appointment ever made, once an hour.
+    "CREATE INDEX IF NOT EXISTS idx_appointments_pending_reminder ON appointments (datetime_start) WHERE reminded_at IS NULL AND status = 'confirmed'",
 ];
 
 /**
@@ -195,6 +209,13 @@ const COLUMN_BACKFILLS = [
     `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS owner_phone TEXT`,
     `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS owner_whatsapp TEXT`,
     `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS notes TEXT`,
+
+    // Stamped when the day-before reminder goes out, so a job whose window
+    // still overlaps does not send the same reminder twice.
+    `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminded_at TIMESTAMPTZ`,
+    // How many visits this client had already counted when the appointment was
+    // confirmed, so the loyalty notice fires exactly once per reward earned.
+    `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS loyalty_notified BOOLEAN NOT NULL DEFAULT FALSE`,
 ];
 
 export async function initDb(): Promise<void> {

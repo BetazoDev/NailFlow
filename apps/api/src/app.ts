@@ -9,6 +9,7 @@ import { imagesRouter } from './routes/images';
 import { webhooksRouter } from './routes/webhooks';
 import { gatewayRouter } from './routes/gateway';
 import { platformRouter } from './routes/platform';
+import { devicesRouter } from './routes/devices';
 import { tenantRouter } from './routes/tenant';
 import { sessionRouter } from './routes/session';
 import { servicesRouter } from './routes/services';
@@ -128,6 +129,7 @@ export function createApp(): Express {
     api.use(sessionRouter);
     api.use(tenantRouter);
     api.use(gatewayRouter);
+    api.use(devicesRouter);
     api.use(servicesRouter);
     api.use(staffRouter);
     api.use(appointmentsRouter);
