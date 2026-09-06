@@ -138,11 +138,13 @@ export default function LoginPage() {
                     </Button>
                 </div>
 
+                {/*
+                    Salons are onboarded by Diabolical, not self-served, so there
+                    is no public sign-up to link to. An owner who cannot get in
+                    needs us, not a registration form.
+                */}
                 <p className="mt-6 text-center text-sm text-text-muted">
-                    ¿No tienes cuenta?{' '}
-                    <Link href="/signup" className="font-bold text-brand hover:underline">
-                        Regístrate aquí
-                    </Link>
+                    ¿Aún no tienes acceso? Escríbenos y damos de alta tu salón.
                 </p>
             </div>
         </main>

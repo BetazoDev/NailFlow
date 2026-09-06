@@ -141,8 +141,6 @@ export const api = {
         request<Tenant>('/tenant', { method: 'PUT', body: data }),
 
     /** First sign-up on a fresh deployment takes ownership of the salon. */
-    claimTenant: (salonName: string) =>
-        request<Tenant>('/tenant/claim', { method: 'POST', body: { salon_name: salonName } }),
 
     // ── Services ─────────────────────────────────────────────────────────────
 
