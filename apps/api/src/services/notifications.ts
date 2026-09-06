@@ -9,7 +9,8 @@ export type AutomationEvent =
     | 'booking.paid'
     | 'booking.cancelled'
     | 'booking.reminder'
-    | 'loyalty.earned';
+    | 'loyalty.earned'
+    | 'subscription.lapsed';
 
 /**
  * Who to tell, and how to reach them.

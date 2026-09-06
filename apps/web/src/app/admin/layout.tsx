@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { api } from '@/lib/api';
+import { api, type Standing } from '@/lib/api';
 import { applyBranding } from '@/lib/theme';
 import { SessionContext, type AdminSession } from '@/lib/session-context';
 import type { StaffRole, Tenant } from '@/lib/types';
@@ -46,6 +46,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const [tenant, setTenant] = useState<Tenant | null>(null);
     const [role, setRole] = useState<StaffRole | null>(null);
     const [staffId, setStaffId] = useState<string | null>(null);
+    const [standing, setStanding] = useState<Standing>('ok');
+    const [graceDaysLeft, setGraceDaysLeft] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [accessDenied, setAccessDenied] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -78,6 +80,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
                 setRole(session.role);
                 setStaffId(session.staffId);
+                setStanding(session.standing);
+                setGraceDaysLeft(session.graceDaysLeft);
             } catch {
                 setAccessDenied(true);
             } finally {
@@ -96,7 +100,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.replace('/login');
     };
 
-    const session: AdminSession = { tenant, role, staffId, loading, refresh: loadTenant };
+    const session: AdminSession = {
+        tenant,
+        role,
+        staffId,
+        standing,
+        graceDaysLeft,
+        loading,
+        refresh: loadTenant,
+    };
     const isActive = (href: string) =>
         pathname === href || (href !== '/admin' && pathname.startsWith(href));
 
@@ -239,6 +251,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 )}
 
                 <main className="flex-1 overflow-y-auto overscroll-contain lg:p-8">
+                    {standing !== 'ok' && (
+                        <div
+                            role="status"
+                            className={`mx-auto mb-4 w-full max-w-[1240px] rounded-2xl border px-5 py-4 text-sm lg:mb-6 ${
+                                standing === 'suspended'
+                                    ? 'border-danger/30 bg-danger/10 text-danger'
+                                    : 'border-warning/30 bg-warning/10 text-warning'
+                            }`}
+                        >
+                            {standing === 'suspended' ? (
+                                <>
+                                    <strong className="font-semibold">
+                                        Tu página no está aceptando reservas.
+                                    </strong>{' '}
+                                    Tus citas y tus datos siguen aquí. Escríbenos para
+                                    reactivarla.
+                                </>
+                            ) : (
+                                <>
+                                    <strong className="font-semibold">Tu cuota está pendiente.</strong>{' '}
+                                    {graceDaysLeft === 0
+                                        ? 'Tu página deja de aceptar reservas hoy.'
+                                        : `Te quedan ${graceDaysLeft} ${
+                                              graceDaysLeft === 1 ? 'día' : 'días'
+                                          } antes de que tu página deje de aceptar reservas.`}
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     <div className="mx-auto min-h-full w-full max-w-[1240px] lg:rounded-[2rem] lg:border lg:border-line lg:bg-surface-raised lg:p-8 lg:shadow-soft">
                         {children}
                     </div>

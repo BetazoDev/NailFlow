@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import { env } from '../config/env';
 import { query } from '../db/pool';
 import { purgeExpiredLocks } from '../services/availability';
+import { warnLapsedSalons } from '../services/subscription';
 import { createLogger, errorContext } from '../lib/logger';
 
 const log = createLogger('cleanup');
@@ -33,13 +34,15 @@ export async function purgeExpiredReferenceImages(): Promise<number> {
 
 async function runCleanup(): Promise<void> {
     try {
-        const [images, locks] = await Promise.all([
+        const [images, locks, lapsed] = await Promise.all([
             purgeExpiredReferenceImages(),
             purgeExpiredLocks(),
+            warnLapsedSalons(),
         ]);
         log.info('Cleanup finished', {
             appointmentsCleared: images,
             expiredLocksRemoved: locks,
+            salonsWarnedAboutPayment: lapsed,
             retentionDays: env.retention.referenceImageDays,
         });
     } catch (error) {

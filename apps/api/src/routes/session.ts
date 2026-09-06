@@ -4,6 +4,7 @@ import { query } from '../db/pool';
 import { asyncHandler } from '../middleware/errors';
 import { requireAuth } from '../middleware/auth';
 import { tenantOf } from '../middleware/tenant';
+import { graceDaysLeft, standingOf, type Standing } from '../services/subscription';
 
 export const sessionRouter: Router = Router();
 
@@ -14,6 +15,13 @@ export interface SessionResponse {
     /** null when the signed-in user has no relationship with this salon. */
     role: StaffRole | null;
     staffId: string | null;
+    /**
+     * Whether the salon is paid up. Sent here rather than on the public tenant
+     * endpoint: her clients have no business knowing about her invoice.
+     */
+    standing: Standing;
+    /** Days before a lapsed salon stops taking bookings. Null when not in grace. */
+    graceDaysLeft: number | null;
 }
 
 /**
@@ -37,6 +45,8 @@ sessionRouter.get(
                 tenantId: tenant.id,
                 role: 'owner',
                 staffId: null,
+                standing: standingOf(tenant.subscription),
+                graceDaysLeft: graceDaysLeft(tenant.subscription),
             };
             return res.json(response);
         }
@@ -58,6 +68,8 @@ sessionRouter.get(
             tenantId: tenant.id,
             role: member?.role ?? null,
             staffId: member?.id ?? null,
+            standing: standingOf(tenant.subscription),
+            graceDaysLeft: graceDaysLeft(tenant.subscription),
         };
         res.json(response);
     })

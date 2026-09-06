@@ -9,6 +9,7 @@ import { firebaseAuth } from '../lib/firebase';
 import { newId } from '../services/bookings';
 import { summaryFor } from '../services/payments/accounts';
 import { forgetRecipients } from '../services/notifications';
+import { markPaid } from '../services/subscription';
 import { createLogger, errorContext } from '../lib/logger';
 
 const log = createLogger('platform');
@@ -313,6 +314,30 @@ platformRouter.patch(
         });
 
         res.json({ ...tenant, created_at: tenant.created_at.toISOString() });
+    })
+);
+
+/**
+ * Records a monthly payment, extending the salon's period.
+ *
+ * This is the seam the plan left open. Whether the fee is collected by a
+ * billing provider, a transfer or an invoice, the product only depends on this
+ * having been called — so a webhook can call it later without anything else
+ * changing.
+ */
+platformRouter.post(
+    '/tenants/:id/paid',
+    requirePlatform,
+    validateBody(z.object({ months: z.coerce.number().int().min(1).max(24).default(1) })),
+    asyncHandler(async (req, res) => {
+        const exists = await query('SELECT 1 FROM tenants WHERE id = $1', [req.params.id]);
+        if (!exists.rowCount) throw ApiError.notFound('Ese salón no existe');
+
+        const months = (req.body as { months: number }).months;
+        const subscription = await markPaid(req.params.id, months);
+
+        await audit(req.user!.email!, 'subscription.paid', req.params.id, { months });
+        res.json(subscription);
     })
 );
 

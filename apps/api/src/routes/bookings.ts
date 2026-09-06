@@ -7,6 +7,7 @@ import { validateBody } from '../middleware/validate';
 import { createBookingSchema } from './schemas';
 import { createAppointment, depositFor, prepareBooking } from '../services/bookings';
 import { canCharge, createDepositCheckout, GatewayUnavailable } from '../services/payments';
+import { standingOf } from '../services/subscription';
 import { triggerAutomation } from '../services/notifications';
 import { createLogger } from '../lib/logger';
 
@@ -30,6 +31,17 @@ bookingsRouter.post(
     asyncHandler(async (req, res) => {
         const { tenant } = tenantOf(req);
         const request = req.body as CreateBookingRequest;
+
+        // A suspended salon stops taking *new* bookings, and nothing else. Her
+        // panel stays readable and the appointments she already has stay valid:
+        // her clients did not miss a payment, and punishing them would be both
+        // unfair and the fastest way to lose the salon for good.
+        if (standingOf(tenant.subscription) === 'suspended') {
+            throw new ApiError(
+                503,
+                'Este salón no está aceptando reservas en este momento. Contáctalo directamente.'
+            );
+        }
 
         const prepared = await prepareBooking(tenant, request);
         const deposit = depositFor(prepared);
@@ -111,6 +123,17 @@ bookingsRouter.post(
     asyncHandler(async (req, res) => {
         const { tenant } = tenantOf(req);
         const request = req.body as CreateBookingRequest;
+
+        // A suspended salon stops taking *new* bookings, and nothing else. Her
+        // panel stays readable and the appointments she already has stay valid:
+        // her clients did not miss a payment, and punishing them would be both
+        // unfair and the fastest way to lose the salon for good.
+        if (standingOf(tenant.subscription) === 'suspended') {
+            throw new ApiError(
+                503,
+                'Este salón no está aceptando reservas en este momento. Contáctalo directamente.'
+            );
+        }
 
         const prepared = await prepareBooking(tenant, request);
         const appointment = await createAppointment({

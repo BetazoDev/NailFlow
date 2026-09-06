@@ -1,5 +1,6 @@
 'use client';
 
+import type { Standing } from './api';
 import { createContext, useContext } from 'react';
 import type { StaffRole, Tenant } from '@/lib/types';
 
@@ -15,6 +16,10 @@ export interface AdminSession {
     tenant: Tenant | null;
     role: StaffRole | null;
     staffId: string | null;
+    /** Whether the salon is paid up. Only the panel sees this. */
+    standing: Standing;
+    /** Days before a lapsed salon stops taking bookings. Null when not in grace. */
+    graceDaysLeft: number | null;
     /** True until the first session lookup resolves. */
     loading: boolean;
     /** Re-reads the tenant after a settings change. */
@@ -25,6 +30,8 @@ export const SessionContext = createContext<AdminSession>({
     tenant: null,
     role: null,
     staffId: null,
+    standing: 'ok',
+    graceDaysLeft: null,
     loading: true,
     refresh: async () => {},
 });

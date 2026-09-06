@@ -46,7 +46,11 @@ export interface PlatformSalon {
     owner_phone: string | null;
     owner_whatsapp: string | null;
     notes: string | null;
-    subscription: { status?: 'active' | 'trial' | 'cancelled'; plan?: string };
+    subscription: {
+        status?: 'active' | 'trial' | 'cancelled';
+        plan?: string;
+        current_period_end?: string;
+    };
     created_at: string;
     appointments?: number;
     gateway: GatewayAccount | null;
@@ -88,6 +92,9 @@ export interface GatewayState {
     available: { mercadopago: boolean; stripe: boolean };
 }
 
+/** Whether the salon is paid up. Only the panel sees this, never her clients. */
+export type Standing = 'ok' | 'grace' | 'suspended';
+
 /** Answer from `GET /api/session`: the caller's role in the current salon. */
 export interface SessionInfo {
     uid: string;
@@ -96,6 +103,9 @@ export interface SessionInfo {
     /** null when the user has no relationship with this salon. */
     role: StaffRole | null;
     staffId: string | null;
+    standing: Standing;
+    /** Days before a lapsed salon stops taking bookings. Null when not in grace. */
+    graceDaysLeft: number | null;
 }
 
 export class ApiError extends Error {
@@ -259,6 +269,16 @@ export const api = {
             subscription?: { status: 'active' | 'trial' | 'cancelled'; plan: string };
         }) =>
             request<PlatformSalon>(`/platform/tenants/${id}`, { method: 'PATCH', body: patch }),
+
+        /**
+         * Records a monthly payment and extends the salon's period. However the
+         * fee is actually collected, the product only depends on this.
+         */
+        markPaid: (id: string, months = 1) =>
+            request<{ status: string; plan: string; current_period_end?: string }>(
+                `/platform/tenants/${id}/paid`,
+                { method: 'POST', body: { months } }
+            ),
 
         /** Re-issues the access link for an owner who never received it. */
         invite: (id: string) =>

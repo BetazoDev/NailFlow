@@ -384,6 +384,20 @@ function SalonDrawer({
         }
     };
 
+    const registerPayment = async () => {
+        setBusy(true);
+        try {
+            await api.platform.markPaid(salon.id, 1);
+            setStatus('active');
+            setMessage('Un mes más registrado');
+            onChanged();
+        } catch {
+            setMessage('No pudimos registrar el pago.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const resend = async () => {
         setBusy(true);
         try {
@@ -411,6 +425,17 @@ function SalonDrawer({
                         month: 'long',
                         year: 'numeric',
                     })}
+                />
+                <Row
+                    label="Pagada hasta"
+                    value={
+                        salon.subscription?.current_period_end
+                            ? new Date(salon.subscription.current_period_end).toLocaleDateString(
+                                  'es-MX',
+                                  { day: 'numeric', month: 'long', year: 'numeric' }
+                              )
+                            : 'Sin registrar'
+                    }
                 />
             </dl>
 
@@ -448,6 +473,13 @@ function SalonDrawer({
                     className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-[#14100E] disabled:opacity-40"
                 >
                     Guardar
+                </button>
+                <button
+                    onClick={registerPayment}
+                    disabled={busy}
+                    className="rounded-xl border border-white/20 px-5 py-2.5 text-sm text-white disabled:opacity-40"
+                >
+                    Registrar un mes pagado
                 </button>
                 <button
                     onClick={resend}
