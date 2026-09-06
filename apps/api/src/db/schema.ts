@@ -99,6 +99,31 @@ const TABLES = `
         PRIMARY KEY (tenant_id, staff_id, slot_time)
     );
 
+    -- Who at Diabolical may administer the platform itself: create salons,
+    -- see every salon's status, change a subscription. Deliberately separate
+    -- from a salon's own owner/staff roles — being the owner of one salon must
+    -- never imply anything about another.
+    --
+    -- PLATFORM_ADMIN_EMAILS bootstraps the first one, so an empty table can
+    -- never lock everybody out of the panel that manages the table.
+    CREATE TABLE IF NOT EXISTS platform_admins (
+        email       TEXT PRIMARY KEY,
+        name        TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    -- What was done from the platform panel, and by whom. These actions cross
+    -- tenant boundaries, so "who created this salon" and "who changed this
+    -- subscription" are questions that need answers later.
+    CREATE TABLE IF NOT EXISTS platform_audit (
+        id          TEXT PRIMARY KEY,
+        actor_email TEXT NOT NULL,
+        action      TEXT NOT NULL,
+        tenant_id   TEXT,
+        detail      JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     -- Each salon collects into her own gateway account, so deposits never pass
     -- through Diabolical. One row per salon: a salon uses one gateway at a
     -- time, and switching replaces the row rather than accumulating accounts.
@@ -147,6 +172,7 @@ const INDEXES = [
     // Stripe Connect delivers every account's events to one endpoint, so the
     // webhook looks the salon up by connected account id on every call.
     "CREATE INDEX IF NOT EXISTS idx_payment_accounts_stripe ON payment_accounts (stripe_account_id) WHERE stripe_account_id IS NOT NULL",
+    'CREATE INDEX IF NOT EXISTS idx_platform_audit_created ON platform_audit (created_at DESC)',
 ];
 
 /**
@@ -161,6 +187,14 @@ const COLUMN_BACKFILLS = [
     `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS image_url TEXT`,
     `ALTER TABLE staff ADD COLUMN IF NOT EXISTS weekly_schedule JSONB DEFAULT '{}'::jsonb`,
     `ALTER TABLE staff ADD COLUMN IF NOT EXISTS services_offered TEXT[] DEFAULT '{}'`,
+
+    // How to reach the woman who runs the salon. Until now the only thing
+    // recorded about her was a Firebase uid, which is useless when she calls.
+    `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS owner_name TEXT`,
+    `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS owner_email TEXT`,
+    `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS owner_phone TEXT`,
+    `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS owner_whatsapp TEXT`,
+    `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS notes TEXT`,
 ];
 
 export async function initDb(): Promise<void> {

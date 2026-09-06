@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { env } from '../config/env';
 import { firebaseAuth } from '../lib/firebase';
 import { query } from '../db/pool';
 import { ApiError } from './errors';
@@ -94,3 +95,36 @@ export function requireTenantAccess(
 /** Convenience: authenticate, then authorise against the resolved tenant. */
 export const requireTenantMember = [requireAuth, requireTenantAccess()];
 export const requireTenantOwner = [requireAuth, requireTenantAccess({ ownerOnly: true })];
+
+/**
+ * Confirms the caller administers the *platform*, not a salon.
+ *
+ * Kept deliberately apart from `requireTenantAccess`: owning one salon must
+ * never imply anything about another, and these routes cross every tenant
+ * boundary there is. They are also mounted outside `resolveTenant`, because a
+ * platform admin acts on all salons rather than on the one whose domain she
+ * happens to be visiting.
+ */
+export function requirePlatformAdmin(
+    req: Request,
+    _res: Response,
+    next: NextFunction
+): void {
+    void (async () => {
+        const email = req.user?.email?.toLowerCase();
+        if (!email) return next(ApiError.forbidden('Esta cuenta no tiene correo verificado'));
+
+        if (env.platformAdminEmails.includes(email)) return next();
+
+        const result = await query('SELECT 1 FROM platform_admins WHERE LOWER(email) = $1', [
+            email,
+        ]);
+        if (result.rowCount) return next();
+
+        log.warn('Platform route refused', { email });
+        next(ApiError.forbidden('No administras esta plataforma'));
+    })().catch(next);
+}
+
+/** Authenticate, then authorise against the platform itself. */
+export const requirePlatform = [requireAuth, requirePlatformAdmin];

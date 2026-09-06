@@ -8,6 +8,7 @@ import { resolveTenant } from './middleware/tenant';
 import { imagesRouter } from './routes/images';
 import { webhooksRouter } from './routes/webhooks';
 import { gatewayRouter } from './routes/gateway';
+import { platformRouter } from './routes/platform';
 import { tenantRouter } from './routes/tenant';
 import { sessionRouter } from './routes/session';
 import { servicesRouter } from './routes/services';
@@ -89,7 +90,14 @@ export function createApp(): Express {
     app.use('/api', imagesRouter);
     app.use('/api', webhooksRouter);
 
-    // ── Tier 2: tenant-scoped API ────────────────────────────────────────────
+    // ── Tier 2: the platform's own panel ─────────────────────────────────────
+
+    // Mounted before the tenant-scoped router and outside `resolveTenant`: a
+    // platform admin acts across every salon, so the Host header says nothing
+    // about which one is meant.
+    app.use('/api/platform', platformRouter);
+
+    // ── Tier 3: tenant-scoped API ────────────────────────────────────────────
 
     const api = express.Router();
 

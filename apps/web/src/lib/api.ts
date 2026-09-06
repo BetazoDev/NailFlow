@@ -35,6 +35,42 @@ function tenantDomain(explicit?: string): string | undefined {
     return undefined;
 }
 
+/** A salon as Diabolical's own panel sees it. */
+export interface PlatformSalon {
+    id: string;
+    domain: string;
+    name: string | null;
+    owner_id: string | null;
+    owner_name: string | null;
+    owner_email: string | null;
+    owner_phone: string | null;
+    owner_whatsapp: string | null;
+    notes: string | null;
+    subscription: { status?: 'active' | 'trial' | 'cancelled'; plan?: string };
+    created_at: string;
+    appointments?: number;
+    gateway: GatewayAccount | null;
+}
+
+export interface NewSalon {
+    domain: string;
+    name: string;
+    owner_name?: string;
+    owner_email: string;
+    owner_phone?: string;
+    owner_whatsapp?: string;
+    notes?: string;
+}
+
+export interface AuditEntry {
+    id: string;
+    actor_email: string;
+    action: string;
+    tenant_id: string | null;
+    detail: Record<string, unknown>;
+    created_at: string;
+}
+
 /** A salon's connected payment gateway, as the panel is allowed to see it. */
 export interface GatewayAccount {
     provider: 'mercadopago' | 'stripe';
@@ -185,6 +221,42 @@ export const api = {
     refreshStripe: () => request<GatewayAccount>('/gateway/stripe/refresh', { method: 'POST' }),
 
     disconnectGateway: () => request<void>('/gateway', { method: 'DELETE' }),
+
+    // ── Plataforma (Diabolical) ──────────────────────────────────────────────
+
+    /**
+     * Diabolical's own panel. These routes act across every salon, so they are
+     * mounted outside the per-domain API and answer 403 to anyone who is not a
+     * platform administrator.
+     */
+    platform: {
+        session: () => request<{ email: string; platformAdmin: true }>('/platform/session'),
+
+        salons: () => request<PlatformSalon[]>('/platform/tenants'),
+
+        salon: (id: string) => request<PlatformSalon>(`/platform/tenants/${id}`),
+
+        /**
+         * Creates the salon and returns a link the owner uses to set her own
+         * password. No password is ever chosen or sent by us.
+         */
+        createSalon: (salon: NewSalon) =>
+            request<{ id: string; domain: string; invite: string | null }>('/platform/tenants', {
+                method: 'POST',
+                body: salon,
+            }),
+
+        updateSalon: (id: string, patch: Partial<NewSalon> & {
+            subscription?: { status: 'active' | 'trial' | 'cancelled'; plan: string };
+        }) =>
+            request<PlatformSalon>(`/platform/tenants/${id}`, { method: 'PATCH', body: patch }),
+
+        /** Re-issues the access link for an owner who never received it. */
+        invite: (id: string) =>
+            request<{ invite: string }>(`/platform/tenants/${id}/invite`, { method: 'POST' }),
+
+        audit: () => request<AuditEntry[]>('/platform/audit'),
+    },
 
     /** First sign-up on a fresh deployment takes ownership of the salon. */
 

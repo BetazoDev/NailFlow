@@ -123,6 +123,19 @@ export const env = {
     credentialsKey: optional('CREDENTIALS_KEY'),
 
     /**
+     * Emails that always administer the platform, however empty the table is.
+     *
+     * The list of platform admins lives in the database and is edited from the
+     * platform panel — which only a platform admin can open. Without a
+     * bootstrap, an empty table locks everyone out of the only screen that
+     * could fill it.
+     */
+    platformAdminEmails: (optional('PLATFORM_ADMIN_EMAILS') ?? '')
+        .split(',')
+        .map(email => email.trim().toLowerCase())
+        .filter(Boolean),
+
+    /**
      * Our Mercado Pago application, used to ask each salon for authorisation.
      *
      * These identify Diabolical as the integrator; the money always moves with
@@ -204,6 +217,7 @@ const EXPECTED: Record<string, string[]> = {
     'admin sign-in': ['FIREBASE_SERVICE_ACCOUNT', 'GOOGLE_APPLICATION_CREDENTIALS'],
     'images': ['CDN_UPLOAD_TOKEN', 'CDN_API_KEY_REFERENCES'],
     'connecting a gateway': ['CREDENTIALS_KEY'],
+    'platform panel': ['PLATFORM_ADMIN_EMAILS'],
     'Mercado Pago onboarding': ['MP_CLIENT_ID', 'MP_CLIENT_SECRET'],
     'Stripe onboarding': ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
     'schema bootstrap': ['DB_AUTO_MIGRATE'],
