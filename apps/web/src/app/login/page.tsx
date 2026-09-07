@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
@@ -36,6 +36,19 @@ export default function LoginPage() {
             setLoading(false);
         }
     };
+
+    /**
+     * Google sign-in only works on a domain Firebase has been told about, and
+     * that list takes no wildcards — so on a salon's own subdomain the popup
+     * fails with `auth/unauthorized-domain` no matter what we do. Offering a
+     * button that cannot work is worse than not offering it: she would blame
+     * her password. Email and password work everywhere.
+     */
+    const [googleAvailable, setGoogleAvailable] = useState(false);
+    useEffect(() => {
+        const account = process.env.NEXT_PUBLIC_ACCOUNT_DOMAIN;
+        setGoogleAvailable(!account || window.location.host === account);
+    }, []);
 
     const handleGoogleLogin = async () => {
         setLoading(true);
@@ -109,6 +122,7 @@ export default function LoginPage() {
                         </Link>
                     </p>
 
+                    {googleAvailable && (
                     <div className="relative my-8">
                         <span className="absolute inset-0 flex items-center" aria-hidden="true">
                             <span className="w-full border-t border-line" />
@@ -117,7 +131,9 @@ export default function LoginPage() {
                             O continuar con
                         </span>
                     </div>
+                    )}
 
+                    {googleAvailable && (
                     <Button
                         type="button"
                         variant="secondary"
@@ -136,6 +152,7 @@ export default function LoginPage() {
                     >
                         Google
                     </Button>
+                    )}
                 </div>
 
                 {/*

@@ -19,6 +19,7 @@ import { availabilityRouter } from './routes/availability';
 import { bookingsRouter } from './routes/bookings';
 import { favoritesRouter } from './routes/favorites';
 import { createLogger } from './lib/logger';
+import { originPolicy } from './lib/origins';
 
 const log = createLogger('http');
 
@@ -46,17 +47,20 @@ export function createApp(): Express {
         })
     );
 
+    const allowedOrigins = originPolicy(env.corsOrigins);
+
     app.use(
         cors({
             origin(origin, callback) {
                 // Server-to-server calls (no Origin header) are always allowed;
-                // browsers are held to the configured allowlist.
+                // browsers are held to the configured allowlist, which may name
+                // a whole family of salon subdomains with one wildcard entry.
                 //
                 // A disallowed origin resolves to `false` rather than an error:
                 // the response then simply carries no CORS headers, which the
                 // browser blocks. Rejecting with an error instead turned every
                 // stray request into a 500 with a stack trace in the logs.
-                if (!origin || env.corsOrigins.includes(origin)) {
+                if (!origin || allowedOrigins.allows(origin)) {
                     return callback(null, true);
                 }
                 log.warn('Blocked cross-origin request', { origin });

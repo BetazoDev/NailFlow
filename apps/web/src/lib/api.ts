@@ -249,7 +249,10 @@ export const api = {
      * platform administrator.
      */
     platform: {
-        session: () => request<{ email: string; platformAdmin: true }>('/platform/session'),
+        session: () =>
+            request<{ email: string; platformAdmin: true; rootDomain: string | null }>(
+                '/platform/session'
+            ),
 
         salons: () => request<PlatformSalon[]>('/platform/tenants'),
 

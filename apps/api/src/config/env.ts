@@ -93,7 +93,34 @@ export const env = {
      * the API accepts credentials, so `*` would let any site act on behalf of
      * a logged-in salon owner.
      */
+    /**
+     * Origins the browser may call this API from.
+     *
+     * An entry may name one origin (`https://demo.example.com`) or a whole
+     * family of them with a leading `*.` (`https://*.nailflow.com`). The
+     * wildcard form is what lets a new salon go live without anyone editing a
+     * variable and redeploying: her subdomain is covered the moment DNS points
+     * at the server.
+     */
     corsOrigins: list('CORS_ORIGINS', isProduction ? [] : ['http://localhost:3000']),
+
+    /**
+     * The domain salons get their subdomain under, e.g. `nailflow.com`.
+     *
+     * Used to suggest a subdomain when a salon is created. Empty is fine: the
+     * platform panel then just asks for the whole domain.
+     */
+    rootDomain: optional('APP_ROOT_DOMAIN'),
+
+    /**
+     * The one domain Firebase knows about.
+     *
+     * Firebase's authorised-domain list takes no wildcards, so anything that
+     * has to pass through it — the invitation link's return address, Google
+     * sign-in — is pinned to this single domain instead of each salon's. It is
+     * authorised once, by hand, and never again.
+     */
+    accountDomain: optional('APP_ACCOUNT_DOMAIN'),
 
     booking: {
         /** Business rule (spec §4): earliest a client may book, in days from now. */

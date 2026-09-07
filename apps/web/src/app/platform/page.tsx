@@ -26,6 +26,9 @@ const SUBSCRIPTION_TONE: Record<string, string> = {
 
 export default function PlatformPage() {
     const [salons, setSalons] = useState<PlatformSalon[] | null>(null);
+    // Comes from the server rather than the build, so changing the root domain
+    // is a variable on the API and not a rebuild of this app.
+    const [rootDomain, setRootDomain] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
     const [selected, setSelected] = useState<PlatformSalon | null>(null);
@@ -42,6 +45,7 @@ export default function PlatformPage() {
 
     useEffect(() => {
         void load();
+        void api.platform.session().then(session => setRootDomain(session.rootDomain));
     }, [load]);
 
     const counts = useMemo(() => {
@@ -142,6 +146,7 @@ export default function PlatformPage() {
 
             {creating && (
                 <NewSalonDrawer
+                    rootDomain={rootDomain}
                     onClose={() => setCreating(false)}
                     onCreated={() => {
                         setCreating(false);
@@ -200,9 +205,11 @@ const EMPTY: NewSalon = {
 };
 
 function NewSalonDrawer({
+    rootDomain,
     onClose,
     onCreated,
 }: {
+    rootDomain: string | null;
     onClose: () => void;
     onCreated: () => void;
 }) {
@@ -220,7 +227,10 @@ function NewSalonDrawer({
      * Multi-tenancy resolves from this value, so getting it right matters more
      * than anything else on the form — and typing it twice invites a typo.
      */
-    const suggested = form.name && !domainTouched ? `${slugify(form.name)}.nailflow.app` : '';
+    const suggested =
+        form.name && !domainTouched && rootDomain
+            ? `${slugify(form.name)}.${rootDomain}`
+            : '';
     const domain = domainTouched ? form.domain : suggested;
 
     const submit = async () => {
@@ -276,7 +286,11 @@ function NewSalonDrawer({
 
             <Field
                 label="Dominio"
-                hint="Es de donde el sistema reconoce al salón. Se rellena solo desde el nombre."
+                hint={
+                    rootDomain
+                        ? 'Se rellena solo desde el nombre. Es de donde el sistema reconoce al salón.'
+                        : 'Es de donde el sistema reconoce al salón. Configura APP_ROOT_DOMAIN para que se rellene solo.'
+                }
             >
                 <input
                     value={domain}
@@ -285,7 +299,7 @@ function NewSalonDrawer({
                         set('domain', event.target.value);
                     }}
                     className={`${inputClass} font-mono`}
-                    placeholder="bella-nails.nailflow.app"
+                    placeholder={rootDomain ? `bella-nails.${rootDomain}` : 'bella-nails.tudominio.com'}
                 />
             </Field>
 

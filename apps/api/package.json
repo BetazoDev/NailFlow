@@ -8,7 +8,8 @@
         "build": "tsc -p tsconfig.json",
         "start": "node dist/index.js",
         "typecheck": "tsc -p tsconfig.json --noEmit",
-        "smoke": "node scripts/smoke.mjs"
+        "smoke": "node scripts/smoke.mjs",
+        "check:origins": "tsx src/lib/__tests__/origins.check.ts"
     },
     "dependencies": {
         "@nailflow/shared": "*",

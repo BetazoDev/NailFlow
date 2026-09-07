@@ -220,15 +220,24 @@ platformRouter.post(
  * Returned to the panel rather than emailed from here: Diabolical hands it over
  * however it already talks to the salon — WhatsApp, usually — and there is no
  * mail configuration standing between creating a salon and the owner getting in.
+ *
+ * The return address is the one account domain, never the salon's own. Firebase
+ * only accepts a return address whose domain it has been told about, and that
+ * list takes no wildcards — pointing it at each salon would mean authorising a
+ * domain by hand for every salon created, which is exactly what running them
+ * all on one deployment is meant to avoid. The account domain then forwards her
+ * to her own panel.
  */
 async function inviteLink(email: string, domain: string): Promise<string | null> {
     const auth = firebaseAuth();
     if (!auth) return null;
 
+    const landing = env.accountDomain
+        ? `https://${env.accountDomain}/entrar?salon=${encodeURIComponent(domain)}`
+        : `https://${domain}/login`;
+
     try {
-        return await auth.generatePasswordResetLink(email, {
-            url: `https://${domain}/login`,
-        });
+        return await auth.generatePasswordResetLink(email, { url: landing });
     } catch (error) {
         log.error('Could not generate the invitation link', { email, ...errorContext(error) });
         return null;
@@ -416,5 +425,11 @@ platformRouter.get(
 
 /** Whether the caller may open the panel at all — the web app asks before routing. */
 platformRouter.get('/session', requirePlatform, (req: Request, res: Response) => {
-    res.json({ email: req.user!.email, platformAdmin: true });
+    res.json({
+        email: req.user!.email,
+        platformAdmin: true,
+        // Sent rather than built into the panel, so changing the root domain is
+        // a variable on the server and not a rebuild of the web app.
+        rootDomain: env.rootDomain ?? null,
+    });
 });
