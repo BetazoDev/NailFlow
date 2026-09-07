@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, ApiError, type NewSalon, type PlatformSalon } from '@/lib/api';
+import { api, ApiError, type DomainCheck, type NewSalon, type PlatformSalon } from '@/lib/api';
 import { slugify } from '@/lib/format';
 
 /**
@@ -217,6 +217,7 @@ function NewSalonDrawer({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [invite, setInvite] = useState<string | null>(null);
+    const [created, setCreated] = useState('');
     const [domainTouched, setDomainTouched] = useState(false);
 
     const set = <K extends keyof NewSalon>(field: K, value: NewSalon[K]) =>
@@ -237,9 +238,10 @@ function NewSalonDrawer({
         setSaving(true);
         setError(null);
         try {
-            const created = await api.platform.createSalon({ ...form, domain });
-            setInvite(created.invite);
-            if (!created.invite) onCreated();
+            const salon = await api.platform.createSalon({ ...form, domain });
+            setCreated(salon.domain);
+            setInvite(salon.invite);
+            if (!salon.invite) onCreated();
         } catch (caught) {
             setError(
                 caught instanceof ApiError ? caught.message : 'No pudimos crear el salón.'
@@ -252,9 +254,35 @@ function NewSalonDrawer({
     if (invite) {
         return (
             <Drawer title="Salón creado" onClose={onCreated}>
+                {/*
+                    The row exists; her subdomain does not. Sending the invitation
+                    before routing it means she opens a link that goes nowhere and
+                    neither of you knows why, so the two manual steps come first.
+                */}
+                <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
+                    <p className="text-sm font-semibold text-amber-200">
+                        Antes de enviar el enlace, registra el subdominio
+                    </p>
+                    <ol className="mt-3 space-y-2 text-sm text-amber-100/80">
+                        <li>
+                            1. En tu DNS: un registro que apunte{' '}
+                            <code className="font-mono text-xs text-white">{created}</code> a tu
+                            servidor.
+                        </li>
+                        <li>
+                            2. En Dokploy: añade ese mismo dominio a la aplicación web, puerto
+                            3000, con certificado Let&apos;s Encrypt.
+                        </li>
+                    </ol>
+                    <p className="mt-3 text-xs text-amber-100/60">
+                        Es el mismo proyecto de siempre — solo un dominio más en la lista.
+                    </p>
+                </div>
+
                 <p className="text-sm text-white/70">
-                    Envíale este enlace a la dueña para que elija su contraseña. No lo sabemos
-                    nosotros ni queda guardado: es de un solo uso y caduca.
+                    Cuando esté enrutado, envíale este enlace a la dueña para que elija su
+                    contraseña. No lo sabemos nosotros ni queda guardado: es de un solo uso y
+                    caduca.
                 </p>
                 <textarea
                     readOnly
@@ -379,8 +407,16 @@ function SalonDrawer({
     const [status, setStatus] = useState(salon.subscription?.status ?? 'trial');
     const [notes, setNotes] = useState(salon.notes ?? '');
     const [invite, setInvite] = useState<string | null>(null);
+    const [domain, setDomain] = useState<DomainCheck | null>(null);
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
+
+    // Asked once when the card opens: it is the answer to "why can't she get
+    // in", and waiting for a button press means nobody ever finds out.
+    useEffect(() => {
+        setDomain(null);
+        void api.platform.checkDomain(salon.id).then(setDomain).catch(() => setDomain(null));
+    }, [salon.id]);
 
     const save = async () => {
         setBusy(true);
@@ -453,6 +489,8 @@ function SalonDrawer({
                 />
             </dl>
 
+            <DomainStatus check={domain} />
+
             <div className="h-px bg-white/10" />
 
             <Field label="Suscripción">
@@ -514,6 +552,58 @@ function SalonDrawer({
                 />
             )}
         </Drawer>
+    );
+}
+
+/**
+ * Whether this salon's subdomain reaches us, and what to do when it does not.
+ *
+ * Each verdict names a different missing step, because "no funciona" sends you
+ * looking in the wrong place: a missing DNS record and a missing entry in the
+ * reverse proxy look identical from the outside and are fixed in different
+ * panels.
+ */
+const DOMAIN_FIX: Record<DomainCheck['verdict'], { tone: string; label: string; fix: string }> = {
+    ok: {
+        tone: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200',
+        label: 'Enrutado',
+        fix: 'Su página responde. Puedes enviarle el enlace.',
+    },
+    'no-dns': {
+        tone: 'border-rose-400/30 bg-rose-400/10 text-rose-200',
+        label: 'Falta el DNS',
+        fix: 'Añade el registro que apunte este subdominio a tu servidor.',
+    },
+    'no-route': {
+        tone: 'border-amber-400/30 bg-amber-400/10 text-amber-200',
+        label: 'Falta en Dokploy',
+        fix: 'El DNS ya llega, pero añade el dominio a la aplicación web (puerto 3000).',
+    },
+    'no-certificate': {
+        tone: 'border-amber-400/30 bg-amber-400/10 text-amber-200',
+        label: 'Sin certificado',
+        fix: 'Llega al servidor. El certificado tarda un momento en emitirse.',
+    },
+    unknown: {
+        tone: 'border-white/15 bg-white/5 text-white/60',
+        label: 'Sin comprobar',
+        fix: 'No pudimos comprobarlo desde aquí.',
+    },
+};
+
+function DomainStatus({ check }: { check: DomainCheck | null }) {
+    if (!check) {
+        return <div className="h-16 animate-pulse rounded-xl bg-white/5" aria-label="Comprobando el dominio" />;
+    }
+
+    const { tone, label, fix } = DOMAIN_FIX[check.verdict];
+
+    return (
+        <div className={`rounded-xl border p-4 ${tone}`}>
+            <p className="text-sm font-semibold">{label}</p>
+            <p className="mt-1 text-xs opacity-80">{fix}</p>
+            <p className="mt-2 font-mono text-[11px] opacity-60">{check.domain}</p>
+        </div>
     );
 }
 

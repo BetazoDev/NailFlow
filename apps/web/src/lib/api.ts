@@ -66,6 +66,13 @@ export interface NewSalon {
     notes?: string;
 }
 
+/** Whether a salon's subdomain is actually routed here, and what is missing. */
+export interface DomainCheck {
+    domain: string;
+    verdict: 'ok' | 'no-dns' | 'no-route' | 'no-certificate' | 'unknown';
+    detail: string;
+}
+
 export interface AuditEntry {
     id: string;
     actor_email: string;
@@ -272,6 +279,13 @@ export const api = {
             subscription?: { status: 'active' | 'trial' | 'cancelled'; plan: string };
         }) =>
             request<PlatformSalon>(`/platform/tenants/${id}`, { method: 'PATCH', body: patch }),
+
+        /**
+         * Whether the salon's subdomain reaches this deployment yet. Creating a
+         * salon writes a row; DNS and the reverse proxy are separate steps.
+         */
+        checkDomain: (id: string) =>
+            request<DomainCheck>(`/platform/tenants/${id}/domain`),
 
         /**
          * Records a monthly payment and extends the salon's period. However the

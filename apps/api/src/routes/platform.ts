@@ -269,6 +269,68 @@ platformRouter.post(
     })
 );
 
+/**
+ * Whether a salon's subdomain actually reaches this deployment yet.
+ *
+ * Creating a salon writes a row; it does not create DNS or tell the reverse
+ * proxy about her. Those are two manual steps, and forgetting either means the
+ * owner receives an invitation link that goes nowhere — with no hint of why.
+ * This is the check that turns "it does not work" into a specific next step.
+ *
+ * The three failure modes look different on purpose:
+ *   - DNS missing        → the request never connects
+ *   - proxy not told     → it connects and answers 404
+ *   - certificate missing → the TLS handshake fails
+ */
+type DomainVerdict = 'ok' | 'no-dns' | 'no-route' | 'no-certificate' | 'unknown';
+
+async function probeDomain(domain: string): Promise<{ verdict: DomainVerdict; detail: string }> {
+    try {
+        const response = await fetch(`https://${domain}/login`, {
+            method: 'GET',
+            redirect: 'manual',
+            signal: AbortSignal.timeout(6_000),
+        });
+
+        if (response.status === 404) {
+            return {
+                verdict: 'no-route',
+                detail: 'El servidor responde pero no conoce este subdominio.',
+            };
+        }
+        return { verdict: 'ok', detail: 'Responde correctamente.' };
+    } catch (error) {
+        const reason = error instanceof Error ? `${error.message} ${error.cause ?? ''}` : '';
+
+        if (/ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(reason)) {
+            return { verdict: 'no-dns', detail: 'El subdominio no existe en el DNS todavía.' };
+        }
+        if (/certificate|ERR_TLS|SSL|altname/i.test(reason)) {
+            return {
+                verdict: 'no-certificate',
+                detail: 'Llega al servidor pero aún no tiene certificado.',
+            };
+        }
+        return { verdict: 'unknown', detail: 'No pudimos comprobarlo.' };
+    }
+}
+
+platformRouter.get(
+    '/tenants/:id/domain',
+    requirePlatform,
+    asyncHandler(async (req, res) => {
+        const result = await query<{ domain: string }>(
+            'SELECT domain FROM tenants WHERE id = $1',
+            [req.params.id]
+        );
+
+        const domain = result.rows[0]?.domain;
+        if (!domain) throw ApiError.notFound('Ese salón no existe');
+
+        res.json({ domain, ...(await probeDomain(domain)) });
+    })
+);
+
 // ── Edición ──────────────────────────────────────────────────────────────────
 
 const updateSalonSchema = z.object({
