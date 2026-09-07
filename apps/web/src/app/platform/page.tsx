@@ -1,7 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, ApiError, type DomainCheck, type NewSalon, type PlatformSalon } from '@/lib/api';
+import {
+    api,
+    ApiError,
+    type DomainCheck,
+    type HostingOutcome,
+    type NewSalon,
+    type PlatformSalon,
+} from '@/lib/api';
 import { slugify } from '@/lib/format';
 
 /**
@@ -29,6 +36,7 @@ export default function PlatformPage() {
     // Comes from the server rather than the build, so changing the root domain
     // is a variable on the API and not a rebuild of this app.
     const [rootDomain, setRootDomain] = useState<string | null>(null);
+    const [hosting, setHosting] = useState<(HostingOutcome & { enabled: boolean }) | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
     const [selected, setSelected] = useState<PlatformSalon | null>(null);
@@ -46,6 +54,10 @@ export default function PlatformPage() {
     useEffect(() => {
         void load();
         void api.platform.session().then(session => setRootDomain(session.rootDomain));
+        // Checked when the panel opens rather than behind a button: finding out
+        // the token is wrong while creating a salon means finding out in front
+        // of a customer.
+        void api.platform.hosting().then(setHosting).catch(() => setHosting(null));
     }, [load]);
 
     const counts = useMemo(() => {
@@ -80,6 +92,16 @@ export default function PlatformPage() {
             {error && (
                 <p role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
                     {error}
+                </p>
+            )}
+
+            {hosting && !hosting.ok && hosting.reason !== 'unconfigured' && (
+                <p
+                    role="alert"
+                    className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"
+                >
+                    <strong className="font-semibold">Alta automática de subdominios caída.</strong>{' '}
+                    {hosting.detail} Los salones que crees ahora habrá que enrutarlos a mano.
                 </p>
             )}
 
@@ -218,6 +240,7 @@ function NewSalonDrawer({
     const [error, setError] = useState<string | null>(null);
     const [invite, setInvite] = useState<string | null>(null);
     const [created, setCreated] = useState('');
+    const [hosting, setHosting] = useState<HostingOutcome | null>(null);
     const [domainTouched, setDomainTouched] = useState(false);
 
     const set = <K extends keyof NewSalon>(field: K, value: NewSalon[K]) =>
@@ -240,6 +263,7 @@ function NewSalonDrawer({
         try {
             const salon = await api.platform.createSalon({ ...form, domain });
             setCreated(salon.domain);
+            setHosting(salon.hosting);
             setInvite(salon.invite);
             if (!salon.invite) onCreated();
         } catch (caught) {
@@ -259,25 +283,33 @@ function NewSalonDrawer({
                     before routing it means she opens a link that goes nowhere and
                     neither of you knows why, so the two manual steps come first.
                 */}
-                <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
-                    <p className="text-sm font-semibold text-amber-200">
-                        Antes de enviar el enlace, registra el subdominio
-                    </p>
-                    <ol className="mt-3 space-y-2 text-sm text-amber-100/80">
-                        <li>
-                            1. En tu DNS: un registro que apunte{' '}
-                            <code className="font-mono text-xs text-white">{created}</code> a tu
-                            servidor.
-                        </li>
-                        <li>
-                            2. En Dokploy: añade ese mismo dominio a la aplicación web, puerto
-                            3000, con certificado Let&apos;s Encrypt.
-                        </li>
-                    </ol>
-                    <p className="mt-3 text-xs text-amber-100/60">
-                        Es el mismo proyecto de siempre — solo un dominio más en la lista.
-                    </p>
-                </div>
+                {hosting?.ok ? (
+                    <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4">
+                        <p className="text-sm font-semibold text-emerald-200">
+                            Subdominio registrado
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-100/70">{hosting.detail}</p>
+                        <p className="mt-2 font-mono text-[11px] text-emerald-100/50">{created}</p>
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
+                        <p className="text-sm font-semibold text-amber-200">
+                            Registra el subdominio antes de enviar el enlace
+                        </p>
+                        {hosting && (
+                            <p className="mt-1 text-xs text-amber-100/70">{hosting.detail}</p>
+                        )}
+                        <p className="mt-3 text-sm text-amber-100/80">
+                            En Dokploy: añade{' '}
+                            <code className="font-mono text-xs text-white">{created}</code> a la
+                            aplicación web, puerto 3000, con certificado Let&apos;s Encrypt.
+                        </p>
+                        <p className="mt-2 text-xs text-amber-100/60">
+                            El DNS ya está cubierto por tu registro comodín. Es el mismo proyecto
+                            de siempre — solo un dominio más en la lista.
+                        </p>
+                    </div>
+                )}
 
                 <p className="text-sm text-white/70">
                     Cuando esté enrutado, envíale este enlace a la dueña para que elija su
@@ -448,6 +480,25 @@ function SalonDrawer({
         }
     };
 
+    /**
+     * Offered only when the domain is not routed: a button that re-does
+     * something already done is a button people press to see what happens.
+     */
+    const retryDomain = async () => {
+        setBusy(true);
+        try {
+            const outcome = await api.platform.registerDomain(salon.id);
+            setMessage(outcome.detail);
+            if (outcome.ok) {
+                setDomain(await api.platform.checkDomain(salon.id).catch(() => null));
+            }
+        } catch {
+            setMessage('No pudimos registrarlo.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const resend = async () => {
         setBusy(true);
         try {
@@ -490,6 +541,16 @@ function SalonDrawer({
             </dl>
 
             <DomainStatus check={domain} />
+
+            {domain && domain.verdict !== 'ok' && (
+                <button
+                    onClick={retryDomain}
+                    disabled={busy}
+                    className="rounded-xl border border-white/20 px-5 py-2.5 text-sm text-white disabled:opacity-40"
+                >
+                    Registrar el subdominio ahora
+                </button>
+            )}
 
             <div className="h-px bg-white/10" />
 

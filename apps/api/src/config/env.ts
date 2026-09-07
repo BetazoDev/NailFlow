@@ -122,6 +122,24 @@ export const env = {
      */
     accountDomain: optional('APP_ACCOUNT_DOMAIN'),
 
+    /**
+     * The hosting panel, so creating a salon can register her subdomain.
+     *
+     * Entirely optional: without it the platform panel simply tells the
+     * operator to add the domain by hand, which is what it did before.
+     *
+     * Worth knowing before enabling it: a Dokploy API key is not scoped to one
+     * application. Holding one here means that whoever compromises this API can
+     * drive the whole hosting account, not just NailFlow.
+     */
+    hosting: {
+        url: optional('DOKPLOY_URL')?.replace(/\/+$/, ''),
+        apiKey: optional('DOKPLOY_API_KEY'),
+        /** The application salon subdomains are attached to. */
+        webApplicationId: optional('DOKPLOY_WEB_APPLICATION_ID'),
+        webPort: int('DOKPLOY_WEB_PORT', 3000),
+    },
+
     booking: {
         /** Business rule (spec §4): earliest a client may book, in days from now. */
         minAdvanceDays: int('BOOKING_MIN_ADVANCE_DAYS', 7),
@@ -247,6 +265,7 @@ const EXPECTED: Record<string, string[]> = {
     'images': ['CDN_UPLOAD_TOKEN', 'CDN_API_KEY_REFERENCES'],
     'connecting a gateway': ['CREDENTIALS_KEY'],
     'platform panel': ['PLATFORM_ADMIN_EMAILS'],
+    'automatic subdomains': ['DOKPLOY_URL', 'DOKPLOY_API_KEY', 'DOKPLOY_WEB_APPLICATION_ID'],
     'Mercado Pago onboarding': ['MP_CLIENT_ID', 'MP_CLIENT_SECRET'],
     'Stripe onboarding': ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
     'schema bootstrap': ['DB_AUTO_MIGRATE'],

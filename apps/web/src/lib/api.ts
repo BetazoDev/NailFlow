@@ -66,6 +66,13 @@ export interface NewSalon {
     notes?: string;
 }
 
+/** Result of asking the hosting panel to do something. */
+export interface HostingOutcome {
+    ok: boolean;
+    detail: string;
+    reason?: 'unconfigured' | 'rejected' | 'unreachable';
+}
+
 /** Whether a salon's subdomain is actually routed here, and what is missing. */
 export interface DomainCheck {
     domain: string;
@@ -270,10 +277,22 @@ export const api = {
          * password. No password is ever chosen or sent by us.
          */
         createSalon: (salon: NewSalon) =>
-            request<{ id: string; domain: string; invite: string | null }>('/platform/tenants', {
+            request<{
+                id: string;
+                domain: string;
+                invite: string | null;
+                /** Whether the subdomain was registered with the proxy for us. */
+                hosting: HostingOutcome;
+            }>('/platform/tenants', { method: 'POST', body: salon }),
+
+        /** Retries the subdomain registration for a salon whose first try failed. */
+        registerDomain: (id: string) =>
+            request<HostingOutcome>(`/platform/tenants/${id}/register-domain`, {
                 method: 'POST',
-                body: salon,
             }),
+
+        /** Confirms the hosting token works, before a real salon depends on it. */
+        hosting: () => request<HostingOutcome & { enabled: boolean }>('/platform/hosting'),
 
         updateSalon: (id: string, patch: Partial<NewSalon> & {
             subscription?: { status: 'active' | 'trial' | 'cancelled'; plan: string };

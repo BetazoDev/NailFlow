@@ -10,6 +10,7 @@ import { newId } from '../services/bookings';
 import { summaryFor } from '../services/payments/accounts';
 import { forgetRecipients } from '../services/notifications';
 import { markPaid } from '../services/subscription';
+import { checkConnection, hostingEnabled, registerDomain } from '../services/hosting';
 import { createLogger, errorContext } from '../lib/logger';
 
 const log = createLogger('platform');
@@ -202,15 +203,23 @@ platformRouter.post(
             [newId(), tenantId, body.owner_name || body.name, body.owner_email]
         );
 
+        const invite = await inviteLink(body.owner_email, body.domain);
+
+        // Registering the subdomain is best effort on purpose. The salon and her
+        // owner's account already exist; refusing the whole creation because the
+        // hosting panel was slow would leave a half-made salon and an operator
+        // with no idea which half. A failure here is reported, and the panel
+        // then shows the manual step.
+        const hosting = await registerDomain(body.domain);
+
         await audit(actor, 'tenant.created', tenantId, {
             domain: body.domain,
             owner_email: body.owner_email,
+            subdomain_registered: hosting.ok,
         });
 
-        const invite = await inviteLink(body.owner_email, body.domain);
-
-        log.info('Salon created', { tenantId, domain: body.domain });
-        res.status(201).json({ id: tenantId, domain: body.domain, invite });
+        log.info('Salon created', { tenantId, domain: body.domain, hosting: hosting.ok });
+        res.status(201).json({ id: tenantId, domain: body.domain, invite, hosting });
     })
 );
 
@@ -328,6 +337,38 @@ platformRouter.get(
         if (!domain) throw ApiError.notFound('Ese salón no existe');
 
         res.json({ domain, ...(await probeDomain(domain)) });
+    })
+);
+
+/** Registers the subdomain for a salon whose first attempt did not go through. */
+platformRouter.post(
+    '/tenants/:id/register-domain',
+    requirePlatform,
+    asyncHandler(async (req, res) => {
+        const result = await query<{ domain: string }>(
+            'SELECT domain FROM tenants WHERE id = $1',
+            [req.params.id]
+        );
+
+        const domain = result.rows[0]?.domain;
+        if (!domain) throw ApiError.notFound('Ese salón no existe');
+
+        const outcome = await registerDomain(domain);
+        await audit(req.user!.email!, 'tenant.domain_registered', req.params.id, {
+            domain,
+            ok: outcome.ok,
+        });
+
+        res.json(outcome);
+    })
+);
+
+/** Confirms the hosting token works before an actual salon depends on it. */
+platformRouter.get(
+    '/hosting',
+    requirePlatform,
+    asyncHandler(async (_req, res) => {
+        res.json({ enabled: hostingEnabled(), ...(await checkConnection()) });
     })
 );
 
