@@ -119,6 +119,21 @@ platformRouter.get(
 
 // ── Alta ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Subdomains the platform itself needs, or might.
+ *
+ * A salon called just "API" slugs to `api`, and if salons hang directly off the
+ * product's domain that is the same host the API answers on. The two would
+ * fight over it, and the outage would take a while to explain. Two-word names
+ * are already safe — "API Nails" becomes `api-nails` — so this only catches the
+ * narrow case, which is exactly when it is impossible to see coming.
+ */
+const RESERVED_LABELS = new Set([
+    'api', 'app', 'admin', 'cuenta', 'www', 'mail', 'smtp', 'ftp',
+    'cdn', 'static', 'assets', 'panel', 'platform', 'plataforma',
+    'demo', 'staging', 'test', 'dev', 'status', 'blog', 'ayuda', 'soporte',
+]);
+
 const createSalonSchema = z.object({
     /** The host the salon is reached on; multi-tenancy resolves from it. */
     domain: z
@@ -127,7 +142,11 @@ const createSalonSchema = z.object({
         .toLowerCase()
         .min(3)
         .max(253)
-        .regex(/^[a-z0-9.-]+$/, 'El dominio solo admite letras, números, puntos y guiones'),
+        .regex(/^[a-z0-9.-]+$/, 'El dominio solo admite letras, números, puntos y guiones')
+        .refine(
+            value => !RESERVED_LABELS.has(value.split('.')[0] ?? ''),
+            'Ese subdominio está reservado para la plataforma. Elige otro.'
+        ),
     name: z.string().trim().min(1).max(120),
     owner_name: z.string().trim().max(120).optional(),
     owner_email: z.string().trim().toLowerCase().email(),
