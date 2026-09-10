@@ -57,6 +57,8 @@ interface BookingContextValue {
     confirmBooking: (appointmentId: string) => void;
 
     salonName: string;
+    /** Whether this API accepts bookings confirmed without payment. */
+    testBookings: boolean;
 }
 
 const BookingContext = createContext<BookingContextValue | null>(null);
@@ -67,6 +69,7 @@ export interface BookingProviderProps {
     staffName: string;
     staffPhoto?: string;
     salonName: string;
+    testBookings?: boolean;
     onStepChange?: (step: BookingStep) => void;
 }
 
@@ -76,6 +79,7 @@ export function BookingProvider({
     staffName,
     staffPhoto,
     salonName,
+    testBookings = false,
     onStepChange,
 }: BookingProviderProps) {
     const [step, setStep] = useState<BookingStep>('personal');
@@ -211,11 +215,12 @@ export function BookingProvider({
             confirmedAppointmentId,
             confirmBooking,
             salonName,
+            testBookings,
         }),
         [
             step, stepIndex, goTo, goNext, goBack, draft, totals, setClient, toggleService,
             setDate, setTime, setPaymentMethod, pendingFiles, localPreviews, setFiles,
-            setUploadedImageUrls, confirmedAppointmentId, confirmBooking, salonName,
+            setUploadedImageUrls, confirmedAppointmentId, confirmBooking, salonName, testBookings,
         ]
     );
 

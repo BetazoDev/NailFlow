@@ -166,6 +166,7 @@ export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, 
                     staffName={staffName}
                     staffPhoto={staffPhoto}
                     salonName={salonName}
+                    testBookings={tenant.test_bookings ?? false}
                     onStepChange={setCurrentStep}
                 />
             </main>

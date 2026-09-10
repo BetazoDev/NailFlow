@@ -15,6 +15,8 @@ export interface BookingWizardProps {
     staffName: string;
     staffPhoto?: string;
     salonName: string;
+    /** Whether this API accepts bookings confirmed without payment. */
+    testBookings?: boolean;
     onStepChange?: (step: BookingStep) => void;
 }
 

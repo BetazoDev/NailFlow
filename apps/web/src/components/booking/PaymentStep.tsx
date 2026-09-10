@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { api, ApiError } from '@/lib/api';
+import { api, clientReason } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import type { CreateBookingRequest, PaymentMethod } from '@/lib/types';
 import { useBooking } from './BookingContext';
@@ -23,11 +23,12 @@ interface MethodOption {
     redirects: boolean;
 }
 
-/** Set at build time; mirrors the API's `ALLOW_TEST_BOOKINGS`. */
-const TEST_BOOKINGS_ENABLED = process.env.NEXT_PUBLIC_ALLOW_TEST_BOOKINGS === 'true';
-
 export default function PaymentStep() {
-    const { draft, totals, goBack, confirmBooking, setPaymentMethod } = useBooking();
+    // Whether the demo method exists is the API's answer, not this build's.
+    // It used to be a `NEXT_PUBLIC_` flag baked in here, and the two drifted:
+    // the option was offered, the server answered 404, and the client saw
+    // "Route not found" as the reason her booking failed.
+    const { draft, totals, goBack, confirmBooking, setPaymentMethod, testBookings } = useBooking();
 
     const deposit = totals.requiredAdvance;
 
@@ -52,7 +53,7 @@ export default function PaymentStep() {
                 : 'Este servicio no requiere anticipo. Pagas el día de tu cita.',
             redirects: false,
         },
-        ...(TEST_BOOKINGS_ENABLED
+        ...(testBookings
             ? [
                   {
                       id: 'test' as const,
@@ -111,11 +112,7 @@ export default function PaymentStep() {
 
             confirmBooking(result.appointmentId);
         } catch (caught) {
-            const message =
-                caught instanceof ApiError
-                    ? caught.message
-                    : 'No pudimos procesar tu reserva. Intenta de nuevo.';
-            setError(message);
+            setError(clientReason(caught, 'No pudimos procesar tu reserva. Intenta de nuevo.'));
             setStatus('idle');
         }
     };

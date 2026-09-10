@@ -134,6 +134,28 @@ export class ApiError extends Error {
 }
 
 /**
+ * The reason to show a client, out of a failed request.
+ *
+ * The API writes real Spanish for the refusals it means a client to read — a
+ * suspended salon, a slot taken while she was deciding. It also emits plumbing
+ * that is not addressed to anyone: a 404 on a route that is switched off, a
+ * 500. Passing those straight through told a client her booking failed because
+ * of "Route not found", which is both meaningless and alarming.
+ *
+ * So the API's own words are used only for the statuses where it is talking to
+ * her, and everything else gets a sentence that says what she can do.
+ */
+const SPEAKS_TO_CLIENT = new Set([400, 402, 403, 409, 410, 422, 429, 503]);
+
+export function clientReason(caught: unknown, fallback: string): string {
+    if (caught instanceof ApiError && SPEAKS_TO_CLIENT.has(caught.status)) {
+        return fieldMessage(caught.details) ?? caught.message;
+    }
+    return fallback;
+}
+
+
+/**
  * The first specific reason out of a validation failure's details.
  *
  * Only the first: a form that reports six problems at once is read as noise,

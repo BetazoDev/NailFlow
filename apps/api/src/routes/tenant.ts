@@ -6,6 +6,7 @@ import { tenantOf } from '../middleware/tenant';
 import { validateBody } from '../middleware/validate';
 import { tenantUpdateSchema } from './schemas';
 import { forgetRecipients } from '../services/notifications';
+import { env } from '../config/env';
 export const tenantRouter: Router = Router();
 
 /**
@@ -16,7 +17,12 @@ export const tenantRouter: Router = Router();
 tenantRouter.get('/tenant', (req, res) => {
     const { tenant } = tenantOf(req);
     const { owner_id: _ownerId, ...publicTenant } = tenant;
-    res.json(publicTenant);
+
+    // Whether unpaid test bookings are accepted is the API's business, and the
+    // booking page has to be told rather than guess: it used to carry its own
+    // copy of the flag, baked in at build time, and offered the option long
+    // after this server stopped honouring it.
+    res.json({ ...publicTenant, test_bookings: env.booking.allowUnpaidTestBookings });
 });
 
 /** Update branding and settings. Owner only. */

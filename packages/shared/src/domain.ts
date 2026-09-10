@@ -99,6 +99,15 @@ export interface Tenant {
         plan: string;
     };
     created_at?: string;
+    /**
+     * Whether this deployment accepts bookings confirmed without payment.
+     *
+     * Comes from the API, not from the web app's own build. The two used to
+     * carry the same flag independently, and when they drifted the booking
+     * page offered "Modo prueba" and the server answered 404 — which reached
+     * the client, mid-booking, as "Route not found".
+     */
+    test_bookings?: boolean;
 }
 
 // ── Staff ────────────────────────────────────────────────────────────────────
