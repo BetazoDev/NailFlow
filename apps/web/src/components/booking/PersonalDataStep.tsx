@@ -124,7 +124,11 @@ export default function PersonalDataStep() {
                         {/* Email */}
                         <div className="group">
                             <label className="block text-[11px] tracking-widest uppercase font-bold mb-1 text-nf-gray group-focus-within:text-brand-ink">
-                                Correo Electrónico <span className="opacity-40 font-normal normal-case">(Opcional)</span>
+                                Correo Electrónico{' '}
+                                {/* Sin opacidad: al 40% daba 1.71 de contraste, es decir,
+                                    invisible. Ya se distingue de la etiqueta por ir en
+                                    minúsculas y sin negrita, que es lo que se pretendía. */}
+                                <span className="font-normal normal-case">(Opcional)</span>
                             </label>
                             <input
                                 className="w-full bg-transparent border-0 border-b-2 border-cream-dark py-3 text-charcoal placeholder-gray-light focus:outline-none focus:border-pink transition-all text-lg font-medium"
