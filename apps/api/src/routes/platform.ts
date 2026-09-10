@@ -132,11 +132,16 @@ platformRouter.get(
  * fight over it, and the outage would take a while to explain. Two-word names
  * are already safe — "API Nails" becomes `api-nails` — so this only catches the
  * narrow case, which is exactly when it is impossible to see coming.
+ *
+ * Kept to names that are, or plausibly will be, infrastructure. An earlier
+ * version also held `test`, `blog`, `ayuda` and `soporte`, which protect nothing
+ * and simply refuse a salon her own name — the first person it turned away was
+ * someone typing "test" into the form.
  */
 const RESERVED_LABELS = new Set([
-    'api', 'app', 'admin', 'cuenta', 'www', 'mail', 'smtp', 'ftp',
-    'cdn', 'static', 'assets', 'panel', 'platform', 'plataforma',
-    'demo', 'staging', 'test', 'dev', 'status', 'blog', 'ayuda', 'soporte',
+    'api', 'app', 'admin', 'cuenta', 'panel', 'platform',
+    'www', 'mail', 'smtp', 'ftp', 'cdn', 'static', 'assets',
+    'demo', 'staging', 'dev',
 ]);
 
 const createSalonSchema = z.object({

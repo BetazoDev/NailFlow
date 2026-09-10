@@ -133,6 +133,26 @@ export class ApiError extends Error {
     }
 }
 
+/**
+ * The first specific reason out of a validation failure's details.
+ *
+ * Only the first: a form that reports six problems at once is read as noise,
+ * and fixing the first usually reveals whether the rest were the same mistake.
+ */
+function fieldMessage(details: unknown): string | undefined {
+    if (!Array.isArray(details)) return undefined;
+
+    const first = details.find(
+        (entry): entry is { message: string } =>
+            typeof entry === 'object' &&
+            entry !== null &&
+            typeof (entry as { message?: unknown }).message === 'string' &&
+            (entry as { message: string }).message.trim().length > 0
+    );
+
+    return first?.message;
+}
+
 interface RequestOptions extends Omit<RequestInit, 'body'> {
     body?: unknown;
     /** Explicit tenant domain, for server-side rendering where there is no window. */
@@ -180,7 +200,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (!response.ok) {
         throw new ApiError(
             response.status,
-            payload?.error ?? `Request failed with status ${response.status}`,
+            // A validation failure answers with a generic headline and the real
+            // reason in `details`. Showing only the headline turns "ese
+            // subdominio está reservado" into "Invalid request", which tells the
+            // reader nothing and sends them guessing at a form that was one word
+            // away from being right.
+            fieldMessage(payload?.details) ??
+                payload?.error ??
+                `Request failed with status ${response.status}`,
             payload?.details
         );
     }
