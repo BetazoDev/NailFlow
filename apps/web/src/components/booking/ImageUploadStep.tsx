@@ -110,7 +110,7 @@ export default function ImageUploadStep() {
                             </svg>
                         </div>
                         <p className="text-charcoal font-serif text-xl font-bold">Añadir referencias</p>
-                        <p className="text-nf-gray text-[10px] font-bold uppercase tracking-widest mt-2 opacity-60">JPG, PNG • Máximo 6 fotos</p>
+                        <p className="text-nf-gray text-[10px] font-bold uppercase tracking-widest mt-2">JPG, PNG • Máximo 6 fotos</p>
                         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => addFiles(e.target.files)} />
                     </div>
 

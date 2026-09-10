@@ -166,7 +166,7 @@ export default function PaymentStep() {
                                 <label
                                     key={option.id}
                                     className={`flex cursor-pointer items-start gap-4 rounded-3xl border-2 bg-surface-raised p-5 transition-all ${
-                                        active ? 'border-brand shadow-soft' : 'border-transparent opacity-70 hover:opacity-100'
+                                        active ? 'border-brand shadow-soft' : 'border-line hover:border-brand-soft'
                                     }`}
                                 >
                                     <input

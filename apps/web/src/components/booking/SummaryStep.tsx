@@ -155,7 +155,7 @@ export default function SummaryStep() {
                                         </div>
                                         <span className="font-serif text-xl font-bold text-brand-ink">${totals.requiredAdvance.toFixed(2)}</span>
                                     </div>
-                                    <p className="text-[9px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider opacity-70">
+                                    <p className="text-[9px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider">
                                         Este monto se descontará del total el día de tu cita. Pago seguro vía Mercado Pago.
                                     </p>
                                 </div>
