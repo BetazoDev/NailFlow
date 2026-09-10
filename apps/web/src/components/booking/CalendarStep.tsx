@@ -148,7 +148,7 @@ export default function CalendarStep({ selectedDate, onSelect }: CalendarStepPro
                                 relative aspect-square flex items-center justify-center rounded-2xl text-sm font-bold
                                 transition-all duration-300 transform
                                 ${disabled
-                                    ? 'text-nf-gray/20 cursor-not-allowed'
+                                    ? 'text-text-subtle cursor-not-allowed'
                                     : 'cursor-pointer hover:bg-pink-pale hover:text-brand-ink hover:scale-110'}
                                 ${selected
                                     ? 'bg-charcoal text-white shadow-lg scale-110 z-10'

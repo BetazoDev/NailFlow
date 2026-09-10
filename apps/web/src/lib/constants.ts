@@ -51,9 +51,11 @@ export interface Palette {
 }
 
 /*
- * Los tres tonos de texto de cada paleta están medidos contra el `--surface`
- * de esa misma paleta, que es el peor de los dos fondos que existen —el
- * elevado es blanco y da algo más de contraste.
+ * Los tonos de texto de cada paleta están medidos contra el fondo más
+ * oscuro sobre el que se pintan de verdad, que no es `--surface` sino
+ * `--surface-sunken`: las etiquetas y las notas viven dentro de tarjetas
+ * hundidas y de tintes de marca, no sobre el lienzo. Medirlos contra el
+ * lienzo dejaba la nota de "sube fotos de inspiración" en 4.36.
  *
  *   --text-strong  >= 7.0    titulares y cifras
  *   --text         >= 5.5    cuerpo
@@ -88,8 +90,8 @@ export const PALETTES: Palette[] = [
             '--brand-secondary': '#E8B4A0',
             '--text-strong': '#2C2420',
             '--text': '#5A4E48',
-            '--text-muted': '#7A706B',
-            '--text-subtle': '#968E8A',
+            '--text-muted': '#746A66',
+            '--text-subtle': '#908884',
             '--border': '#F0E9DF',
         },
     },
@@ -108,8 +110,8 @@ export const PALETTES: Palette[] = [
             '--brand-secondary': '#D9AFB3',
             '--text-strong': '#6E4649',
             '--text': '#85595D',
-            '--text-muted': '#856A6A',
-            '--text-subtle': '#9F8989',
+            '--text-muted': '#7E6565',
+            '--text-subtle': '#978282',
             '--border': '#EFE0E1',
         },
     },
@@ -128,8 +130,8 @@ export const PALETTES: Palette[] = [
             '--brand-secondary': '#C9BEB2',
             '--text-strong': '#3F3934',
             '--text': '#5C544E',
-            '--text-muted': '#786F68',
-            '--text-subtle': '#948E87',
+            '--text-muted': '#706761',
+            '--text-subtle': '#8A847E',
             '--border': '#E5E0DA',
         },
     },
@@ -148,8 +150,8 @@ export const PALETTES: Palette[] = [
             '--brand-secondary': '#E7D4BE',
             '--text-strong': '#645442',
             '--text': '#746351',
-            '--text-muted': '#806E5E',
-            '--text-subtle': '#9A8E7F',
+            '--text-muted': '#7A6859',
+            '--text-subtle': '#918577',
             '--border': '#EDE5DC',
         },
     },
