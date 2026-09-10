@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import { query } from '../db/pool';
+import { query, transaction } from '../db/pool';
 import { env } from '../config/env';
 import { ApiError, asyncHandler } from '../middleware/errors';
 import { requirePlatform } from '../middleware/auth';
@@ -517,10 +517,37 @@ platformRouter.delete(
 
         const hosting = await unregisterDomain(tenant.domain);
 
-        // The row goes even when the proxy could not be reached: leaving the
-        // salon behind because a second system was down would mean the operator
-        // has to remember to come back, and nobody does.
-        await query('DELETE FROM tenants WHERE id = $1', [req.params.id]);
+        // Everything that hangs off the salon, removed explicitly and in one
+        // transaction.
+        //
+        // The schema declares ON DELETE CASCADE on all of these, but the live
+        // database disagreed: `staff` was created before that clause existed and
+        // `CREATE TABLE IF NOT EXISTS` never alters a table that is already
+        // there, so the file had been describing a shape the database did not
+        // have. Nothing surfaced it until the first attempt to delete a salon.
+        //
+        // Naming the tables is also the better shape for a destructive
+        // operation: the code says exactly what it destroys instead of trusting
+        // a constraint nobody can see from here.
+        await transaction(async tx => {
+            await tx.query(
+                `DELETE FROM appointment_services
+                 WHERE appointment_id IN (SELECT id FROM appointments WHERE tenant_id = $1)`,
+                [req.params.id]
+            );
+            for (const table of [
+                'appointments',
+                'client_favorites',
+                'slot_locks',
+                'services',
+                'staff',
+                'push_devices',
+                'payment_accounts',
+            ]) {
+                await tx.query(`DELETE FROM ${table} WHERE tenant_id = $1`, [req.params.id]);
+            }
+            await tx.query('DELETE FROM tenants WHERE id = $1', [req.params.id]);
+        });
 
         await audit(req.user!.email!, 'tenant.deleted', null, {
             domain: tenant.domain,
