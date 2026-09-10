@@ -109,6 +109,60 @@ export async function registerDomain(host: string): Promise<HostingOutcome> {
 }
 
 /**
+ * Removes a salon's subdomain from the reverse proxy.
+ *
+ * Dokploy addresses domains by id, not by host, so the entry has to be found
+ * first. A subdomain left behind after a salon is deleted keeps answering with
+ * whatever the app serves for an unknown tenant, and still counts against the
+ * certificate authority's weekly quota.
+ */
+export async function unregisterDomain(host: string): Promise<HostingOutcome> {
+    if (!hostingEnabled()) {
+        return {
+            ok: false,
+            reason: 'unconfigured',
+            detail: 'El alta automática de subdominios no está configurada en este servidor.',
+        };
+    }
+
+    try {
+        const listed = await fetch(
+            `${env.hosting.url}/api/domain.byApplicationId` +
+                `?applicationId=${encodeURIComponent(env.hosting.webApplicationId!)}`,
+            {
+                headers: { 'x-api-key': env.hosting.apiKey! },
+                signal: AbortSignal.timeout(15_000),
+            }
+        );
+
+        if (!listed.ok) return explain(listed);
+
+        const domains = (await listed.json()) as { domainId: string; host: string }[];
+        const match = Array.isArray(domains)
+            ? domains.find(domain => domain.host === host)
+            : undefined;
+
+        if (!match) {
+            // Nothing to remove is a success: the goal is that it is gone.
+            return { ok: true, detail: 'Ese subdominio ya no estaba registrado.' };
+        }
+
+        const removed = await call('domain.delete', { domainId: match.domainId });
+        if (!removed.ok) return explain(removed);
+
+        log.info('Subdomain unregistered', { host });
+        return { ok: true, detail: 'Subdominio retirado.' };
+    } catch (error) {
+        log.warn('Hosting panel unreachable', { host, ...errorContext(error) });
+        return {
+            ok: false,
+            reason: 'unreachable',
+            detail: 'No pudimos contactar con el panel de hosting.',
+        };
+    }
+}
+
+/**
  * Confirms the token works and names the right application, before an actual
  * salon depends on it.
  *

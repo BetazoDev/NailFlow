@@ -316,6 +316,15 @@ export const api = {
                 { method: 'POST', body: { months } }
             ),
 
+        /**
+         * Deletes a salon. Refused once she has appointments — borrar arrastra
+         * su historial, y el panel prefiere que canceles su suscripción.
+         */
+        deleteSalon: (id: string) =>
+            request<{ deleted: true; hosting: HostingOutcome }>(`/platform/tenants/${id}`, {
+                method: 'DELETE',
+            }),
+
         /** Re-issues the access link for an owner who never received it. */
         invite: (id: string) =>
             request<{ invite: string }>(`/platform/tenants/${id}/invite`, { method: 'POST' }),

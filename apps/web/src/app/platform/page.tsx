@@ -466,6 +466,29 @@ function SalonDrawer({
         }
     };
 
+    /**
+     * Deleting asks for the domain to be typed out.
+     *
+     * A confirm dialog is dismissed by reflex; typing the name is the smallest
+     * thing that proves the right salon is being deleted, and it costs nothing
+     * on the only salons this is allowed for — the ones nobody booked into.
+     */
+    const [confirmDomain, setConfirmDomain] = useState('');
+
+    const remove = async () => {
+        setBusy(true);
+        try {
+            await api.platform.deleteSalon(salon.id);
+            onChanged();
+            onClose();
+        } catch (caught) {
+            setMessage(
+                caught instanceof ApiError ? caught.message : 'No pudimos borrarlo.'
+            );
+            setBusy(false);
+        }
+    };
+
     const registerPayment = async () => {
         setBusy(true);
         try {
@@ -601,6 +624,32 @@ function SalonDrawer({
                 >
                     Reenviar acceso
                 </button>
+            </div>
+
+            <div className="h-px bg-white/10" />
+
+            <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.14em] text-white/35">Borrar</p>
+                <p className="text-xs text-white/50">
+                    Escribe <code className="font-mono text-white/70">{salon.domain}</code> para
+                    confirmar. Solo se puede borrar un salón sin citas.
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                        value={confirmDomain}
+                        onChange={event => setConfirmDomain(event.target.value)}
+                        placeholder={salon.domain}
+                        aria-label="Confirma el dominio del salón a borrar"
+                        className={inputClass}
+                    />
+                    <button
+                        onClick={remove}
+                        disabled={busy || confirmDomain.trim() !== salon.domain}
+                        className="shrink-0 rounded-xl border border-rose-400/40 px-5 py-2.5 text-sm text-rose-200 disabled:opacity-30"
+                    >
+                        Borrar salón
+                    </button>
+                </div>
             </div>
 
             {invite && (

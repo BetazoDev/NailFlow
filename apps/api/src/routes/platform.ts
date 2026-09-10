@@ -10,7 +10,12 @@ import { newId } from '../services/bookings';
 import { summaryFor } from '../services/payments/accounts';
 import { forgetRecipients } from '../services/notifications';
 import { markPaid } from '../services/subscription';
-import { checkConnection, hostingEnabled, registerDomain } from '../services/hosting';
+import {
+    checkConnection,
+    hostingEnabled,
+    registerDomain,
+    unregisterDomain,
+} from '../services/hosting';
 import { createLogger, errorContext } from '../lib/logger';
 
 const log = createLogger('platform');
@@ -469,6 +474,62 @@ platformRouter.post(
 
         await audit(req.user!.email!, 'subscription.paid', req.params.id, { months });
         res.json(subscription);
+    })
+);
+
+/**
+ * Deletes a salon, for cleaning up after a trial run.
+ *
+ * Refuses once the salon has appointments. Deleting cascades to her clients,
+ * services and payment account, so a slip here would destroy a real salon's
+ * history with no undo — and the only salons that genuinely need deleting are
+ * the ones nobody ever booked into. A salon that is closing gets her
+ * subscription cancelled instead, which stops new bookings and keeps the record.
+ *
+ * The domain has to go with her: a subdomain left registered still answers, and
+ * still counts against the certificate authority's weekly quota.
+ */
+platformRouter.delete(
+    '/tenants/:id',
+    requirePlatform,
+    asyncHandler(async (req, res) => {
+        const found = await query<{ domain: string; name: string | null }>(
+            'SELECT domain, name FROM tenants WHERE id = $1',
+            [req.params.id]
+        );
+
+        const tenant = found.rows[0];
+        if (!tenant) throw ApiError.notFound('Ese salón no existe');
+
+        const booked = await query<{ count: string }>(
+            'SELECT COUNT(*) AS count FROM appointments WHERE tenant_id = $1',
+            [req.params.id]
+        );
+
+        const appointments = Number(booked.rows[0]?.count ?? 0);
+        if (appointments > 0) {
+            throw new ApiError(
+                409,
+                `Este salón tiene ${appointments} cita(s). Cancela su suscripción en vez de ` +
+                    'borrarlo: borrar arrastraría sus clientas y su historial.'
+            );
+        }
+
+        const hosting = await unregisterDomain(tenant.domain);
+
+        // The row goes even when the proxy could not be reached: leaving the
+        // salon behind because a second system was down would mean the operator
+        // has to remember to come back, and nobody does.
+        await query('DELETE FROM tenants WHERE id = $1', [req.params.id]);
+
+        await audit(req.user!.email!, 'tenant.deleted', null, {
+            domain: tenant.domain,
+            name: tenant.name,
+            domain_unregistered: hosting.ok,
+        });
+
+        log.info('Salon deleted', { domain: tenant.domain });
+        res.json({ deleted: true, hosting });
     })
 );
 
