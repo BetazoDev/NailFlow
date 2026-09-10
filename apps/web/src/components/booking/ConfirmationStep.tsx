@@ -197,7 +197,7 @@ export default function ConfirmationStep() {
                 )}
 
                 {confirmedAppointmentId && (
-                    <p className="mt-6 text-center text-[9px] uppercase tracking-widest text-text-subtle">
+                    <p className="mt-6 text-center text-[9px] uppercase tracking-widest text-text-muted">
                         Folio {confirmedAppointmentId.slice(0, 8)}
                     </p>
                 )}

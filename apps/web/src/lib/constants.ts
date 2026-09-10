@@ -50,6 +50,24 @@ export interface Palette {
     tokens: PaletteTokens;
 }
 
+/*
+ * Los tres tonos de texto de cada paleta están medidos contra el `--surface`
+ * de esa misma paleta, que es el peor de los dos fondos que existen —el
+ * elevado es blanco y da algo más de contraste.
+ *
+ *   --text-strong  >= 7.0    titulares y cifras
+ *   --text         >= 5.5    cuerpo
+ *   --text-muted   >= 4.6    etiquetas y notas
+ *
+ * `--text-muted` fallaba en las cuatro (entre 2.82 y 3.64, con un mínimo de
+ * 4.5) y es el color de casi todas las etiquetas de formulario del producto.
+ * Al corregirlo se conservó el tono de cada paleta: son los mismos colores,
+ * más profundos, no grises nuevos.
+ *
+ * `--text-subtle` se queda deliberadamente por debajo: es para iconos y
+ * trazos decorativos, no para texto. Si acaba bajo un párrafo, el que está
+ * mal es el párrafo.
+ */
 export const PALETTES: Palette[] = [
     {
         id: 'soft-rose',
@@ -66,7 +84,7 @@ export const PALETTES: Palette[] = [
             '--brand-secondary': '#E8B4A0',
             '--text-strong': '#2C2420',
             '--text': '#5A4E48',
-            '--text-muted': '#9A8E88',
+            '--text-muted': '#7A706B',
             '--text-subtle': '#C8BEB8',
             '--border': '#F0E9DF',
         },
@@ -75,7 +93,7 @@ export const PALETTES: Palette[] = [
         id: 'vintage-rose',
         name: 'Vintage Rose',
         description: 'Sofisticación clásica y tonos empolvados.',
-        swatches: ['#FDF7F7', '#E8C5C8', '#8B5D61'],
+        swatches: ['#FDF7F7', '#E8C5C8', '#85595D'],
         tokens: {
             '--surface': '#FDF7F7',
             '--surface-raised': '#FFFFFF',
@@ -85,8 +103,8 @@ export const PALETTES: Palette[] = [
             '--brand-primary-tint': '#FBF1F1',
             '--brand-secondary': '#D9AFB3',
             '--text-strong': '#6E4649',
-            '--text': '#8B5D61',
-            '--text-muted': '#A08080',
+            '--text': '#85595D',
+            '--text-muted': '#856A6A',
             '--text-subtle': '#C7ABAB',
             '--border': '#EFE0E1',
         },
@@ -106,7 +124,7 @@ export const PALETTES: Palette[] = [
             '--brand-secondary': '#C9BEB2',
             '--text-strong': '#3F3934',
             '--text': '#5C544E',
-            '--text-muted': '#8A8078',
+            '--text-muted': '#786F68',
             '--text-subtle': '#B5ADA5',
             '--border': '#E5E0DA',
         },
@@ -115,7 +133,7 @@ export const PALETTES: Palette[] = [
         id: 'soft-aesthetic',
         name: 'Soft Aesthetic',
         description: 'Calidez natural y luz etérea.',
-        swatches: ['#FCFBF9', '#E4CDB2', '#AB937D'],
+        swatches: ['#FCFBF9', '#E4CDB2', '#746351'],
         tokens: {
             '--surface': '#FCFBF9',
             '--surface-raised': '#FFFFFF',
@@ -124,9 +142,9 @@ export const PALETTES: Palette[] = [
             '--brand-primary-soft': '#F2E6D8',
             '--brand-primary-tint': '#FAF5EE',
             '--brand-secondary': '#E7D4BE',
-            '--text-strong': '#6E5C48',
-            '--text': '#8A7660',
-            '--text-muted': '#AB937D',
+            '--text-strong': '#645442',
+            '--text': '#746351',
+            '--text-muted': '#806E5E',
             '--text-subtle': '#CBBBA7',
             '--border': '#EDE5DC',
         },

@@ -215,7 +215,7 @@ export default function PaymentStep() {
                 >
                     {selected?.redirects ? 'Pagar y confirmar' : 'Confirmar reserva'}
                 </Button>
-                <p className="mt-4 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-text-subtle">
+                <p className="mt-4 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-text-muted">
                     {selected?.redirects ? 'Pago protegido por Mercado Pago' : 'Sin cargos ahora'}
                 </p>
             </div>

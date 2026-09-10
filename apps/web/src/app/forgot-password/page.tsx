@@ -98,7 +98,7 @@ export default function ForgotPasswordPage() {
                             Si <strong className="text-text-strong">{email.trim()}</strong> tiene una
                             cuenta, le acabamos de enviar un enlace para crear una contraseña nueva.
                         </p>
-                        <p className="mb-8 text-xs text-text-subtle">
+                        <p className="mb-8 text-xs text-text-muted">
                             El enlace caduca en una hora. Si no lo ves, mira en spam.
                         </p>
 
