@@ -305,13 +305,13 @@ export default function ProfilePage() {
     return (
         <div className="min-h-full pb-24">
             {/* Header */}
-            <div className="px-6 pt-8 pb-6">
+            <div className="pt-2 pb-6">
                 <p className="text-[10px] tracking-[0.3em] text-aesthetic-muted uppercase mb-2 font-display italic font-medium">Administración</p>
                 <h1 className="font-display text-4xl font-light italic tracking-tight text-aesthetic-taupe">Mi Perfil</h1>
             </div>
 
             {/* Avatar section */}
-            <div className="px-6 mb-8">
+            <div className="mb-8">
                 <Card variant="raised" className="flex items-center gap-5 p-6">
                     <div className="size-24 rounded-full bg-aesthetic-soft-pink border-4 border-white shadow-soft flex items-center justify-center text-aesthetic-taupe text-4xl font-display italic flex-shrink-0 overflow-hidden ring-1 ring-aesthetic-accent/50">
                         {logoPreview ? (
@@ -332,7 +332,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Tabs */}
-            <div className="px-6 mb-8">
+            <div className="mb-8">
                 <div className="flex gap-2 bg-aesthetic-cream/60 backdrop-blur-sm rounded-[2rem] p-1.5 border border-white/50 shadow-inner overflow-x-auto scrollbar-hide">
                     {TABS.map(([id, label, icon]) => (
                         <button
@@ -349,7 +349,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Content Tabs */}
-            <div className="px-6">
+            <div>
                 {tab === 'info' && (
                     <div className="space-y-6 animate-fade-in">
                         <Card variant="raised" className="p-8 border-none shadow-soft overflow-hidden">

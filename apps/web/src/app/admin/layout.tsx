@@ -250,7 +250,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </div>
                 )}
 
-                <main className="flex-1 overflow-y-auto overscroll-contain lg:p-8">
+                {/*
+                    Padding on every size, not only from `lg`. Below that the
+                    panel had none at all, so five of the six pages rendered
+                    edge to edge on a phone: a heading and its action button
+                    together measured just under the viewport, fit on one line,
+                    and the button ended flush against the screen — reading as
+                    clipped rather than as a layout with no margin.
+                */}
+                <main className="flex-1 overflow-y-auto overscroll-contain px-5 py-6 lg:p-8">
                     {standing !== 'ok' && (
                         <div
                             role="status"
