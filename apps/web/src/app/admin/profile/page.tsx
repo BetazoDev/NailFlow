@@ -6,7 +6,6 @@ import { useSession } from '@/lib/session-context';
 import { applyBranding, clearBrandingPreview } from '@/lib/theme';
 import { Feedback, type FeedbackState } from '@/components/admin/Feedback';
 import { GatewayPanel } from '@/components/admin/GatewayPanel';
-import { SharePanel } from '@/components/admin/SharePanel';
 import { DEFAULT_PALETTE_ID, DEFAULT_TYPOGRAPHY_ID, PALETTES, TYPOGRAPHY, WEEKDAYS } from '@/lib/constants';
 import type { DaySchedule, SocialLinks, TenantBranding, TenantSettings } from '@/lib/types';
 import {
@@ -43,7 +42,6 @@ const TABS = [
     ['info', 'Negocio', 'storefront'],
     ['apariencia', 'Apariencia', 'palette'],
     ['horarios', 'Horarios', 'schedule'],
-    ['compartir', 'Comparte', 'qr_code_2'],
     ['cobros', 'Cobros', 'payments'],
     ['fidelizacion', 'Fidelización', 'card_giftcard'],
     ['password', 'Seguridad', 'shield'],
@@ -589,33 +587,52 @@ export default function ProfilePage() {
                                                 )}
                                             </div>
 
+                                            {/*
+                                                Stacked on a phone, side by side from `sm`.
+
+                                                A native time control will not shrink below
+                                                roughly 130px, and `flex-1` cannot force it to:
+                                                two of them plus the arrow and the indent needed
+                                                312px where 266 were available, so the closing
+                                                time hung 57px past the card. Its label sat in
+                                                `absolute -top-6` as well, which is why it
+                                                floated loose against the edge instead of
+                                                travelling with its field.
+                                            */}
                                             {sched.active && (
-                                                <div className="flex items-center gap-4 pl-11 animate-fade-in">
-                                                    <div className="flex-1 relative">
-                                                        <span className="absolute -top-6 left-1 text-[8px] uppercase tracking-widest text-aesthetic-muted font-bold">Inicio</span>
-                                                        <input 
-                                                            type="time" 
+                                                <div className="flex flex-col gap-3 animate-fade-in sm:flex-row sm:items-end sm:gap-4 sm:pl-11">
+                                                    <label className="flex-1">
+                                                        <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-widest text-aesthetic-muted">
+                                                            Inicio
+                                                        </span>
+                                                        <input
+                                                            type="time"
                                                             value={sched.start}
                                                             onChange={e => updateDay(idx, { start: e.target.value })}
                                                             aria-label={`Hora de apertura, ${dayName}`}
                                                             aria-invalid={invalid || undefined}
-                                                            className="w-full bg-white border-none rounded-2xl px-4 py-3 text-xs font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 outline-none" 
+                                                            className="w-full rounded-2xl border-none bg-white px-4 py-3 text-xs font-bold text-aesthetic-taupe shadow-sm outline-none focus:ring-2 focus:ring-aesthetic-pink/20"
                                                         />
-                                                    </div>
-                                                    <div className="pt-2 text-aesthetic-muted opacity-30">
-                                                        <span className="material-symbol text-lg" aria-hidden="true">arrow_forward</span>
-                                                    </div>
-                                                    <div className="flex-1 relative">
-                                                        <span className="absolute -top-6 left-1 text-[8px] uppercase tracking-widest text-aesthetic-muted font-bold">Cierre</span>
-                                                        <input 
-                                                            type="time" 
+                                                    </label>
+                                                    <span
+                                                        className="hidden pb-3 text-aesthetic-muted opacity-30 sm:block"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <span className="material-symbol text-lg">arrow_forward</span>
+                                                    </span>
+                                                    <label className="flex-1">
+                                                        <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-widest text-aesthetic-muted">
+                                                            Cierre
+                                                        </span>
+                                                        <input
+                                                            type="time"
                                                             value={sched.end}
                                                             onChange={e => updateDay(idx, { end: e.target.value })}
                                                             aria-label={`Hora de cierre, ${dayName}`}
                                                             aria-invalid={invalid || undefined}
-                                                            className="w-full bg-white border-none rounded-2xl px-4 py-3 text-xs font-bold text-aesthetic-taupe shadow-sm focus:ring-2 focus:ring-aesthetic-pink/20 outline-none" 
+                                                            className="w-full rounded-2xl border-none bg-white px-4 py-3 text-xs font-bold text-aesthetic-taupe shadow-sm outline-none focus:ring-2 focus:ring-aesthetic-pink/20"
                                                         />
-                                                    </div>
+                                                    </label>
                                                 </div>
                                             )}
 
@@ -683,8 +700,6 @@ export default function ProfilePage() {
                         </Card>
                     </div>
                 )}
-
-                {tab === 'compartir' && <SharePanel domain={tenant?.domain} />}
 
                 {tab === 'cobros' && <GatewayPanel />}
 

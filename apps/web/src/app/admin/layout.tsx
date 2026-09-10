@@ -23,6 +23,9 @@ const NAV_ITEMS: NavItem[] = [
     { href: '/admin/agenda', label: 'Agenda', icon: 'calendar_today', roles: ['owner', 'staff'] },
     { href: '/admin/services', label: 'Servicios', icon: 'content_cut', roles: ['owner'] },
     { href: '/admin/clients', label: 'Clientas', icon: 'group', roles: ['owner'] },
+    // Sending a client the booking link is a daily errand, so it sits in the
+    // sidebar rather than inside settings next to the things she configures once.
+    { href: '/admin/compartir', label: 'Comparte', icon: 'qr_code_2', roles: ['owner', 'staff'] },
     { href: '/admin/team', label: 'Equipo', icon: 'badge', roles: ['owner'] },
     { href: '/admin/profile', label: 'Perfil', icon: 'person', roles: ['owner'] },
 ];

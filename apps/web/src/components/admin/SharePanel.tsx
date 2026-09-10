@@ -39,7 +39,19 @@ export function SharePanel({ domain }: { domain: string | undefined }) {
             margin: 2,
             errorCorrectionLevel: 'H',
             color: { dark: '#2C2420', light: '#FFFFFF' },
-        }).catch(() => setFailed(true));
+        })
+            .then(() => {
+                // The library writes width and height into the element's inline
+                // style, and an inline style beats any class — so the canvas
+                // rendered at its full 520px and hung out of the card. The bitmap
+                // stays large, which is what the download needs; only what is
+                // shown is brought back down.
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                canvas.style.width = '100%';
+                canvas.style.height = 'auto';
+            })
+            .catch(() => setFailed(true));
     }, [url]);
 
     const copy = async () => {
@@ -64,13 +76,6 @@ export function SharePanel({ domain }: { domain: string | undefined }) {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div>
-                <h2 className="t-title">Comparte tu salón</h2>
-                <p className="t-label mt-1 opacity-70">
-                    Tus clientas reservan desde aquí.
-                </p>
-            </div>
-
             <Card variant="raised" className="p-8 border-none shadow-soft space-y-6">
                 <div>
                     <p className="t-label mb-2">Tu enlace</p>
@@ -94,12 +99,12 @@ export function SharePanel({ domain }: { domain: string | undefined }) {
                 <div className="rule" />
 
                 <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-                    <div className="rounded-2xl border border-line bg-white p-4">
-                        {/* Rendered at 520px and shown at 176 so a printed copy
-                            stays sharp; the download carries the full size. */}
+                    <div className="w-44 shrink-0 rounded-2xl border border-line bg-white p-4">
+                        {/* Drawn at 520px and shown at 176, so a printed copy stays
+                            sharp and the download carries the full resolution. */}
                         <canvas
                             ref={canvasRef}
-                            className="size-44"
+                            className="block w-full"
                             aria-label={`Código QR de ${domain ?? 'tu salón'}`}
                         />
                     </div>
