@@ -4,25 +4,8 @@
         {
             "name": "web",
             "runtimeExecutable": "npm",
-            "runtimeArgs": [
-                "run",
-                "dev",
-                "-w",
-                "@nailflow/web"
-            ],
+            "runtimeArgs": ["run", "dev", "-w", "@nailflow/web"],
             "port": 3000
-        },
-        {
-            "name": "guias",
-            "runtimeExecutable": "python",
-            "runtimeArgs": [
-                "-m",
-                "http.server",
-                "8933",
-                "--directory",
-                "C:/Users/alons/AppData/Local/Temp/claude/C--Users-alons-Documents-Antigravity-NailFlow/ec6cd93d-7a69-4833-953c-1803c87e3a92/scratchpad"
-            ],
-            "port": 8933
         }
     ]
 }
