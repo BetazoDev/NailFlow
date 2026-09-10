@@ -149,7 +149,21 @@
 
 /* ============================================================================
    Base
+   ============================================================================
+
+   Wrapped in @layer base, and the styles below it in @layer components, for a
+   reason that was silently breaking layouts: unlayered CSS beats *every*
+   layered rule, whatever its specificity. Tailwind's utilities live in the
+   `utilities` layer, so an unlayered `.input-field { padding: 14px 18px }` beat
+   `pl-14` outright — the icon inside the field sat on top of the text, and no
+   amount of adding utilities could move it.
+
+   With both blocks in layers the order becomes theme → base → components →
+   utilities, so a utility written next to one of these classes wins, which is
+   what anyone reading the markup expects.
    ============================================================================ */
+
+@layer base {
 
 *,
 *::before,
@@ -212,6 +226,10 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+
+}
+
+@layer components {
 
 .no-scrollbar {
   scrollbar-width: none;
@@ -676,4 +694,5 @@ body {
   border: 1px dashed var(--border);
   border-radius: var(--radius-lg);
   color: var(--text-muted);
+}
 }
