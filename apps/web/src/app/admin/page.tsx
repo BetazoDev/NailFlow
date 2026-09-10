@@ -376,6 +376,14 @@ export default function DashboardPage() {
     );
 }
 
+/**
+ * One figure about the business.
+ *
+ * Full width on a phone, and it has to be. Two-up leaves 129px of content and a
+ * real income figure — `$12,480.00`, not the `$0` of an empty salon — measures
+ * more than that even a size down; three-up overflows the labels as well.
+ * Measured rather than assumed, after trying both.
+ */
 function Metric({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
     return (
         <div className="sheet p-6">

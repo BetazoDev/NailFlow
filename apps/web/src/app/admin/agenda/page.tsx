@@ -335,7 +335,17 @@ function WeekView({
 
     return (
         <div className="sheet overflow-hidden">
-            <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-line">
+            {/*
+                Seven day columns do not fit a phone. Squeezed into 390px each is
+                about 43px wide, and an appointment card inside one — with its own
+                padding, and halved again when two overlap — is left with a dozen
+                pixels of text. Below the width where the week genuinely fits it
+                scrolls sideways instead, so a column stays readable and the whole
+                week is still reachable with a swipe.
+            */}
+            <div className="overflow-x-auto">
+                <div className="min-w-[760px]">
+                    <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-line">
                 <div />
                 {week.map((day, index) => {
                     const isToday = isSameDay(day, today);
@@ -426,6 +436,8 @@ function WeekView({
                                 </button>
                             );
                         })}
+                    </div>
+                        </div>
                     </div>
                 </div>
             </div>
