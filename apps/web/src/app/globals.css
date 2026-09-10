@@ -22,6 +22,14 @@
   --surface-sunken: #F5F0E8;
 
   /* ── Brand ── */
+  /* Text that sits *on* the brand colour.
+     Every palette here is a pale pastel, so white on it lands between 1.4 and
+     2.2 against a 4.5 minimum — the label on the main call to action was less
+     than half as legible as it needed to be, and read as disabled. Dark text on
+     the same pastels lands between 6.9 and 10.6.
+     A salon that sets her own brand colour gets this recomputed at runtime; see
+     applyBranding in lib/theme.ts. */
+  --on-brand: #2C2420;
   --brand-primary: #E8A0B4;
   --brand-primary-soft: #F8D8E0;
   --brand-primary-tint: #FFF0F3;
@@ -105,6 +113,7 @@
   --color-brand-soft: var(--brand-primary-soft);
   --color-brand-tint: var(--brand-primary-tint);
   --color-brand-secondary: var(--brand-secondary);
+  --color-on-brand: var(--on-brand);
 
   --color-text-strong: var(--text-strong);
   --color-text-body: var(--text);
@@ -353,7 +362,7 @@ body {
 
 .btn-gradient {
   background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
-  color: #fff;
+  color: var(--on-brand);
   border: none;
   border-radius: var(--radius-pill);
   font-family: var(--font-body);
@@ -463,7 +472,7 @@ body {
 
 .pill-tab-active {
   background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
-  color: #fff;
+  color: var(--on-brand);
   box-shadow: var(--shadow-sm);
 }
 

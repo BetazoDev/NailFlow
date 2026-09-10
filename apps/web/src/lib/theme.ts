@@ -1,6 +1,47 @@
 import type { TenantBranding } from '@/lib/types';
 import { PALETTES, TYPOGRAPHY, DEFAULT_PALETTE_ID, DEFAULT_TYPOGRAPHY_ID } from '@/lib/constants';
 
+/** Relative luminance, per WCAG. */
+function luminance(hex: string): number | null {
+    const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!match) return null;
+
+    const channels = [0, 2, 4].map(i => parseInt(match[1].slice(i, i + 2), 16) / 255);
+    const [r, g, b] = channels.map(c =>
+        c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    );
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: number, b: number): number {
+    const [light, dark] = a > b ? [a, b] : [b, a];
+    return (light + 0.05) / (dark + 0.05);
+}
+
+const INK = '#2C2420';
+const PAPER = '#FFFFFF';
+
+/**
+ * The text colour that stays legible across a two-stop gradient.
+ *
+ * Scored against the *worse* of the two stops, because the label runs over
+ * both: a colour that reads beautifully at one end and vanishes at the other is
+ * still an unreadable button.
+ *
+ * Falls back to ink when a colour cannot be parsed — every palette in the
+ * product is pale, so that is the safer guess than white.
+ */
+function readableOn(...colours: string[]): string {
+    const stops = colours.map(luminance).filter((value): value is number => value !== null);
+    if (stops.length === 0) return INK;
+
+    const ink = luminance(INK)!;
+    const paper = luminance(PAPER)!;
+
+    const worst = (text: number) => Math.min(...stops.map(stop => contrast(text, stop)));
+    return worst(ink) >= worst(paper) ? INK : PAPER;
+}
+
 /**
  * Applies a tenant's palette and typography to the document.
  *
@@ -44,6 +85,18 @@ export function applyBranding(branding: TenantBranding | undefined): void {
     // A salon that set explicit brand colours overrides the palette's accents.
     if (branding?.primary_color) set('--brand-primary', branding.primary_color);
     if (branding?.secondary_color) set('--brand-secondary', branding.secondary_color);
+
+    // Whatever the brand colour ends up being, the label on top of it has to be
+    // readable. Every palette shipped here is a pale pastel where white lands
+    // around 2:1 against a 4.5 minimum, so the default is dark — but a salon can
+    // pick her own colour, and a dark one would need the opposite.
+    set(
+        '--on-brand',
+        readableOn(
+            branding?.primary_color ?? palette.tokens['--brand-primary'],
+            branding?.secondary_color ?? palette.tokens['--brand-secondary']
+        )
+    );
 }
 
 /**
@@ -67,4 +120,7 @@ export function clearBrandingPreview(): void {
     root.style.removeProperty('--font-body');
     root.style.removeProperty('--brand-primary');
     root.style.removeProperty('--brand-secondary');
+    // Left behind, this pins the label colour of a palette the salon is no
+    // longer using — and on a dark custom brand that means an invisible button.
+    root.style.removeProperty('--on-brand');
 }

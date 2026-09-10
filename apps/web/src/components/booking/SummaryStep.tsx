@@ -204,7 +204,7 @@ export default function SummaryStep() {
                 <button
                     onClick={handleConfirm}
                     disabled={!canConfirm || isUploading}
-                    className="w-full max-w-lg mx-auto py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    className="w-full max-w-lg mx-auto py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                     {isUploading ? (
                         <>

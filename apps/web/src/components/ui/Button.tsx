@@ -19,7 +19,9 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const VARIANTS: Record<NonNullable<ButtonProps['variant']>, string> = {
-    primary: 'btn-gradient text-white',
+    // No text colour here: `.btn-gradient` picks one that is legible on the
+    // salon's own brand colour, and a utility written here would override it.
+    primary: 'btn-gradient',
     secondary: 'bg-surface-raised text-text-strong border border-line shadow-soft hover:border-brand-soft',
     outline: 'bg-transparent border-2 border-brand text-brand hover:bg-brand-tint',
     ghost: 'bg-transparent text-text-muted hover:bg-surface-sunken hover:text-text-strong',

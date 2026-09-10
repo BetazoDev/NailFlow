@@ -124,7 +124,7 @@ export default function BookingWidget({ tenant, staffId, staffName, staffPhoto, 
                                         aria-hidden="true"
                                         className={`grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
                                             done
-                                                ? 'bg-brand text-white'
+                                                ? 'bg-brand text-on-brand'
                                                 : active
                                                   ? 'bg-white text-text-strong'
                                                   : 'bg-white/10 text-white/30'

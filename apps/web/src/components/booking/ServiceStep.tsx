@@ -206,7 +206,7 @@ export default function ServiceStep() {
                     </div>
                     <button
                         onClick={onNext}
-                        className="flex-1 py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient text-white hover:scale-105 active:scale-95 transition-all"
+                        className="flex-1 py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient hover:scale-105 active:scale-95 transition-all"
                     >
                         Siguiente
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
