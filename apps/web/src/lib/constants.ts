@@ -64,8 +64,12 @@ export interface Palette {
  * Al corregirlo se conservó el tono de cada paleta: son los mismos colores,
  * más profundos, no grises nuevos.
  *
- * `--text-subtle` se queda deliberadamente por debajo: es para iconos y
- * trazos decorativos, no para texto. Si acaba bajo un párrafo, el que está
+ *   --text-subtle  >= 3.0    iconos y adornos
+ *
+ * `--text-subtle` se queda por debajo de 4.5 a propósito —no es para
+ * texto— pero sí alcanza 3.0, que es el mínimo de los elementos gráficos.
+ * Estaba entre 1.76 y 2.09, y con eso los iconos de método de pago sin
+ * seleccionar eran casi invisibles. Si acaba bajo un párrafo, el que está
  * mal es el párrafo.
  */
 export const PALETTES: Palette[] = [
@@ -85,7 +89,7 @@ export const PALETTES: Palette[] = [
             '--text-strong': '#2C2420',
             '--text': '#5A4E48',
             '--text-muted': '#7A706B',
-            '--text-subtle': '#C8BEB8',
+            '--text-subtle': '#968E8A',
             '--border': '#F0E9DF',
         },
     },
@@ -105,7 +109,7 @@ export const PALETTES: Palette[] = [
             '--text-strong': '#6E4649',
             '--text': '#85595D',
             '--text-muted': '#856A6A',
-            '--text-subtle': '#C7ABAB',
+            '--text-subtle': '#9F8989',
             '--border': '#EFE0E1',
         },
     },
@@ -125,7 +129,7 @@ export const PALETTES: Palette[] = [
             '--text-strong': '#3F3934',
             '--text': '#5C544E',
             '--text-muted': '#786F68',
-            '--text-subtle': '#B5ADA5',
+            '--text-subtle': '#948E87',
             '--border': '#E5E0DA',
         },
     },
@@ -145,7 +149,7 @@ export const PALETTES: Palette[] = [
             '--text-strong': '#645442',
             '--text': '#746351',
             '--text-muted': '#806E5E',
-            '--text-subtle': '#CBBBA7',
+            '--text-subtle': '#9A8E7F',
             '--border': '#EDE5DC',
         },
     },
