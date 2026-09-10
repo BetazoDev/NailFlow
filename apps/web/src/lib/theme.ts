@@ -18,6 +18,35 @@ function contrast(a: number, b: number): number {
     return (light + 0.05) / (dark + 0.05);
 }
 
+/** Same hue, dark enough to read as text. */
+function inkFrom(colour: string, over: string): string {
+    const base = /^#?([0-9a-f]{6})$/i.exec(colour.trim());
+    const ground = luminance(over);
+    if (!base || ground === null) return colour;
+
+    const channels = [0, 2, 4].map(i => parseInt(base[1].slice(i, i + 2), 16));
+
+    // Walk the colour towards black in small steps and stop at the first shade
+    // that reads. Multiplying every channel keeps the hue: it is the salon's
+    // pink, only deeper — replacing it with a grey would take her brand out of
+    // her own booking page.
+    //
+    // The gate is 5.0 rather than the 4.5 minimum because the same words also
+    // land on the pale brand tint (a chip, a highlighted total), which is
+    // lighter than the surface this is measured against. A shade tuned to
+    // exactly 4.5 here fails there.
+    for (let factor = 1; factor >= 0; factor -= 0.02) {
+        const shade = channels.map(c => Math.round(c * factor)) as [number, number, number];
+        const value = luminance(
+            '#' + shade.map(c => c.toString(16).padStart(2, '0')).join('')
+        );
+        if (value !== null && contrast(value, ground) >= 5) {
+            return '#' + shade.map(c => c.toString(16).padStart(2, '0')).join('');
+        }
+    }
+    return '#2C2420';
+}
+
 const INK = '#2C2420';
 const PAPER = '#FFFFFF';
 
@@ -97,6 +126,18 @@ export function applyBranding(branding: TenantBranding | undefined): void {
             branding?.secondary_color ?? palette.tokens['--brand-secondary']
         )
     );
+
+    // And the reverse: the brand colour used *as* text, on the salon's surface.
+    // Every palette here is a pastel, so the accent lands between 1.5 and 2.2
+    // against a 4.5 minimum — the word picked out in the headline was the least
+    // readable thing on the page.
+    set(
+        '--brand-ink',
+        inkFrom(
+            branding?.primary_color ?? palette.tokens['--brand-primary'],
+            palette.tokens['--surface']
+        )
+    );
 }
 
 /**
@@ -123,4 +164,5 @@ export function clearBrandingPreview(): void {
     // Left behind, this pins the label colour of a palette the salon is no
     // longer using — and on a dark custom brand that means an invisible button.
     root.style.removeProperty('--on-brand');
+    root.style.removeProperty('--brand-ink');
 }

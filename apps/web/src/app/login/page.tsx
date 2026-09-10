@@ -116,7 +116,7 @@ export default function LoginPage() {
                     <p className="mt-5 text-center">
                         <Link
                             href="/forgot-password"
-                            className="text-xs font-semibold text-text-muted underline-offset-4 hover:text-brand hover:underline"
+                            className="text-xs font-semibold text-text-muted underline-offset-4 hover:text-brand-ink hover:underline"
                         >
                             ¿Olvidaste tu contraseña?
                         </Link>

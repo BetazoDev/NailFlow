@@ -79,7 +79,7 @@ export default function PersonalDataStep() {
                     </div>
 
                     <h1 className="font-serif text-3xl text-charcoal mb-2 leading-tight">
-                        ¡Hola! Soy <span className="text-pink italic">{staffName}</span>
+                        ¡Hola! Soy <span className="text-brand-ink italic">{staffName}</span>
                     </h1>
                     <p className="text-sm text-nf-gray max-w-[240px]">
                         Encantada de conocerte. Necesito unos pocos datos para organizar tu cita.
@@ -91,7 +91,7 @@ export default function PersonalDataStep() {
                     <div className="space-y-8">
                         {/* Name */}
                         <div className="group">
-                            <label className={`block text-[11px] tracking-widest uppercase font-bold mb-1 transition-colors ${errors.name ? 'text-red-400' : 'text-nf-gray group-focus-within:text-pink'}`}>
+                            <label className={`block text-[11px] tracking-widest uppercase font-bold mb-1 transition-colors ${errors.name ? 'text-red-400' : 'text-nf-gray group-focus-within:text-brand-ink'}`}>
                                 Tu Nombre Completo
                             </label>
                             <input
@@ -105,13 +105,13 @@ export default function PersonalDataStep() {
 
                         {/* WhatsApp */}
                         <div className="group">
-                            <label className={`block text-[11px] tracking-widest uppercase font-bold mb-1 transition-colors ${errors.phone ? 'text-red-400' : 'text-nf-gray group-focus-within:text-pink'}`}>
+                            <label className={`block text-[11px] tracking-widest uppercase font-bold mb-1 transition-colors ${errors.phone ? 'text-red-400' : 'text-nf-gray group-focus-within:text-brand-ink'}`}>
                                 WhatsApp / Teléfono
                             </label>
                             <div className="relative">
                                 <input
                                     className="w-full bg-transparent border-0 border-b-2 border-cream-dark py-3 text-charcoal placeholder-gray-light focus:outline-none focus:border-pink transition-all text-lg font-medium"
-                                    placeholder="+34 000 000 000"
+                                    placeholder="55 1234 5678"
                                     type="tel"
                                     value={phone}
                                     onChange={e => onPhoneChange(e.target.value)}
@@ -123,7 +123,7 @@ export default function PersonalDataStep() {
 
                         {/* Email */}
                         <div className="group">
-                            <label className="block text-[11px] tracking-widest uppercase font-bold mb-1 text-nf-gray group-focus-within:text-pink">
+                            <label className="block text-[11px] tracking-widest uppercase font-bold mb-1 text-nf-gray group-focus-within:text-brand-ink">
                                 Correo Electrónico <span className="opacity-40 font-normal normal-case">(Opcional)</span>
                             </label>
                             <input

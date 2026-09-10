@@ -143,7 +143,7 @@ export default function TimeSlotStep({ onBack }: TimeSlotStepProps) {
                 <button
                     onClick={onBack}
                     aria-label="Elegir otra fecha"
-                    className="w-10 h-10 rounded-full bg-cream-dark/20 flex items-center justify-center text-nf-gray hover:bg-pink-pale hover:text-pink transition-all"
+                    className="w-10 h-10 rounded-full bg-cream-dark/20 flex items-center justify-center text-nf-gray hover:bg-pink-pale hover:text-brand-ink transition-all"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 12H4M4 12l8-8M4 12l8 8" /></svg>
                 </button>
@@ -161,8 +161,10 @@ export default function TimeSlotStep({ onBack }: TimeSlotStepProps) {
             ) : timeSlots.length === 0 ? (
                 <div className="text-center py-20 px-8">
                     <div className="text-4xl mb-4 opacity-20">📅</div>
-                    <p className="font-serif text-charcoal text-lg mb-2">¡Lo sentimos!</p>
-                    <p className="text-sm text-nf-gray">No hay horarios disponibles para el {formatDate(selectedDate)}. Por favor elige otra fecha.</p>
+                    <p className="font-serif text-charcoal text-lg mb-2">Ese día está lleno</p>
+                    <p className="text-sm text-text-body">
+                        No queda hueco el {formatDate(selectedDate)}. Elige otra fecha y te enseño los horarios.
+                    </p>
                 </div>
             ) : (
                 <div className="stagger-children">

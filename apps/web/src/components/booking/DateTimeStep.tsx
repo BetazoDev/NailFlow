@@ -19,7 +19,7 @@ export default function DateTimeStep() {
             <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-cream-dark/30 shadow-sm">
                 <div className="flex items-center justify-between px-6 pt-6 pb-2">
                     {onBack && (
-                        <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-pink transition-colors group">
+                        <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-brand-ink transition-colors group">
                             <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                             </div>
@@ -38,7 +38,7 @@ export default function DateTimeStep() {
                 <div className="px-6 pt-4 pb-4">
                     <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 3: Disponibilidad</p>
                     <h1 className="font-serif text-3xl text-charcoal leading-tight">
-                        Elige tu <span className="text-pink">momento</span>
+                        Elige tu <span className="text-brand-ink">momento</span>
                     </h1>
                 </div>
             </div>
@@ -65,9 +65,12 @@ export default function DateTimeStep() {
             </div>
 
             {/* CTA: Sticky at the bottom */}
-            <div className={`sticky bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40 transition-all duration-500 ${selectedTime ? 'translate-y-0 opacity-100 shadow-up' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+            <div aria-hidden={!selectedTime} className={`sticky bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 z-40 transition-all duration-500 ${selectedTime ? 'translate-y-0 opacity-100 shadow-up' : 'translate-y-full opacity-0 pointer-events-none'}`}>
                 <button
                     onClick={onNext}
+                    // Oculto pero enfocable: el lector anunciaba "Confirmar
+                    // para las HS", sin hora, antes de elegir ninguna.
+                    tabIndex={selectedTime ? undefined : -1}
                     className="w-full max-w-lg mx-auto py-5 rounded-full text-base font-serif flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl btn-gradient"
                 >
                     Confirmar para las {selectedTime} HS

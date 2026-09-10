@@ -59,7 +59,7 @@ export default function SummaryStep() {
             {/* Header: Sticky at the top */}
             <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-cream-dark/30 shadow-sm">
                 <div className="flex items-center justify-between px-6 pt-6 pb-2">
-                    <button onClick={goBack} disabled={isUploading} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-pink transition-colors group">
+                    <button onClick={goBack} disabled={isUploading} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-brand-ink transition-colors group">
                         <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                         </div>
@@ -79,7 +79,7 @@ export default function SummaryStep() {
                 <div className="px-6 pt-4 pb-4">
                     <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 5: Resumen</p>
                     <h1 className="font-serif text-3xl text-charcoal leading-tight">
-                        Confirma tu <span className="text-pink">cita</span>
+                        Confirma tu <span className="text-brand-ink">cita</span>
                     </h1>
                 </div>
             </div>
@@ -103,7 +103,7 @@ export default function SummaryStep() {
                                             <h2 className="font-serif text-lg text-charcoal font-bold truncate">{svc.name}</h2>
                                             <p className="text-[10px] uppercase tracking-widest text-nf-gray">{svc.duration_minutes} min</p>
                                         </div>
-                                        <span className="text-sm font-bold text-pink shrink-0">${Number(svc.estimated_price).toFixed(2)}</span>
+                                        <span className="text-sm font-bold text-brand-ink shrink-0">${Number(svc.estimated_price).toFixed(2)}</span>
                                     </div>
                                 ))}
                             </div>
@@ -151,9 +151,9 @@ export default function SummaryStep() {
                                 <div className="p-5 rounded-3xl bg-pink-pale/20 border border-pink-light/20">
                                     <div className="flex justify-between items-center mb-3">
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-bold uppercase tracking-[0.2em] text-pink">Seña para reservar</span>
+                                            <span className="text-xs font-bold uppercase tracking-[0.2em] text-brand-ink">Seña para reservar</span>
                                         </div>
-                                        <span className="font-serif text-xl font-bold text-pink">${totals.requiredAdvance.toFixed(2)}</span>
+                                        <span className="font-serif text-xl font-bold text-brand-ink">${totals.requiredAdvance.toFixed(2)}</span>
                                     </div>
                                     <p className="text-[9px] text-nf-gray leading-relaxed font-medium uppercase tracking-wider opacity-70">
                                         Este monto se descontará del total el día de tu cita. Pago seguro vía Mercado Pago.
@@ -184,7 +184,7 @@ export default function SummaryStep() {
                             disabled={isUploading}
                             className="w-full py-4 rounded-2xl border-2 border-dashed border-pink/20 flex items-center justify-center gap-3 bg-white hover:bg-pink-pale hover:border-pink/40 transition-all group"
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-pink/40 group-hover:text-pink transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-brand-ink/40 group-hover:text-brand-ink transition-colors">
                                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
                             </svg>
                             <span className="text-[11px] text-nf-gray font-bold uppercase tracking-widest">Añadir fotos de inspiración</span>

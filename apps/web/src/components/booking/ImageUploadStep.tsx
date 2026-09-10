@@ -60,7 +60,7 @@ export default function ImageUploadStep() {
             {/* Header: Sticky at the top */}
             <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-cream-dark/30 shadow-sm">
                 <div className="flex items-center justify-between px-6 pt-6 pb-2">
-                    <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-pink transition-colors group">
+                    <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-brand-ink transition-colors group">
                         <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                         </div>
@@ -79,7 +79,7 @@ export default function ImageUploadStep() {
                 <div className="px-6 pt-4 pb-4">
                     <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 4: Inspiración</p>
                     <h1 className="font-serif text-3xl text-charcoal leading-tight">
-                        Tu <span className="text-pink">visión</span> creativa
+                        Tu <span className="text-brand-ink">visión</span> creativa
                     </h1>
                 </div>
             </div>
@@ -126,7 +126,7 @@ export default function ImageUploadStep() {
                         <div className="pt-10 animate-fade-in">
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="font-serif text-lg text-charcoal">Seleccionadas</h3>
-                                <span className="text-[10px] font-bold text-pink uppercase tracking-[0.2em] bg-pink-pale px-3 py-1 rounded-full border border-pink-light/20">
+                                <span className="text-[10px] font-bold text-brand-ink uppercase tracking-[0.2em] bg-pink-pale px-3 py-1 rounded-full border border-pink-light/20">
                                     {localPreviews.length} de 6
                                 </span>
                             </div>

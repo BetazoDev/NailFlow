@@ -96,20 +96,20 @@ export default function CalendarStep({ selectedDate, onSelect }: CalendarStepPro
             {/* Month Navigation */}
             <div className="flex items-center justify-between mb-8">
                 <h2 className="font-serif text-2xl font-bold text-charcoal">
-                    {MONTH_NAMES[currentMonth]} <span className="text-pink font-normal">{currentYear}</span>
+                    {MONTH_NAMES[currentMonth]} <span className="text-brand-ink font-normal">{currentYear}</span>
                 </h2>
                 <div className="flex gap-2">
                     <button
                         onClick={handlePrevMonth}
                         aria-label="Mes anterior"
-                        className="w-10 h-10 rounded-full bg-cream/50 flex items-center justify-center hover:bg-pink-pale hover:text-pink transition-all border border-cream-dark/20 text-nf-gray shadow-sm"
+                        className="w-10 h-10 rounded-full bg-cream/50 flex items-center justify-center hover:bg-pink-pale hover:text-brand-ink transition-all border border-cream-dark/20 text-nf-gray shadow-sm"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                     </button>
                     <button
                         onClick={handleNextMonth}
                         aria-label="Mes siguiente"
-                        className="w-10 h-10 rounded-full bg-cream/50 flex items-center justify-center hover:bg-pink-pale hover:text-pink transition-all border border-cream-dark/20 text-nf-gray shadow-sm"
+                        className="w-10 h-10 rounded-full bg-cream/50 flex items-center justify-center hover:bg-pink-pale hover:text-brand-ink transition-all border border-cream-dark/20 text-nf-gray shadow-sm"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                     </button>
@@ -119,7 +119,10 @@ export default function CalendarStep({ selectedDate, onSelect }: CalendarStepPro
             {/* Day names */}
             <div className="grid grid-cols-7 gap-2 mb-4">
                 {DAY_NAMES.map((d) => (
-                    <div key={d} className="text-center text-[10px] font-bold text-nf-gray uppercase tracking-widest py-1 opacity-50">
+                    // Eran gris claro al 50% de opacidad: 2.92 sobre blanco, cuando
+                    // el mínimo para un texto de 10px es 4.5. Es la fila que dice
+                    // en qué columna cae cada día.
+                    <div key={d} className="text-center text-[10px] font-bold text-text-body uppercase tracking-widest py-1">
                         {d}
                     </div>
                 ))}
@@ -146,11 +149,11 @@ export default function CalendarStep({ selectedDate, onSelect }: CalendarStepPro
                                 transition-all duration-300 transform
                                 ${disabled
                                     ? 'text-nf-gray/20 cursor-not-allowed'
-                                    : 'cursor-pointer hover:bg-pink-pale hover:text-pink hover:scale-110'}
+                                    : 'cursor-pointer hover:bg-pink-pale hover:text-brand-ink hover:scale-110'}
                                 ${selected
                                     ? 'bg-charcoal text-white shadow-lg scale-110 z-10'
                                     : todayDay
-                                        ? 'text-pink border-2 border-pink-light'
+                                        ? 'text-brand-ink border-2 border-pink-light'
                                         : 'text-charcoal'}
                             `}
                         >

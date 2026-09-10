@@ -86,7 +86,7 @@ export default function ForgotPasswordPage() {
                 <div className="mx-auto w-full max-w-md">
                     <div className="rounded-3xl border border-line bg-surface-raised p-8 text-center shadow-soft">
                         <div className="mx-auto mb-6 grid size-16 place-items-center rounded-2xl bg-brand-tint">
-                            <span className="material-symbol text-3xl text-brand" aria-hidden="true">
+                            <span className="material-symbol text-3xl text-brand-ink" aria-hidden="true">
                                 mark_email_read
                             </span>
                         </div>
@@ -128,7 +128,7 @@ export default function ForgotPasswordPage() {
                 <div className="rounded-3xl border border-line bg-surface-raised p-8 shadow-soft">
                     <div className="mb-8 text-center">
                         <div className="mx-auto mb-6 grid size-16 place-items-center rounded-2xl bg-brand-tint">
-                            <span className="material-symbol text-3xl text-brand" aria-hidden="true">
+                            <span className="material-symbol text-3xl text-brand-ink" aria-hidden="true">
                                 lock_reset
                             </span>
                         </div>
@@ -175,7 +175,7 @@ export default function ForgotPasswordPage() {
 
                 <p className="mt-6 text-center text-sm text-text-muted">
                     ¿Ya la recordaste?{' '}
-                    <Link href="/login" className="font-bold text-brand hover:underline">
+                    <Link href="/login" className="font-bold text-brand-ink hover:underline">
                         Inicia sesión
                     </Link>
                 </p>

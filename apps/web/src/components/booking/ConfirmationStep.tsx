@@ -93,7 +93,7 @@ export default function ConfirmationStep() {
 
             <div className="stagger-children mb-10 text-center">
                 <h1 className="mb-3 font-display text-4xl leading-tight text-text-strong">
-                    ¡Tu cita está <span className="text-brand">lista!</span>
+                    ¡Tu cita está <span className="text-brand-ink">lista!</span>
                 </h1>
                 <p className="mx-auto max-w-[300px] text-sm leading-relaxed text-text-muted">
                     {draft.paymentMethod === 'mercado'
@@ -167,7 +167,7 @@ export default function ConfirmationStep() {
 
                 <div className="mt-6 flex items-center justify-between border-t border-line pt-4">
                     <div className="flex min-w-0 items-center gap-3">
-                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-tint text-xs font-bold text-brand">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-tint text-xs font-bold text-brand-ink">
                             {draft.clientName.charAt(0).toUpperCase() || 'C'}
                         </span>
                         <span className="truncate text-xs font-bold uppercase tracking-widest text-text-strong">
@@ -233,7 +233,7 @@ export default function ConfirmationStep() {
 
                 <button
                     onClick={() => window.location.reload()}
-                    className="w-full py-4 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-brand underline-offset-4 hover:underline"
+                    className="w-full py-4 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink underline-offset-4 hover:underline"
                 >
                     Agendar otra cita
                 </button>

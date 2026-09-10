@@ -362,7 +362,7 @@ function WeekView({
                             </span>
                             <span
                                 className={`t-figure text-base font-semibold ${
-                                    isToday ? 'text-brand' : 'text-text-strong'
+                                    isToday ? 'text-brand-ink' : 'text-text-strong'
                                 }`}
                             >
                                 {day.getDate()}

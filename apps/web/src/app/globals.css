@@ -30,6 +30,10 @@
      A salon that sets her own brand colour gets this recomputed at runtime; see
      applyBranding in lib/theme.ts. */
   --on-brand: #2C2420;
+
+  /* The brand colour used *as* text on the surface, darkened until it reads.
+     Recomputed per palette and per custom brand colour; see lib/theme.ts. */
+  --brand-ink: #A34E6B;
   --brand-primary: #E8A0B4;
   --brand-primary-soft: #F8D8E0;
   --brand-primary-tint: #FFF0F3;
@@ -114,6 +118,7 @@
   --color-brand-tint: var(--brand-primary-tint);
   --color-brand-secondary: var(--brand-secondary);
   --color-on-brand: var(--on-brand);
+  --color-brand-ink: var(--brand-ink);
 
   --color-text-strong: var(--text-strong);
   --color-text-body: var(--text);

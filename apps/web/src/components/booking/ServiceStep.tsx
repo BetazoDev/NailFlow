@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import type { Service } from '@/lib/types';
+import { useScrollEdges } from '@/hooks/useScrollEdges';
 import { useBooking } from './BookingContext';
 
-const ALL = 'All';
+const ALL = 'Todos';
 
 export default function ServiceStep() {
     const { draft, totals, toggleService, goNext, goBack } = useBooking();
+    const strip = useScrollEdges<HTMLDivElement>();
 
     const [services, setServices] = useState<Service[]>([]);
     const [category, setCategory] = useState<string>(ALL);
@@ -59,7 +61,7 @@ export default function ServiceStep() {
             {/* Header: Sticky at the top */}
             <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-cream-dark/30 shadow-sm">
                 <div className="flex items-center justify-between px-6 pt-6 pb-2">
-                    <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-pink transition-colors group">
+                    <button onClick={onBack} className="flex items-center gap-2 text-nf-gray text-xs font-bold uppercase tracking-widest hover:text-brand-ink transition-colors group">
                         <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-pink-pale transition-colors">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                         </div>
@@ -76,14 +78,18 @@ export default function ServiceStep() {
                 <div className="px-6 pt-4 pb-2">
                     <p className="text-[10px] tracking-[0.2em] text-nf-gray uppercase font-bold mb-1">Paso 2: Servicios</p>
                     <h1 className="font-serif text-3xl text-charcoal leading-tight">
-                        ¿Qué <span className="text-pink">deseo</span> hoy?
+                        ¿Qué <span className="text-brand-ink">deseo</span> hoy?
                     </h1>
                 </div>
 
                 {/* Categories filter */}
                 {!loading && services.length > 0 && (
                     <div className="w-full pb-3">
-                        <div className="flex gap-2 overflow-x-auto thin-scrollbar px-6 py-2 relative after:content-[''] after:pr-6">
+                        <div
+                            ref={strip.ref}
+                            style={strip.style}
+                            className="flex gap-2 overflow-x-auto no-scrollbar px-6 py-2"
+                        >
                             {categories.map((cat) => (
                                 <button
                                     key={cat}
@@ -150,9 +156,9 @@ export default function ServiceStep() {
                                         {/* Info */}
                                         <div className="flex-1 min-w-0 pr-4">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-[10px] font-bold text-pink uppercase tracking-widest">{service.category || 'General'}</span>
+                                                <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">{service.category || 'General'}</span>
                                             </div>
-                                            <h3 className="font-serif text-xl text-charcoal leading-tight mb-2 group-hover:text-pink transition-colors line-clamp-2">{service.name}</h3>
+                                            <h3 className="font-serif text-xl text-charcoal leading-tight mb-2 group-hover:text-brand-ink transition-colors line-clamp-2">{service.name}</h3>
 
                                             <div className="flex items-center gap-4">
                                                 <div className="flex items-center gap-1.5">
@@ -191,13 +197,15 @@ export default function ServiceStep() {
             </div>
 
             {/* Bottom Panel: Sticky at the bottom */}
-            <div className={`
+            <div
+                aria-hidden={totalSelected === 0}
+                className={`
                 sticky bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-xl border-t border-cream-dark/50 transition-all duration-500 transform z-40
                 ${totalSelected > 0 ? 'translate-y-0 opacity-100 shadow-up' : 'translate-y-full opacity-0 pointer-events-none'}
             `}>
                 <div className="max-w-lg mx-auto flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-pink uppercase tracking-widest mb-0.5">
+                        <p className="text-[10px] font-bold text-brand-ink uppercase tracking-widest mb-0.5">
                             {totalSelected} {totalSelected === 1 ? 'Servicio' : 'Servicios'}
                         </p>
                         <p className="font-serif text-charcoal text-xl font-bold">
@@ -206,6 +214,10 @@ export default function ServiceStep() {
                     </div>
                     <button
                         onClick={onNext}
+                        // Invisible is not the same as gone: without this the
+                        // keyboard still lands here and the screen reader still
+                        // reads it out, before a single service is chosen.
+                        tabIndex={totalSelected > 0 ? undefined : -1}
                         className="flex-1 py-5 rounded-full text-base font-serif flex items-center justify-center gap-3 shadow-lg btn-gradient hover:scale-105 active:scale-95 transition-all"
                     >
                         Siguiente

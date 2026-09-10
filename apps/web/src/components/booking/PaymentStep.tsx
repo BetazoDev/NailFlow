@@ -128,7 +128,7 @@ export default function PaymentStep() {
                         onClick={goBack}
                         disabled={busy}
                         aria-label="Volver al resumen"
-                        className="grid size-8 place-items-center rounded-full bg-surface-raised text-text-muted shadow-soft transition-colors hover:text-brand disabled:opacity-40"
+                        className="grid size-8 place-items-center rounded-full bg-surface-raised text-text-muted shadow-soft transition-colors hover:text-brand-ink disabled:opacity-40"
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
                             <path d="M15 18l-6-6 6-6" />
@@ -140,7 +140,7 @@ export default function PaymentStep() {
                         Paso 6 · Pago
                     </p>
                     <h1 className="font-display text-3xl leading-tight text-text-strong">
-                        ¿Cómo prefieres <span className="text-brand">reservar</span>?
+                        ¿Cómo prefieres <span className="text-brand-ink">reservar</span>?
                     </h1>
                 </div>
             </header>
@@ -153,7 +153,7 @@ export default function PaymentStep() {
                     <p className="font-display text-5xl text-text-strong">${totals.price.toFixed(2)}</p>
                     {deposit > 0 && (
                         <p className="mt-2 text-sm text-text-muted">
-                            Anticipo para apartar: <strong className="text-brand">${deposit.toFixed(2)}</strong>
+                            Anticipo para apartar: <strong className="text-brand-ink">${deposit.toFixed(2)}</strong>
                         </p>
                     )}
                 </div>
@@ -181,7 +181,7 @@ export default function PaymentStep() {
                                         className="sr-only"
                                     />
                                     <span
-                                        className={`material-symbol mt-0.5 text-2xl ${active ? 'text-brand' : 'text-text-subtle'}`}
+                                        className={`material-symbol mt-0.5 text-2xl ${active ? 'text-brand-ink' : 'text-text-subtle'}`}
                                         aria-hidden="true"
                                     >
                                         {option.icon}
