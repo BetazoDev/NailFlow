@@ -39,3 +39,30 @@ export function resolveImagePath(
 
     return rest ? { slug, rest } : null;
 }
+
+/**
+ * Every spelling of one image that might be sitting in the database.
+ *
+ * Used to ask "does this salon reference this file", which is what authorises
+ * serving anything out of the shared folder. Exact matching is the only cheap
+ * way to ask it, and the column holds whatever the version that wrote it chose
+ * to store: a bare path, a path with its folder, or — which is what the oldest
+ * rows actually hold — the whole CDN URL.
+ *
+ * Miss a spelling and the salon's own photos stop loading the day she is given
+ * a folder of her own, which is the one moment nobody would think to check.
+ */
+export function storedSpellings(cdnBaseUrl: string, slug: string, rest: string): string[] {
+    const withSlug = `${slug}/${rest}`;
+    const origin = cdnBaseUrl.replace(/\/+$/, '');
+    const bare = origin.replace(/^https?:\/\//, '');
+
+    return [
+        rest,
+        withSlug,
+        `/${withSlug}`,
+        `${origin}/${withSlug}`,
+        `https://${bare}/${withSlug}`,
+        `http://${bare}/${withSlug}`,
+    ];
+}

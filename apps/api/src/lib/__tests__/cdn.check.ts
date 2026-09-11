@@ -9,7 +9,7 @@
  *
  * Run with: npm run check:cdn --workspace @nailflow/api
  */
-import { resolveImagePath } from '../image-paths';
+import { resolveImagePath, storedSpellings } from '../image-paths';
 
 let fallos = 0;
 const check = (nombre: string, ok: boolean, detalle: string) => {
@@ -115,6 +115,44 @@ check(
         'sin carpeta propia sigue funcionando como antes',
         r?.slug === COMPARTIDA && r.rest === 'services/x.jpg',
         'dar de alta la tabla no rompe a quien no la usa'
+    );
+}
+
+// ── Cómo está escrita la ruta en la base de datos ────────────────────────────
+
+{
+    // Esta es la forma que tienen de verdad las filas del salón de
+    // demostración, comprobada contra la API en producción. Si no se reconoce,
+    // sus fotos dejan de cargar el día que se le da carpeta propia — que es el
+    // único momento en que a nadie se le ocurriría mirar.
+    const REAL = 'https://cdn.diabolicalservices.tech/nailssalon/manicura-clasica.jpg';
+    const formas = storedSpellings(
+        'https://cdn.diabolicalservices.tech',
+        COMPARTIDA,
+        'manicura-clasica.jpg'
+    );
+
+    check('se reconoce la URL completa que guardan las filas viejas', formas.includes(REAL), REAL);
+    check(
+        'y la ruta con carpeta',
+        formas.includes(`${COMPARTIDA}/manicura-clasica.jpg`),
+        `${COMPARTIDA}/manicura-clasica.jpg`
+    );
+    check('y la ruta desnuda', formas.includes('manicura-clasica.jpg'), 'manicura-clasica.jpg');
+    check(
+        'la barra inicial tampoco se escapa',
+        formas.includes(`/${COMPARTIDA}/manicura-clasica.jpg`),
+        `/${COMPARTIDA}/manicura-clasica.jpg`
+    );
+    check(
+        'http y https cuentan como la misma',
+        formas.some(f => f.startsWith('http://')) && formas.some(f => f.startsWith('https://')),
+        'ambas'
+    );
+    check(
+        'una barra de más en la base no duplica la barra',
+        storedSpellings('https://cdn.diabolicalservices.tech/', COMPARTIDA, 'x.jpg').includes(REAL.replace('manicura-clasica.jpg', 'x.jpg')),
+        'se normaliza el origen'
     );
 }
 

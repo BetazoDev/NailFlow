@@ -3,6 +3,8 @@ import { env } from '../config/env';
 import { open, seal, secretsEnabled } from '../lib/secretbox';
 import { createLogger, errorContext } from '../lib/logger';
 
+import { storedSpellings } from '../lib/image-paths';
+
 export { resolveImagePath } from '../lib/image-paths';
 
 const log = createLogger('cdn');
@@ -183,7 +185,10 @@ export async function mayServe(
     if (slug === account.slug) return true;
     if (slug !== env.cdn.sharedSlug) return false;
 
-    const withSlug = `${slug}/${path}`;
+    // Whatever spelling the row happens to hold. The oldest ones store the
+    // whole CDN URL, and missing that shape would break a salon's existing
+    // photos on the exact day she is given a folder of her own.
+    const candidates = storedSpellings(env.cdn.baseUrl, slug, path);
     const result = await query(
         `SELECT 1 FROM services
           WHERE tenant_id = $1 AND image_url = ANY($2::text[])
@@ -202,7 +207,7 @@ export async function mayServe(
             AND (branding->>'logo_url' = ANY($2::text[])
                  OR branding->>'logo' = ANY($2::text[]))
           LIMIT 1`,
-        [tenantId, [path, withSlug]]
+        [tenantId, candidates]
     );
 
     return result.rows.length > 0;
