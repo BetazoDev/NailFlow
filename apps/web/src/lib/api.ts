@@ -22,17 +22,24 @@ import { auth } from './firebase';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
 
-/**
- * Top-level folder this deployment's images live under on the CDN. Older rows
- * store a path without it, so it is re-attached when missing.
- */
-const CDN_SLUG = process.env.NEXT_PUBLIC_CDN_SLUG ?? 'nailssalon';
-
 /** The domain the API resolves the salon from. */
 function tenantDomain(explicit?: string): string | undefined {
     if (explicit) return explicit;
     if (typeof window !== 'undefined') return window.location.host;
     return undefined;
+}
+
+/** A salon's image storage, as Diabolical's own panel sees it. */
+export interface CdnSummary {
+    configured: boolean;
+    slug: string;
+    hasUploadToken: boolean;
+    hasReferenceToken: boolean;
+    updatedAt: string | null;
+    /** False when the API has no CREDENTIALS_KEY, so nothing can be sealed. */
+    storable: boolean;
+    /** The folder salons fall back to until they have one of their own. */
+    sharedSlug: string;
 }
 
 /** A salon as Diabolical's own panel sees it. */
@@ -374,6 +381,35 @@ export const api = {
                 method: 'DELETE',
             }),
 
+        // ── Almacenamiento de imágenes ───────────────────────────────────
+
+        /**
+         * The salon's own CDN folder and keys. The keys themselves never come
+         * back: the panel is told whether each one is set, not what it is.
+         */
+        cdn: (id: string) => request<CdnSummary>(`/platform/tenants/${id}/cdn`),
+
+        /**
+         * Saves the folder, and each key that was actually typed. Leaving a key
+         * blank keeps the stored one — the panel cannot show them back, so
+         * correcting the folder must not wipe keys nobody has a copy of.
+         */
+        saveCdn: (
+            id: string,
+            body: { slug: string; upload_token?: string; reference_token?: string }
+        ) => request<CdnSummary>(`/platform/tenants/${id}/cdn`, { method: 'PUT', body }),
+
+        /** Returns the salon to the shared folder every salon used to share. */
+        clearCdn: (id: string) =>
+            request<CdnSummary>(`/platform/tenants/${id}/cdn`, { method: 'DELETE' }),
+
+        /** Checks a key before it is stored, and says which folder it writes into. */
+        probeCdn: (token: string) =>
+            request<{ ok: true; slug: string | null } | { ok: false; detail: string }>(
+                '/platform/cdn/probe',
+                { method: 'POST', body: { token } }
+            ),
+
         /** Re-issues the access link for an owner who never received it. */
         invite: (id: string) =>
             request<{ invite: string }>(`/platform/tenants/${id}/invite`, { method: 'POST' }),
@@ -487,25 +523,46 @@ export const api = {
     // ── Images ───────────────────────────────────────────────────────────────
 
     /**
-     * Uploads through our own Next.js route, which holds the CDN key.
-     * `folder` groups the file (e.g. `services`, `team`, `references`).
+     * Uploads one image and returns the reference to store.
+     *
+     * Straight to the API, as raw bytes. It used to go through a Next.js route
+     * that held a deployment-wide CDN key; the key now belongs to the salon and
+     * is sealed in the database, so the upload has to happen where it can be
+     * opened — and where "is this person signed in" can be the stricter
+     * question the API already answers: does she own *this* salon.
+     *
+     * `folder` groups the file (e.g. `services`, `team`, `references`). Which
+     * salon's folder it lands in is not sent: the API resolves that from the
+     * domain and her own key.
      */
     uploadImage: async (file: File, folder: string): Promise<string> => {
-        const formData = new FormData();
-        formData.append('image', file);
-        formData.append('folder', folder);
+        const headers = new Headers({ 'Content-Type': file.type });
+        const host = tenantDomain();
+        if (host) headers.set('x-tenant-domain', host);
 
-        const response = await fetch('/proxy/upload', {
-            method: 'POST',
-            body: formData,
-            headers: auth.currentUser
-                ? { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }
-                : undefined,
-        });
+        if (auth.currentUser) {
+            try {
+                headers.set('Authorization', `Bearer ${await auth.currentUser.getIdToken()}`);
+            } catch {
+                // An expired session goes out unauthenticated and the API
+                // answers 401, which the caller already handles.
+            }
+        }
+
+        let response: Response;
+        try {
+            response = await fetch(
+                `${API_BASE}/api/images/${encodeURIComponent(folder)}` +
+                    `?filename=${encodeURIComponent(file.name)}`,
+                { method: 'POST', headers, body: file }
+            );
+        } catch {
+            throw new ApiError(0, 'No pudimos conectar con el servidor. Intenta de nuevo.');
+        }
 
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload?.url) {
-            throw new ApiError(response.status, payload?.error ?? 'Upload failed');
+            throw new ApiError(response.status, payload?.error ?? 'No pudimos subir la imagen.');
         }
         return payload.url as string;
     },
@@ -513,15 +570,20 @@ export const api = {
     /**
      * Turns a stored image reference into a URL the browser can load.
      *
-     * Stored values vary — some are bare CDN paths, some full CDN URLs from
-     * older uploads. Everything is normalised to the API's image proxy so the
-     * CDN key never appears in the page.
+     * Stored values vary — some are bare CDN paths, some carry the folder, some
+     * are full CDN URLs from older uploads. All of them are normalised to the
+     * API's image proxy so the CDN key never appears in the page.
+     *
+     * The folder is deliberately not filled in here. Each salon now has her
+     * own, and a value baked into the web app at build time could only ever
+     * name one of them; the API knows which salon the request arrived for and
+     * resolves it there, which is also where it can refuse to serve another
+     * salon's.
      */
     getImageUrl: (reference: string | null | undefined): string => {
         if (!reference) return '';
         if (reference.startsWith('data:') || reference.startsWith('blob:')) return reference;
 
-        // Strip any origin and any pre-existing proxy prefix, keeping "<slug>/<path>".
         const path = reference
             .replace(/^https?:\/\/[^/]+/i, '')
             .replace(/^\/?(api\/)?img\//i, '')
@@ -530,10 +592,7 @@ export const api = {
 
         if (!path) return '';
 
-        const segments = path.split('/').filter(Boolean);
-        if (segments[0] !== CDN_SLUG) segments.unshift(CDN_SLUG);
-
-        return `${API_BASE}/api/img/${segments.join('/')}`;
+        return `${API_BASE}/api/img/${path}`;
     },
 };
 

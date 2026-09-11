@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     api,
     ApiError,
+    type CdnSummary,
     type DomainCheck,
     type HostingOutcome,
     type NewSalon,
@@ -628,6 +629,10 @@ function SalonDrawer({
 
             <div className="h-px bg-white/10" />
 
+            <CdnPanel salonId={salon.id} />
+
+            <div className="h-px bg-white/10" />
+
             <div className="space-y-3">
                 <p className="text-xs uppercase tracking-[0.14em] text-white/35">Borrar</p>
                 <p className="text-xs text-white/50">
@@ -662,6 +667,247 @@ function SalonDrawer({
                 />
             )}
         </Drawer>
+    );
+}
+
+/**
+ * The salon's own CDN folder and keys.
+ *
+ * This is here and not in her panel because she has no CDN account: the keys
+ * are ours to issue and to rotate, and handing the wrong one to the wrong salon
+ * would file her clients' photos in someone else's folder. It is a thing one
+ * person does deliberately, once, per salon.
+ *
+ * A stored key is never shown back. The panel says whether one is set, which is
+ * all that is needed to decide whether to replace it, and means a leaked screen
+ * or a shoulder does not leak the key.
+ */
+function CdnPanel({ salonId }: { salonId: string }) {
+    const [state, setState] = useState<CdnSummary | null>(null);
+    const [slug, setSlug] = useState('');
+    const [uploadToken, setUploadToken] = useState('');
+    const [referenceToken, setReferenceToken] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [message, setMessage] = useState<string | null>(null);
+
+    useEffect(() => {
+        setMessage(null);
+        setUploadToken('');
+        setReferenceToken('');
+        void api.platform
+            .cdn(salonId)
+            .then(summary => {
+                setState(summary);
+                setSlug(summary.configured ? summary.slug : '');
+            })
+            .catch(() => setState(null));
+    }, [salonId]);
+
+    const save = async () => {
+        setBusy(true);
+        setMessage(null);
+        try {
+            const summary = await api.platform.saveCdn(salonId, {
+                slug: slug.trim(),
+                // Only what was actually typed: an empty box means "keep the
+                // stored key", not "delete it".
+                ...(uploadToken.trim() ? { upload_token: uploadToken.trim() } : {}),
+                ...(referenceToken.trim() ? { reference_token: referenceToken.trim() } : {}),
+            });
+            setState(summary);
+            setUploadToken('');
+            setReferenceToken('');
+            setMessage('Guardado. Sus próximas fotos van a su carpeta.');
+        } catch (caught) {
+            setMessage(caught instanceof ApiError ? caught.message : 'No pudimos guardarlo.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const reset = async () => {
+        setBusy(true);
+        setMessage(null);
+        try {
+            const summary = await api.platform.clearCdn(salonId);
+            setState(summary);
+            setSlug('');
+            setMessage('Vuelve a la carpeta compartida.');
+        } catch {
+            setMessage('No pudimos quitarlo.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    /**
+     * Checks a key before it is stored, and says which folder it writes into.
+     *
+     * The folder is the answer that matters. A key that authenticates but
+     * belongs to another project files her photos where nothing will look for
+     * them, and nobody finds out until she asks where her pictures went.
+     */
+    const probe = async (token: string) => {
+        setBusy(true);
+        setMessage(null);
+        try {
+            const result = await api.platform.probeCdn(token.trim());
+            if (!result.ok) {
+                setMessage(result.detail);
+            } else if (result.slug) {
+                setMessage(`La clave funciona y escribe en "${result.slug}".`);
+                if (!slug.trim()) setSlug(result.slug);
+            } else {
+                setMessage('La clave funciona. Su carpeta está vacía, así que no sé cuál es.');
+            }
+        } catch {
+            setMessage('No pudimos comprobarla.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    if (!state) {
+        return (
+            <p className="text-xs uppercase tracking-[0.14em] text-white/35">
+                Almacenamiento de imágenes
+            </p>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-white/35">
+                    Almacenamiento de imágenes
+                </p>
+                {state.configured ? (
+                    <p className="mt-2 text-xs text-white/50">
+                        Sus fotos van a{' '}
+                        <code className="font-mono text-emerald-200">{state.slug}</code>. Nadie más
+                        las ve.
+                    </p>
+                ) : (
+                    <p className="mt-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+                        Está en la carpeta compartida{' '}
+                        <code className="font-mono">{state.sharedSlug}</code>, junto a los demás
+                        salones que tampoco tienen la suya. Dale una carpeta y su propia clave para
+                        separarla.
+                    </p>
+                )}
+            </div>
+
+            {!state.storable && (
+                <p className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-100">
+                    Falta <code className="font-mono">CREDENTIALS_KEY</code> en la API: sin ella no
+                    hay con qué cifrar las claves y no se puede guardar ninguna.
+                </p>
+            )}
+
+            <Field
+                label="Carpeta en el CDN"
+                hint="El proyecto que creaste para ella. La clave decide dónde se escribe; esto es para poder leerlo."
+            >
+                <input
+                    value={slug}
+                    onChange={event => setSlug(event.target.value)}
+                    placeholder="salon-de-ana"
+                    aria-label="Carpeta de este salón en el CDN"
+                    className={inputClass}
+                />
+            </Field>
+
+            <CdnKey
+                label="Clave de las fotos del salón"
+                hint={
+                    state.hasUploadToken
+                        ? 'Ya hay una guardada. Escribe otra solo si la vas a cambiar.'
+                        : 'Servicios, equipo y su logo.'
+                }
+                stored={state.hasUploadToken}
+                value={uploadToken}
+                onChange={setUploadToken}
+                onProbe={probe}
+                busy={busy}
+            />
+
+            <CdnKey
+                label="Clave de las fotos de las clientas"
+                hint={
+                    state.hasReferenceToken
+                        ? 'Ya hay una guardada. Escribe otra solo si la vas a cambiar.'
+                        : 'Las referencias que suben al reservar. Puede ser la misma que la de arriba.'
+                }
+                stored={state.hasReferenceToken}
+                value={referenceToken}
+                onChange={setReferenceToken}
+                onProbe={probe}
+                busy={busy}
+            />
+
+            {message && <p className="text-sm text-white/60">{message}</p>}
+
+            <div className="flex flex-wrap gap-3">
+                <button
+                    onClick={save}
+                    disabled={busy || !state.storable || !slug.trim()}
+                    className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-[#14100E] disabled:opacity-40"
+                >
+                    Guardar almacenamiento
+                </button>
+                {state.configured && (
+                    <button
+                        onClick={reset}
+                        disabled={busy}
+                        className="rounded-xl border border-white/20 px-5 py-2.5 text-sm text-white disabled:opacity-40"
+                    >
+                        Volver a la compartida
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function CdnKey({
+    label,
+    hint,
+    stored,
+    value,
+    onChange,
+    onProbe,
+    busy,
+}: {
+    label: string;
+    hint: string;
+    stored: boolean;
+    value: string;
+    onChange: (next: string) => void;
+    onProbe: (token: string) => void;
+    busy: boolean;
+}) {
+    return (
+        <Field label={label} hint={hint}>
+            <div className="flex flex-col gap-3 sm:flex-row">
+                <input
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={value}
+                    onChange={event => onChange(event.target.value)}
+                    placeholder={stored ? '•••••••• guardada' : 'dmm_…'}
+                    aria-label={label}
+                    className={`${inputClass} font-mono`}
+                />
+                <button
+                    onClick={() => onProbe(value)}
+                    disabled={busy || value.trim().length < 8}
+                    className="shrink-0 rounded-xl border border-white/20 px-5 py-2.5 text-sm text-white disabled:opacity-30"
+                >
+                    Probar
+                </button>
+            </div>
+        </Field>
     );
 }
 

@@ -162,6 +162,37 @@ const TABLES = `
         connected_at       TIMESTAMPTZ,
         updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    /*
+     * Where a salon's images live, and the keys that write them.
+     *
+     * Without this every salon shared one CDN project and one pair of keys, so
+     * a client's reference photo landed in the same folder as every other
+     * salon's, and any salon's page could serve it. The folder is not chosen by
+     * the browser: the CDN derives it from the key, so a key per salon is what
+     * actually keeps them apart.
+     *
+     * The slug is stored as well as the keys because the read proxy has to know
+     * which folder belongs to this salon before it will serve anything from it,
+     * and that question is asked on requests that upload nothing.
+     *
+     * Tokens are sealed with the same AES-256-GCM box as the payment
+     * credentials; see lib/secretbox.ts.
+     */
+    CREATE TABLE IF NOT EXISTS cdn_accounts (
+        tenant_id        TEXT PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+
+        -- Top-level folder on the CDN. Unique: two salons sharing a namespace
+        -- is the exact bug this table exists to prevent.
+        slug             TEXT NOT NULL UNIQUE,
+
+        -- Writes what the salon manages: services, team, branding.
+        upload_token     TEXT,
+        -- Writes client reference photos, which arrive without anyone signed in.
+        reference_token  TEXT,
+
+        updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
 `;
 
 /**

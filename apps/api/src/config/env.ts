@@ -226,6 +226,16 @@ export const env = {
         systemToken: optional('CDN_UPLOAD_TOKEN'),
         /** Token for client-supplied folders (booking reference photos). */
         referenceToken: optional('CDN_API_KEY_REFERENCES'),
+        /**
+         * The folder these shared tokens write into.
+         *
+         * Every salon used to live in here together. It stays as the fallback
+         * for salons that have no CDN account of their own yet, and as the
+         * place their existing images are still served from — but an image
+         * under this folder is only handed to a salon that can be shown to
+         * reference it. See services/cdn.ts.
+         */
+        sharedSlug: process.env.CDN_SLUG ?? 'nailssalon',
     },
 
     n8n: {

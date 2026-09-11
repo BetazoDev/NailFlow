@@ -16,6 +16,13 @@ import {
     registerDomain,
     unregisterDomain,
 } from '../services/hosting';
+import {
+    SLUG_PATTERN,
+    cdnSummary,
+    clearCdnAccount,
+    probeToken,
+    saveCdnAccount,
+} from '../services/cdn';
 import { createLogger, errorContext } from '../lib/logger';
 
 const log = createLogger('platform');
@@ -548,6 +555,7 @@ platformRouter.delete(
                 'staff',
                 'push_devices',
                 'payment_accounts',
+                'cdn_accounts',
             ]) {
                 await tx.query(`DELETE FROM ${table} WHERE tenant_id = $1`, [req.params.id]);
             }
@@ -621,6 +629,119 @@ platformRouter.delete(
         await query('DELETE FROM platform_admins WHERE LOWER(email) = $1', [email]);
         await audit(req.user!.email!, 'admin.removed', null, { email });
         res.sendStatus(204);
+    })
+);
+
+// ── Almacenamiento de imágenes ───────────────────────────────────────────────
+
+/**
+ * Each salon's own CDN project and keys.
+ *
+ * This lives in Diabolical's panel and not in the salon's: she does not have a
+ * CDN account, and the keys are ours to issue and to rotate. It is also the
+ * only place where handing the wrong key to the wrong salon would put her
+ * clients' photos in someone else's folder, so it stays where one person is
+ * doing it deliberately.
+ *
+ * The keys are never read back out. A salon's stored key is write-only from
+ * here on: the panel is told whether one exists, never what it is.
+ */
+
+platformRouter.get(
+    '/tenants/:id/cdn',
+    requirePlatform,
+    asyncHandler(async (req, res) => {
+        res.json(await cdnSummary(req.params.id));
+    })
+);
+
+const cdnSchema = z.object({
+    slug: z
+        .string()
+        .trim()
+        .regex(SLUG_PATTERN, 'La carpeta solo admite letras, números, guion y guion bajo'),
+    // Absent means "leave the stored key alone". The panel never shows them
+    // back, so submitting the form to fix a typo in the folder must not wipe
+    // keys the operator no longer has a copy of.
+    upload_token: z.string().trim().min(8).max(500).optional(),
+    reference_token: z.string().trim().min(8).max(500).optional(),
+});
+
+platformRouter.put(
+    '/tenants/:id/cdn',
+    requirePlatform,
+    validateBody(cdnSchema),
+    asyncHandler(async (req, res) => {
+        const body = req.body as z.infer<typeof cdnSchema>;
+
+        const exists = await query('SELECT 1 FROM tenants WHERE id = $1', [req.params.id]);
+        if (exists.rows.length === 0) throw ApiError.notFound('Ese salón no existe');
+
+        // A folder already claimed by another salon is the one mistake this
+        // whole feature exists to prevent, so it is caught by name rather than
+        // surfacing as a unique-constraint error nobody can read.
+        const taken = await query<{ tenant_id: string }>(
+            'SELECT tenant_id FROM cdn_accounts WHERE slug = $1 AND tenant_id <> $2',
+            [body.slug, req.params.id]
+        );
+        if (taken.rows.length > 0) {
+            throw ApiError.badRequest('Esa carpeta ya es de otro salón. Cada una necesita la suya.');
+        }
+
+        try {
+            await saveCdnAccount(req.params.id, {
+                slug: body.slug,
+                uploadToken: body.upload_token,
+                referenceToken: body.reference_token,
+            });
+        } catch (error) {
+            log.error('Could not store CDN keys', {
+                tenantId: req.params.id,
+                ...errorContext(error),
+            });
+            throw new ApiError(
+                503,
+                error instanceof Error ? error.message : 'No pudimos guardar las claves.'
+            );
+        }
+
+        await audit(req.user!.email!, 'tenant.cdn.updated', req.params.id, {
+            slug: body.slug,
+            // Which keys were replaced, never the keys.
+            replaced: [
+                body.upload_token ? 'upload' : null,
+                body.reference_token ? 'reference' : null,
+            ].filter(Boolean),
+        });
+
+        res.json(await cdnSummary(req.params.id));
+    })
+);
+
+platformRouter.delete(
+    '/tenants/:id/cdn',
+    requirePlatform,
+    asyncHandler(async (req, res) => {
+        await clearCdnAccount(req.params.id);
+        await audit(req.user!.email!, 'tenant.cdn.cleared', req.params.id);
+        res.json(await cdnSummary(req.params.id));
+    })
+);
+
+/**
+ * Checks a key before it is stored, and says which folder it writes into.
+ *
+ * The folder is the answer that matters. A key that authenticates but belongs
+ * to a different project would file the salon's photos somewhere nothing looks
+ * for them, and that failure is silent until she wonders where her pictures
+ * went.
+ */
+platformRouter.post(
+    '/cdn/probe',
+    requirePlatform,
+    validateBody(z.object({ token: z.string().trim().min(8).max(500) })),
+    asyncHandler(async (req, res) => {
+        res.json(await probeToken((req.body as { token: string }).token));
     })
 );
 

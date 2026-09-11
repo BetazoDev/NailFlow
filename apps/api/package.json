@@ -9,7 +9,8 @@
         "start": "node dist/index.js",
         "typecheck": "tsc -p tsconfig.json --noEmit",
         "smoke": "node scripts/smoke.mjs",
-        "check:origins": "tsx src/lib/__tests__/origins.check.ts"
+        "check:origins": "tsx src/lib/__tests__/origins.check.ts",
+        "check:cdn": "tsx src/lib/__tests__/cdn.check.ts"
     },
     "dependencies": {
         "@nailflow/shared": "*",
