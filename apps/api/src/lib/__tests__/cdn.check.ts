@@ -26,7 +26,7 @@ const COMPARTIDA = 'nailssalon';
     // Sin carpeta = escrita antes de que existieran las carpetas propias, y el
     // fichero sigue estando en la compartida. Mandarla a la suya daría 404 en
     // todas las fotos que ya tenía.
-    const r = resolveImagePath(MIA, COMPARTIDA, 'services/manicura.jpg');
+    const r = resolveImagePath([MIA], COMPARTIDA, 'services/manicura.jpg');
     check(
         'una ruta antigua sin carpeta sigue apuntando a la compartida',
         r?.slug === COMPARTIDA && r.rest === 'services/manicura.jpg',
@@ -35,7 +35,7 @@ const COMPARTIDA = 'nailssalon';
 }
 
 {
-    const r = resolveImagePath(MIA, COMPARTIDA, `${MIA}/services/manicura.jpg`);
+    const r = resolveImagePath([MIA], COMPARTIDA, `${MIA}/services/manicura.jpg`);
     check(
         'una ruta con su propia carpeta se respeta',
         r?.slug === MIA && r.rest === 'services/manicura.jpg',
@@ -44,7 +44,7 @@ const COMPARTIDA = 'nailssalon';
 }
 
 {
-    const r = resolveImagePath(MIA, COMPARTIDA, `${COMPARTIDA}/services/vieja.jpg`);
+    const r = resolveImagePath([MIA], COMPARTIDA, `${COMPARTIDA}/services/vieja.jpg`);
     check(
         'una imagen antigua sigue apuntando a la carpeta compartida',
         r?.slug === COMPARTIDA && r.rest === 'services/vieja.jpg',
@@ -55,7 +55,7 @@ const COMPARTIDA = 'nailssalon';
 // ── Lo que NO debe alcanzar la carpeta de otra ───────────────────────────────
 
 {
-    const r = resolveImagePath(MIA, COMPARTIDA, 'salon-de-bea/references/foto.jpg');
+    const r = resolveImagePath([MIA], COMPARTIDA, 'salon-de-bea/references/foto.jpg');
     check(
         'la carpeta de otro salón no se toma como carpeta',
         r?.slug === COMPARTIDA,
@@ -70,7 +70,7 @@ const COMPARTIDA = 'nailssalon';
 
 {
     // El caso desde el otro lado: Bea pidiendo la carpeta de Ana.
-    const r = resolveImagePath('salon-de-bea', COMPARTIDA, `${MIA}/references/foto.jpg`);
+    const r = resolveImagePath(['salon-de-bea'], COMPARTIDA, `${MIA}/references/foto.jpg`);
     check(
         'simétrico: Bea tampoco alcanza la de Ana',
         r?.slug === COMPARTIDA && r.rest === `${MIA}/references/foto.jpg`,
@@ -79,7 +79,7 @@ const COMPARTIDA = 'nailssalon';
 }
 
 {
-    const r = resolveImagePath(MIA, COMPARTIDA, `${COMPARTIDA}/${MIA}/x.jpg`);
+    const r = resolveImagePath([MIA], COMPARTIDA, `${COMPARTIDA}/${MIA}/x.jpg`);
     check(
         'la carpeta compartida no sirve de puente a otra',
         r?.slug === COMPARTIDA && r.rest === `${MIA}/x.jpg`,
@@ -89,20 +89,20 @@ const COMPARTIDA = 'nailssalon';
 
 // ── Rutas que no son rutas ───────────────────────────────────────────────────
 
-check('vacío se rechaza', resolveImagePath(MIA, COMPARTIDA, '') === null, 'null');
+check('vacío se rechaza', resolveImagePath([MIA], COMPARTIDA, '') === null, 'null');
 check(
     'solo la carpeta, sin fichero, se rechaza',
-    resolveImagePath(MIA, COMPARTIDA, MIA) === null,
+    resolveImagePath([MIA], COMPARTIDA, MIA) === null,
     'null'
 );
 check(
     'solo la compartida, sin fichero, se rechaza',
-    resolveImagePath(MIA, COMPARTIDA, COMPARTIDA) === null,
+    resolveImagePath([MIA], COMPARTIDA, COMPARTIDA) === null,
     'null'
 );
 check(
     'las barras de más no cambian nada',
-    resolveImagePath(MIA, COMPARTIDA, '//services//x.jpg')?.rest === 'services/x.jpg',
+    resolveImagePath([MIA], COMPARTIDA, '//services//x.jpg')?.rest === 'services/x.jpg',
     'se normaliza'
 );
 
@@ -110,11 +110,44 @@ check(
 
 {
     // Antes de que se le asigne una, su `slug` ES la compartida.
-    const r = resolveImagePath(COMPARTIDA, COMPARTIDA, 'services/x.jpg');
+    const r = resolveImagePath([COMPARTIDA], COMPARTIDA, 'services/x.jpg');
     check(
         'sin carpeta propia sigue funcionando como antes',
         r?.slug === COMPARTIDA && r.rest === 'services/x.jpg',
         'dar de alta la tabla no rompe a quien no la usa'
+    );
+}
+
+// ── Las dos carpetas propias ─────────────────────────────────────────────────
+
+const REFS = 'salon-de-ana-referencias';
+
+{
+    const r = resolveImagePath([MIA, REFS], COMPARTIDA, `${REFS}/foto-clienta.jpg`);
+    check(
+        'la carpeta de referencias de la propia dueña también es suya',
+        r?.slug === REFS && r.rest === 'foto-clienta.jpg',
+        `${r?.slug}/${r?.rest}`
+    );
+}
+
+{
+    // Las referencias de OTRO salón, pedidas desde el de Ana.
+    const r = resolveImagePath([MIA, REFS], COMPARTIDA, 'salon-de-bea-referencias/foto.jpg');
+    check(
+        'las referencias de otra no se alcanzan ni con las dos carpetas puestas',
+        r?.slug === COMPARTIDA && r.rest === 'salon-de-bea-referencias/foto.jpg',
+        'cae en la compartida, donde hay que demostrar pertenencia'
+    );
+}
+
+{
+    // Un salón a medio aprovisionar: tiene la suya, aún no la de referencias.
+    const r = resolveImagePath([MIA, null], COMPARTIDA, `${MIA}/x.jpg`);
+    check(
+        'un salón sin carpeta de referencias todavía sigue funcionando',
+        r?.slug === MIA && r.rest === 'x.jpg',
+        'null en la lista no rompe nada'
     );
 }
 

@@ -65,7 +65,11 @@ imagesRouter.get(
 
         const account = await cdnFor(tenantId);
 
-        const resolved = resolveImagePath(account.slug, env.cdn.sharedSlug, path);
+        const resolved = resolveImagePath(
+            [account.slug, account.referenceSlug],
+            env.cdn.sharedSlug,
+            path
+        );
         if (!resolved) throw ApiError.badRequest('Invalid image path');
         const { slug, rest } = resolved;
 
@@ -76,9 +80,25 @@ imagesRouter.get(
             throw ApiError.notFound('Image not found');
         }
 
-        const token = SYSTEM_FOLDERS.has(rest.split('/')[0])
-            ? (account.uploadToken ?? account.referenceToken)
-            : (account.referenceToken ?? account.uploadToken);
+        /*
+         * Which key reads this file is decided by which folder it is in, not by
+         * what the path looks like.
+         *
+         * The CDN stores everything flat — "<project>/<file>" — so the segment
+         * after the folder is a filename, never a folder name. Reading it as one
+         * picked the wrong key for every image whose file happened to start with
+         * a word like "services".
+         *
+         * In the shared folder there is nothing to go on, so both are tried:
+         * that is the folder from before salons had their own, and its two keys
+         * were never separated by anything.
+         */
+        const token =
+            slug === account.referenceSlug
+                ? account.referenceToken
+                : slug === account.slug
+                  ? account.uploadToken
+                  : (account.uploadToken ?? account.referenceToken);
 
         if (!token) {
             log.error('No CDN token available for this salon', { tenantId, slug });

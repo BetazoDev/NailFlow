@@ -18,7 +18,9 @@
  * and that is where the file still physically is. Sending it to the salon's new
  * folder instead would 404 every photo she had before today.
  *
- * The rule that matters is the *third* shape: a path naming some other salon's
+ * A salon has two folders of her own, her pictures and her clients', and
+ * either is hers. The rule that matters is the *third* shape: a path naming
+ * some other salon's
  * folder. It is not treated as a folder at all, so it can only ever resolve
  * into the shared one, where being there proves nothing and the caller still
  * has to be shown to own the file. That is what stops
@@ -26,15 +28,18 @@
  * arrived on somebody else's domain.
  */
 export function resolveImagePath(
-    ownSlug: string,
+    ownSlugs: (string | null)[],
     sharedSlug: string,
     path: string
 ): { slug: string; rest: string } | null {
     const segments = path.split('/').filter(Boolean);
     if (segments.length === 0) return null;
 
-    const named = segments[0] === ownSlug || segments[0] === sharedSlug;
-    const slug = named ? segments[0] : sharedSlug;
+    const head = segments[0];
+    const mine = ownSlugs.indexOf(head) !== -1;
+    const named = mine || head === sharedSlug;
+
+    const slug = named ? head : sharedSlug;
     const rest = named ? segments.slice(1).join('/') : segments.join('/');
 
     return rest ? { slug, rest } : null;

@@ -33,6 +33,8 @@ function tenantDomain(explicit?: string): string | undefined {
 export interface CdnSummary {
     configured: boolean;
     slug: string;
+    /** Her clients' photos: a second CDN project, null until she has one. */
+    referenceSlug: string | null;
     hasUploadToken: boolean;
     hasReferenceToken: boolean;
     updatedAt: string | null;
@@ -411,7 +413,12 @@ export const api = {
          */
         saveCdn: (
             id: string,
-            body: { slug: string; upload_token?: string; reference_token?: string }
+            body: {
+                slug: string;
+                reference_slug?: string;
+                upload_token?: string;
+                reference_token?: string;
+            }
         ) => request<CdnSummary>(`/platform/tenants/${id}/cdn`, { method: 'PUT', body }),
 
         /** Returns the salon to the shared folder every salon used to share. */

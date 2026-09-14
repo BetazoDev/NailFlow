@@ -729,6 +729,7 @@ function SalonDrawer({
 function CdnPanel({ salonId }: { salonId: string }) {
     const [state, setState] = useState<CdnSummary | null>(null);
     const [slug, setSlug] = useState('');
+    const [referenceSlug, setReferenceSlug] = useState('');
     const [uploadToken, setUploadToken] = useState('');
     const [referenceToken, setReferenceToken] = useState('');
     const [busy, setBusy] = useState(false);
@@ -743,6 +744,7 @@ function CdnPanel({ salonId }: { salonId: string }) {
             .then(summary => {
                 setState(summary);
                 setSlug(summary.configured ? summary.slug : '');
+                setReferenceSlug(summary.referenceSlug ?? '');
             })
             .catch(() => setState(null));
     }, [salonId]);
@@ -753,6 +755,7 @@ function CdnPanel({ salonId }: { salonId: string }) {
         try {
             const summary = await api.platform.saveCdn(salonId, {
                 slug: slug.trim(),
+                ...(referenceSlug.trim() ? { reference_slug: referenceSlug.trim() } : {}),
                 // Only what was actually typed: an empty box means "keep the
                 // stored key", not "delete it".
                 ...(uploadToken.trim() ? { upload_token: uploadToken.trim() } : {}),
@@ -776,6 +779,7 @@ function CdnPanel({ salonId }: { salonId: string }) {
             const summary = await api.platform.clearCdn(salonId);
             setState(summary);
             setSlug('');
+            setReferenceSlug('');
             setMessage('Vuelve a la carpeta compartida.');
         } catch {
             setMessage('No pudimos quitarlo.');
@@ -828,8 +832,18 @@ function CdnPanel({ salonId }: { salonId: string }) {
                 {state.configured ? (
                     <p className="mt-2 text-xs text-white/50">
                         Sus fotos van a{' '}
-                        <code className="font-mono text-emerald-200">{state.slug}</code>. Nadie más
-                        las ve.
+                        <code className="font-mono text-emerald-200">{state.slug}</code>
+                        {state.referenceSlug ? (
+                            <>
+                                {' '}y las de sus clientas a{' '}
+                                <code className="font-mono text-emerald-200">
+                                    {state.referenceSlug}
+                                </code>
+                            </>
+                        ) : (
+                            <> — todavía sin carpeta aparte para las fotos de sus clientas</>
+                        )}
+                        . Nadie más las ve.
                     </p>
                 ) : (
                     <p className="mt-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
@@ -849,14 +863,27 @@ function CdnPanel({ salonId }: { salonId: string }) {
             )}
 
             <Field
-                label="Carpeta en el CDN"
-                hint="El proyecto que creaste para ella. La clave decide dónde se escribe; esto es para poder leerlo."
+                label="Carpeta de sus fotos"
+                hint="El proyecto del CDN con sus servicios, su equipo y su logo."
             >
                 <input
                     value={slug}
                     onChange={event => setSlug(event.target.value)}
                     placeholder="salon-de-ana"
-                    aria-label="Carpeta de este salón en el CDN"
+                    aria-label="Carpeta de las fotos del salón"
+                    className={inputClass}
+                />
+            </Field>
+
+            <Field
+                label="Carpeta de las fotos de sus clientas"
+                hint="Un proyecto aparte, no una subcarpeta: el CDN guarda todo plano, así que el proyecto es la única separación que hay. Y la clave que escribe aquí la usa gente sin sesión."
+            >
+                <input
+                    value={referenceSlug}
+                    onChange={event => setReferenceSlug(event.target.value)}
+                    placeholder="salon-de-ana-referencias"
+                    aria-label="Carpeta de las fotos de las clientas"
                     className={inputClass}
                 />
             </Field>

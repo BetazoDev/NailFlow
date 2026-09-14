@@ -752,6 +752,13 @@ const cdnSchema = z.object({
         .string()
         .trim()
         .regex(SLUG_PATTERN, 'La carpeta solo admite letras, números, guion y guion bajo'),
+    // Her clients' photos live in a second CDN project, not a subfolder: the
+    // CDN stores everything flat, so a project is the only separation there is.
+    reference_slug: z
+        .string()
+        .trim()
+        .regex(SLUG_PATTERN, 'La carpeta solo admite letras, números, guion y guion bajo')
+        .optional(),
     // Absent means "leave the stored key alone". The panel never shows them
     // back, so submitting the form to fix a typo in the folder must not wipe
     // keys the operator no longer has a copy of.
@@ -772,9 +779,18 @@ platformRouter.put(
         // A folder already claimed by another salon is the one mistake this
         // whole feature exists to prevent, so it is caught by name rather than
         // surfacing as a unique-constraint error nobody can read.
+        const claimed = [body.slug, body.reference_slug].filter(Boolean) as string[];
+        if (claimed.length === 2 && claimed[0] === claimed[1]) {
+            throw ApiError.badRequest(
+                'Las dos carpetas no pueden ser la misma: la de las clientas se sube sin sesión.'
+            );
+        }
+
         const taken = await query<{ tenant_id: string }>(
-            'SELECT tenant_id FROM cdn_accounts WHERE slug = $1 AND tenant_id <> $2',
-            [body.slug, req.params.id]
+            `SELECT tenant_id FROM cdn_accounts
+              WHERE (slug = ANY($1::text[]) OR reference_slug = ANY($1::text[]))
+                AND tenant_id <> $2`,
+            [claimed, req.params.id]
         );
         if (taken.rows.length > 0) {
             throw ApiError.badRequest('Esa carpeta ya es de otro salón. Cada una necesita la suya.');
@@ -783,6 +799,7 @@ platformRouter.put(
         try {
             await saveCdnAccount(req.params.id, {
                 slug: body.slug,
+                referenceSlug: body.reference_slug,
                 uploadToken: body.upload_token,
                 referenceToken: body.reference_token,
             });
@@ -799,6 +816,7 @@ platformRouter.put(
 
         await audit(req.user!.email!, 'tenant.cdn.updated', req.params.id, {
             slug: body.slug,
+            reference_slug: body.reference_slug ?? null,
             // Which keys were replaced, never the keys.
             replaced: [
                 body.upload_token ? 'upload' : null,
@@ -872,13 +890,18 @@ function requireProvisionToken(req: Request, res: Response, next: NextFunction):
 
 const provisionedSchema = z.object({
     tenant_id: z.string().trim().min(1).max(64),
+    /** Her own pictures: services, team, branding. */
     slug: z
         .string()
         .trim()
         .regex(SLUG_PATTERN, 'La carpeta solo admite letras, números, guion y guion bajo'),
-    /** Writes what the salon manages: services, team, her logo. */
     upload_token: z.string().trim().min(8).max(500).optional(),
-    /** Writes the reference photos her clients upload while booking. */
+    /** A second CDN project, for the photos her clients upload while booking. */
+    reference_slug: z
+        .string()
+        .trim()
+        .regex(SLUG_PATTERN, 'La carpeta solo admite letras, números, guion y guion bajo')
+        .optional(),
     reference_token: z.string().trim().min(8).max(500).optional(),
 });
 
@@ -893,9 +916,16 @@ platformRouter.post(
         const exists = await query('SELECT 1 FROM tenants WHERE id = $1', [body.tenant_id]);
         if (exists.rows.length === 0) throw ApiError.notFound('Ese salón no existe');
 
+        const claimed = [body.slug, body.reference_slug].filter(Boolean) as string[];
+        if (claimed.length === 2 && claimed[0] === claimed[1]) {
+            throw ApiError.badRequest('Las dos carpetas no pueden ser la misma.');
+        }
+
         const taken = await query(
-            'SELECT 1 FROM cdn_accounts WHERE slug = $1 AND tenant_id <> $2',
-            [body.slug, body.tenant_id]
+            `SELECT 1 FROM cdn_accounts
+              WHERE (slug = ANY($1::text[]) OR reference_slug = ANY($1::text[]))
+                AND tenant_id <> $2`,
+            [claimed, body.tenant_id]
         );
         if (taken.rows.length > 0) {
             throw ApiError.badRequest('Esa carpeta ya es de otro salón. Cada una necesita la suya.');
@@ -904,6 +934,7 @@ platformRouter.post(
         try {
             await saveCdnAccount(body.tenant_id, {
                 slug: body.slug,
+                referenceSlug: body.reference_slug,
                 uploadToken: body.upload_token,
                 referenceToken: body.reference_token,
             });
@@ -923,6 +954,7 @@ platformRouter.post(
         // photos start going somewhere unexpected.
         await audit('automation', 'tenant.cdn.provisioned', body.tenant_id, {
             slug: body.slug,
+            reference_slug: body.reference_slug ?? null,
             stored: [
                 body.upload_token ? 'upload' : null,
                 body.reference_token ? 'reference' : null,

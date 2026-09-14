@@ -182,13 +182,22 @@ const TABLES = `
     CREATE TABLE IF NOT EXISTS cdn_accounts (
         tenant_id        TEXT PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
 
-        -- Top-level folder on the CDN. Unique: two salons sharing a namespace
-        -- is the exact bug this table exists to prevent.
+        -- Her own folder, and the key that writes it: services, team, branding.
+        -- Unique, because two salons sharing a folder is the exact bug this
+        -- table exists to prevent.
         slug             TEXT NOT NULL UNIQUE,
-
-        -- Writes what the salon manages: services, team, branding.
         upload_token     TEXT,
-        -- Writes client reference photos, which arrive without anyone signed in.
+
+        -- And a second folder for the photos her clients upload while booking.
+        --
+        -- A separate folder rather than a subfolder because the CDN has no
+        -- subfolders: every stored path is "<project>/<file>", flat, and the
+        -- "folder" sent with an upload is metadata that never reaches the URL.
+        -- A project is the only unit of separation there is — and these two
+        -- have to be separated, because the key that writes reference photos is
+        -- used by people who are not signed in and must not be able to
+        -- overwrite the salon's own pictures.
+        reference_slug   TEXT UNIQUE,
         reference_token  TEXT,
 
         updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -225,6 +234,8 @@ const INDEXES = [
  * Safe to re-run; each is a no-op once applied.
  */
 const COLUMN_BACKFILLS = [
+    // Salons that got a folder before client photos had one of their own.
+    `ALTER TABLE cdn_accounts ADD COLUMN IF NOT EXISTS reference_slug TEXT`,
     `ALTER TABLE services ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE`,
     `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2)`,
     `ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_method TEXT`,

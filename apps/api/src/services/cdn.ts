@@ -33,8 +33,11 @@ export const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 export const FOLDER_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 export interface CdnAccount {
+    /** Her own pictures: services, team, branding. */
     slug: string;
     uploadToken: string | null;
+    /** The photos her clients upload while booking. A separate CDN project. */
+    referenceSlug: string | null;
     referenceToken: string | null;
     /** False when this is the shared fallback rather than the salon's own. */
     own: boolean;
@@ -43,6 +46,7 @@ export interface CdnAccount {
 interface Row {
     slug: string;
     upload_token: string | null;
+    reference_slug: string | null;
     reference_token: string | null;
     updated_at: Date;
 }
@@ -52,6 +56,9 @@ function shared(): CdnAccount {
     return {
         slug: env.cdn.sharedSlug,
         uploadToken: env.cdn.systemToken ?? null,
+        // The shared account never had two folders: everything, from every
+        // salon, went into the one.
+        referenceSlug: null,
         referenceToken: env.cdn.referenceToken ?? null,
         own: false,
     };
@@ -66,7 +73,7 @@ function shared(): CdnAccount {
  */
 export async function cdnFor(tenantId: string): Promise<CdnAccount> {
     const result = await query<Row>(
-        `SELECT slug, upload_token, reference_token, updated_at
+        `SELECT slug, upload_token, reference_slug, reference_token, updated_at
            FROM cdn_accounts WHERE tenant_id = $1`,
         [tenantId]
     );
@@ -78,6 +85,7 @@ export async function cdnFor(tenantId: string): Promise<CdnAccount> {
         return {
             slug: row.slug,
             uploadToken: row.upload_token ? open(row.upload_token) : null,
+            referenceSlug: row.reference_slug,
             referenceToken: row.reference_token ? open(row.reference_token) : null,
             own: true,
         };
@@ -95,6 +103,8 @@ export async function cdnFor(tenantId: string): Promise<CdnAccount> {
 export interface CdnSummary {
     configured: boolean;
     slug: string;
+    /** Her clients' photos live here. Null until she has been given one. */
+    referenceSlug: string | null;
     /** Whether each key is present — never what it is. */
     hasUploadToken: boolean;
     hasReferenceToken: boolean;
@@ -107,7 +117,7 @@ export interface CdnSummary {
 
 export async function cdnSummary(tenantId: string): Promise<CdnSummary> {
     const result = await query<Row>(
-        `SELECT slug, upload_token, reference_token, updated_at
+        `SELECT slug, upload_token, reference_slug, reference_token, updated_at
            FROM cdn_accounts WHERE tenant_id = $1`,
         [tenantId]
     );
@@ -116,6 +126,7 @@ export async function cdnSummary(tenantId: string): Promise<CdnSummary> {
     return {
         configured: Boolean(row),
         slug: row?.slug ?? env.cdn.sharedSlug,
+        referenceSlug: row?.reference_slug ?? null,
         hasUploadToken: Boolean(row?.upload_token),
         hasReferenceToken: Boolean(row?.reference_token),
         updatedAt: row?.updated_at.toISOString() ?? null,
@@ -126,6 +137,7 @@ export async function cdnSummary(tenantId: string): Promise<CdnSummary> {
 
 export interface CdnInput {
     slug: string;
+    referenceSlug?: string | null;
     /** Omitted means "leave the stored one alone"; a value replaces it. */
     uploadToken?: string;
     referenceToken?: string;
@@ -140,20 +152,25 @@ export async function saveCdnAccount(tenantId: string, input: CdnInput): Promise
     // panel never shows them back, so without this, correcting a typo in the
     // folder name would silently wipe both — and they are not recoverable.
     await query(
-        `INSERT INTO cdn_accounts (tenant_id, slug, upload_token, reference_token, updated_at)
-         VALUES ($1, $2, $3, $4, NOW())
+        `INSERT INTO cdn_accounts
+             (tenant_id, slug, upload_token, reference_slug, reference_token, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
          ON CONFLICT (tenant_id) DO UPDATE SET
              slug            = EXCLUDED.slug,
-             upload_token    = CASE WHEN $5 THEN EXCLUDED.upload_token
+             reference_slug  = CASE WHEN $6 THEN EXCLUDED.reference_slug
+                                    ELSE cdn_accounts.reference_slug END,
+             upload_token    = CASE WHEN $7 THEN EXCLUDED.upload_token
                                     ELSE cdn_accounts.upload_token END,
-             reference_token = CASE WHEN $6 THEN EXCLUDED.reference_token
+             reference_token = CASE WHEN $8 THEN EXCLUDED.reference_token
                                     ELSE cdn_accounts.reference_token END,
              updated_at      = NOW()`,
         [
             tenantId,
             input.slug,
             input.uploadToken ? seal(input.uploadToken) : null,
+            input.referenceSlug ?? null,
             input.referenceToken ? seal(input.referenceToken) : null,
+            input.referenceSlug !== undefined,
             input.uploadToken !== undefined,
             input.referenceToken !== undefined,
         ]
@@ -182,7 +199,9 @@ export async function mayServe(
     slug: string,
     path: string
 ): Promise<boolean> {
+    // Either of her own folders is hers by definition.
     if (slug === account.slug) return true;
+    if (account.referenceSlug && slug === account.referenceSlug) return true;
     if (slug !== env.cdn.sharedSlug) return false;
 
     // Whatever spelling the row happens to hold. The oldest ones store the
