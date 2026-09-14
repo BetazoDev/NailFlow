@@ -7,6 +7,7 @@ import {
     type CdnSummary,
     type DomainCheck,
     type HostingOutcome,
+    type MailOutcome,
     type NewSalon,
     type PlatformSalon,
 } from '@/lib/api';
@@ -38,6 +39,7 @@ export default function PlatformPage() {
     // is a variable on the API and not a rebuild of this app.
     const [rootDomain, setRootDomain] = useState<string | null>(null);
     const [hosting, setHosting] = useState<(HostingOutcome & { enabled: boolean }) | null>(null);
+    const [mail, setMail] = useState<(MailOutcome & { enabled: boolean }) | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
     const [selected, setSelected] = useState<PlatformSalon | null>(null);
@@ -59,6 +61,7 @@ export default function PlatformPage() {
         // the token is wrong while creating a salon means finding out in front
         // of a customer.
         void api.platform.hosting().then(setHosting).catch(() => setHosting(null));
+        void api.platform.mail().then(setMail).catch(() => setMail(null));
     }, [load]);
 
     const counts = useMemo(() => {
@@ -103,6 +106,20 @@ export default function PlatformPage() {
                 >
                     <strong className="font-semibold">Alta automática de subdominios caída.</strong>{' '}
                     {hosting.detail} Los salones que crees ahora habrá que enrutarlos a mano.
+                </p>
+            )}
+
+            {mail && !mail.ok && (
+                <p
+                    role="alert"
+                    className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"
+                >
+                    <strong className="font-semibold">
+                        {mail.reason === 'unconfigured'
+                            ? 'El envío de accesos no está configurado.'
+                            : 'El buzón que envía los accesos no responde.'}
+                    </strong>{' '}
+                    {mail.detail} Las dueñas que des de alta ahora tendrás que avisarlas tú.
                 </p>
             )}
 
@@ -242,6 +259,7 @@ function NewSalonDrawer({
     const [invite, setInvite] = useState<string | null>(null);
     const [created, setCreated] = useState('');
     const [hosting, setHosting] = useState<HostingOutcome | null>(null);
+    const [mail, setMail] = useState<MailOutcome | null>(null);
     const [domainTouched, setDomainTouched] = useState(false);
 
     const set = <K extends keyof NewSalon>(field: K, value: NewSalon[K]) =>
@@ -265,6 +283,7 @@ function NewSalonDrawer({
             const salon = await api.platform.createSalon({ ...form, domain });
             setCreated(salon.domain);
             setHosting(salon.hosting);
+            setMail(salon.mail);
             setInvite(salon.invite);
             if (!salon.invite) onCreated();
         } catch (caught) {
@@ -312,11 +331,23 @@ function NewSalonDrawer({
                     </div>
                 )}
 
-                <p className="text-sm text-white/70">
-                    Cuando esté enrutado, envíale este enlace a la dueña para que elija su
-                    contraseña. No lo sabemos nosotros ni queda guardado: es de un solo uso y
-                    caduca.
-                </p>
+                {mail?.ok ? (
+                    <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4">
+                        <p className="text-sm font-semibold text-emerald-200">Acceso enviado</p>
+                        <p className="mt-1 text-xs text-emerald-100/70">{mail.detail}</p>
+                        <p className="mt-2 text-xs text-emerald-100/60">
+                            No tienes que hacer nada más. El enlace de abajo es el mismo, por si
+                            prefieres mandárselo también por WhatsApp.
+                        </p>
+                    </div>
+                ) : (
+                    <p className="text-sm text-white/70">
+                        {mail?.detail ?? 'No se envió el correo.'} Cuando su subdominio responda,
+                        usa <strong className="text-white">Reenviar acceso</strong> en su ficha —
+                        o mándale este enlace tú. No lo sabemos nosotros ni queda guardado: es de
+                        un solo uso y caduca.
+                    </p>
+                )}
                 <textarea
                     readOnly
                     value={invite}
@@ -523,11 +554,24 @@ function SalonDrawer({
         }
     };
 
+    /**
+     * Sends her access letter, and says whether it actually went.
+     *
+     * The link is still shown either way. It is the same one, and WhatsApp is
+     * how most of these salons are reached anyway — the email is the thing that
+     * stops it being forgotten, not a replacement for handing it over.
+     */
     const resend = async () => {
         setBusy(true);
+        setMessage(null);
         try {
-            const { invite: link } = await api.platform.invite(salon.id);
+            const { invite: link, mail } = await api.platform.invite(salon.id);
             setInvite(link);
+            setMessage(
+                mail.ok
+                    ? `Enviado. ${mail.detail}`
+                    : `No se envió el correo: ${mail.detail} El enlace de abajo sigue sirviendo.`
+            );
         } catch {
             setMessage('No pudimos generar el enlace.');
         } finally {

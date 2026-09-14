@@ -80,6 +80,19 @@ export interface HostingOutcome {
     reason?: 'unconfigured' | 'rejected' | 'unreachable';
 }
 
+/**
+ * Result of trying to send a salon her access letter.
+ *
+ * Separate from the hosting outcome despite the shape: a salon whose subdomain
+ * is not routed cannot be reached at all, while one whose letter did not send
+ * is reachable and simply has not been told — and the fix is different.
+ */
+export interface MailOutcome {
+    ok: boolean;
+    detail: string;
+    reason?: 'unconfigured' | 'rejected' | 'unreachable';
+}
+
 /** Whether a salon's subdomain is actually routed here, and what is missing. */
 export interface DomainCheck {
     domain: string;
@@ -339,6 +352,8 @@ export const api = {
                 invite: string | null;
                 /** Whether the subdomain was registered with the proxy for us. */
                 hosting: HostingOutcome;
+                /** Whether her access letter actually went out. */
+                mail: MailOutcome;
             }>('/platform/tenants', { method: 'POST', body: salon }),
 
         /** Retries the subdomain registration for a salon whose first try failed. */
@@ -412,7 +427,16 @@ export const api = {
 
         /** Re-issues the access link for an owner who never received it. */
         invite: (id: string) =>
-            request<{ invite: string }>(`/platform/tenants/${id}/invite`, { method: 'POST' }),
+            request<{ invite: string; mail: MailOutcome }>(
+                `/platform/tenants/${id}/invite`,
+                { method: 'POST' }
+            ),
+
+        /**
+         * Whether the mailbox that sends access letters works. Asked when the
+         * panel opens, so a wrong password is found before a salon needs it.
+         */
+        mail: () => request<MailOutcome & { enabled: boolean }>('/platform/mail'),
 
         audit: () => request<AuditEntry[]>('/platform/audit'),
     },

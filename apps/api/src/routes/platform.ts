@@ -16,6 +16,7 @@ import {
     registerDomain,
     unregisterDomain,
 } from '../services/hosting';
+import { checkMail, mailEnabled, sendInvite, type MailOutcome } from '../services/mail';
 import {
     SLUG_PATTERN,
     cdnSummary,
@@ -248,14 +249,48 @@ platformRouter.post(
         // then shows the manual step.
         const hosting = await registerDomain(body.domain);
 
+        /*
+         * The letter goes out only once her subdomain is actually routed.
+         *
+         * It tells her where her panel is and sends her to set a password; if
+         * the subdomain is not up yet she opens a link that goes nowhere, and
+         * the first thing she ever sees of the product is a page that does not
+         * load. When registration failed, the panel shows the manual step and
+         * the button that sends this afterwards.
+         *
+         * Best effort even then, like the registration: the salon and her
+         * account already exist, and refusing the whole creation because a mail
+         * server was slow would leave a half-made salon and nobody sure which
+         * half.
+         */
+        const mail: MailOutcome = !invite
+            ? {
+                  ok: false,
+                  reason: 'unconfigured',
+                  detail: 'No pudimos generar el enlace, así que no se envió nada.',
+              }
+            : !hosting.ok
+              ? {
+                    ok: false,
+                    reason: 'unconfigured',
+                    detail: 'No se envió todavía: su subdominio aún no responde.',
+                }
+              : await sendInvite({
+                    to: body.owner_email,
+                    salonName: body.name,
+                    domain: body.domain,
+                    link: invite,
+                });
+
         await audit(actor, 'tenant.created', tenantId, {
             domain: body.domain,
             owner_email: body.owner_email,
             subdomain_registered: hosting.ok,
+            invite_emailed: mail.ok,
         });
 
         log.info('Salon created', { tenantId, domain: body.domain, hosting: hosting.ok });
-        res.status(201).json({ id: tenantId, domain: body.domain, invite, hosting });
+        res.status(201).json({ id: tenantId, domain: body.domain, invite, hosting, mail });
     })
 );
 
@@ -294,8 +329,8 @@ platformRouter.post(
     '/tenants/:id/invite',
     requirePlatform,
     asyncHandler(async (req, res) => {
-        const result = await query<{ domain: string; owner_email: string | null }>(
-            'SELECT domain, owner_email FROM tenants WHERE id = $1',
+        const result = await query<{ domain: string; name: string | null; owner_email: string | null }>(
+            'SELECT domain, name, owner_email FROM tenants WHERE id = $1',
             [req.params.id]
         );
 
@@ -306,11 +341,19 @@ platformRouter.post(
         const invite = await inviteLink(tenant.owner_email, tenant.domain);
         if (!invite) throw new ApiError(503, 'No pudimos generar el enlace de acceso');
 
-        await audit(req.user!.email!, 'tenant.invited', req.params.id, {
-            owner_email: tenant.owner_email,
+        const mail = await sendInvite({
+            to: tenant.owner_email,
+            salonName: tenant.name ?? tenant.domain,
+            domain: tenant.domain,
+            link: invite,
         });
 
-        res.json({ invite });
+        await audit(req.user!.email!, 'tenant.invited', req.params.id, {
+            owner_email: tenant.owner_email,
+            emailed: mail.ok,
+        });
+
+        res.json({ invite, mail });
     })
 );
 
@@ -405,6 +448,21 @@ platformRouter.get(
     requirePlatform,
     asyncHandler(async (_req, res) => {
         res.json({ enabled: hostingEnabled(), ...(await checkConnection()) });
+    })
+);
+
+/**
+ * Whether the mailbox that sends access letters actually works.
+ *
+ * Asked when the panel opens rather than behind a button, for the same reason
+ * as the hosting check: finding out the password is wrong while creating a
+ * salon means finding out in front of a customer.
+ */
+platformRouter.get(
+    '/mail',
+    requirePlatform,
+    asyncHandler(async (_req, res) => {
+        res.json({ enabled: mailEnabled(), ...(await checkMail()) });
     })
 );
 

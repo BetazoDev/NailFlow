@@ -238,6 +238,29 @@ export const env = {
         sharedSlug: process.env.CDN_SLUG ?? 'nailssalon',
     },
 
+    /**
+     * Outgoing mail.
+     *
+     * Only one thing is sent from here: the message that lets a salon owner
+     * into her panel for the first time. Everything a *client* receives —
+     * confirmations, reminders — goes through the automation webhook instead,
+     * because those can be late without anyone being locked out.
+     *
+     * Optional, like every other integration: with nothing configured the panel
+     * says so and still shows the link to send by hand, which is exactly how
+     * this worked before.
+     */
+    smtp: {
+        host: optional('SMTP_HOST'),
+        port: Number(process.env.SMTP_PORT ?? 587),
+        user: optional('SMTP_USER'),
+        password: optional('SMTP_PASSWORD'),
+        /** The visible sender. Must be a mailbox the server will send as. */
+        from: optional('MAIL_FROM'),
+        /** Shown as the reply-to, so an owner answering reaches a human. */
+        replyTo: optional('MAIL_REPLY_TO'),
+    },
+
     n8n: {
         webhookUrl: optional('N8N_WEBHOOK_URL'),
     },
