@@ -263,6 +263,16 @@ export const env = {
 
     n8n: {
         webhookUrl: optional('N8N_WEBHOOK_URL'),
+        /**
+         * Shared secret the automation uses to write back what it provisioned.
+         *
+         * Deliberately not a platform-admin identity. The automation needs to do
+         * exactly one thing — hand back the CDN folder and keys it just created
+         * for a salon — and a token scoped to that cannot also list every salon,
+         * delete one, or read a payment account. Without it the route does not
+         * exist at all rather than standing open.
+         */
+        provisionToken: optional('N8N_PROVISION_TOKEN'),
     },
 
     retention: {

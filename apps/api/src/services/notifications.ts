@@ -10,7 +10,15 @@ export type AutomationEvent =
     | 'booking.cancelled'
     | 'booking.reminder'
     | 'loyalty.earned'
-    | 'subscription.lapsed';
+    | 'subscription.lapsed'
+    /**
+     * A salon has just been created and needs its image storage provisioning.
+     *
+     * The only event here that is not about a booking, and the only one whose
+     * result comes back: the automation creates the salon's folder and keys in
+     * the CDN and hands them to POST /api/platform/cdn/provisioned.
+     */
+    | 'salon.created';
 
 /**
  * Who to tell, and how to reach them.

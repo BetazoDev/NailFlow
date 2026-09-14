@@ -1,4 +1,6 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
+import rateLimit from 'express-rate-limit';
+import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { query, transaction } from '../db/pool';
 import { env } from '../config/env';
@@ -8,7 +10,7 @@ import { validateBody } from '../middleware/validate';
 import { firebaseAuth } from '../lib/firebase';
 import { newId } from '../services/bookings';
 import { summaryFor } from '../services/payments/accounts';
-import { forgetRecipients } from '../services/notifications';
+import { forgetRecipients, triggerAutomation } from '../services/notifications';
 import { markPaid } from '../services/subscription';
 import {
     checkConnection,
@@ -28,6 +30,20 @@ import { createLogger, errorContext } from '../lib/logger';
 
 const log = createLogger('platform');
 export const platformRouter: Router = Router();
+
+/**
+ * The provisioning callback is the only route here reachable without a signed-in
+ * admin, so it is the only one that can be hammered by someone guessing the
+ * shared secret. A budget turns that from an offline-speed attack into one that
+ * takes longer than the token will live.
+ */
+const provisionLimit = rateLimit({
+    windowMs: 60_000,
+    limit: 10,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Demasiados intentos. Espera un momento.' },
+});
 
 /**
  * Diabolical's own panel.
@@ -281,6 +297,24 @@ platformRouter.post(
                     domain: body.domain,
                     link: invite,
                 });
+
+        /*
+         * Ask the automation to provision her image storage.
+         *
+         * Fire and forget, like every other automation call: the salon already
+         * exists and refusing the creation because a workflow was down would
+         * leave a half-made salon. Until the keys come back she simply falls
+         * back to the shared folder, which is where every salon lived before
+         * any of this — visible in her card, and fixable by hand.
+         *
+         * The folder name is the subdomain's first label. It is already unique
+         * across salons, already a valid slug, and already the thing everyone
+         * calls her — so nobody has to invent a second name for the same salon.
+         */
+        void triggerAutomation(tenantId, 'salon.created', {
+            salon_slug: body.domain.split('.')[0],
+            owner_name: body.owner_name ?? null,
+        });
 
         await audit(actor, 'tenant.created', tenantId, {
             domain: body.domain,
@@ -800,6 +834,102 @@ platformRouter.post(
     validateBody(z.object({ token: z.string().trim().min(8).max(500) })),
     asyncHandler(async (req, res) => {
         res.json(await probeToken((req.body as { token: string }).token));
+    })
+);
+
+/**
+ * Where the automation hands back what it provisioned.
+ *
+ * Authenticated by a shared secret rather than a platform admin, because it
+ * needs to do exactly one thing. A token that can write a salon's CDN account
+ * and nothing else cannot also list every salon, delete one, or read a payment
+ * account — which is what handing the automation a real admin identity would
+ * have given it.
+ *
+ * Mounted before `requirePlatform` for that reason, and only when a secret is
+ * configured: an unset token makes the route not exist rather than stand open.
+ */
+function requireProvisionToken(req: Request, res: Response, next: NextFunction): void {
+    const expected = env.n8n.provisionToken;
+    if (!expected) return next(ApiError.notFound('Route not found'));
+
+    const given = req.headers['x-provision-key'];
+    const offered = typeof given === 'string' ? given : '';
+
+    // Constant time: comparing with === leaks the shared secret one character
+    // at a time to anyone who can measure the response.
+    const a = Buffer.from(offered);
+    const b = Buffer.from(expected);
+    const ok = a.length === b.length && timingSafeEqual(a, b);
+
+    if (!ok) {
+        log.warn('Provisioning call rejected', { ip: req.ip });
+        return next(new ApiError(401, 'Clave de aprovisionamiento inválida'));
+    }
+
+    next();
+}
+
+const provisionedSchema = z.object({
+    tenant_id: z.string().trim().min(1).max(64),
+    slug: z
+        .string()
+        .trim()
+        .regex(SLUG_PATTERN, 'La carpeta solo admite letras, números, guion y guion bajo'),
+    /** Writes what the salon manages: services, team, her logo. */
+    upload_token: z.string().trim().min(8).max(500).optional(),
+    /** Writes the reference photos her clients upload while booking. */
+    reference_token: z.string().trim().min(8).max(500).optional(),
+});
+
+platformRouter.post(
+    '/cdn/provisioned',
+    provisionLimit,
+    requireProvisionToken,
+    validateBody(provisionedSchema),
+    asyncHandler(async (req, res) => {
+        const body = req.body as z.infer<typeof provisionedSchema>;
+
+        const exists = await query('SELECT 1 FROM tenants WHERE id = $1', [body.tenant_id]);
+        if (exists.rows.length === 0) throw ApiError.notFound('Ese salón no existe');
+
+        const taken = await query(
+            'SELECT 1 FROM cdn_accounts WHERE slug = $1 AND tenant_id <> $2',
+            [body.slug, body.tenant_id]
+        );
+        if (taken.rows.length > 0) {
+            throw ApiError.badRequest('Esa carpeta ya es de otro salón. Cada una necesita la suya.');
+        }
+
+        try {
+            await saveCdnAccount(body.tenant_id, {
+                slug: body.slug,
+                uploadToken: body.upload_token,
+                referenceToken: body.reference_token,
+            });
+        } catch (error) {
+            log.error('Could not store provisioned CDN keys', {
+                tenantId: body.tenant_id,
+                ...errorContext(error),
+            });
+            throw new ApiError(
+                503,
+                error instanceof Error ? error.message : 'No pudimos guardar las claves.'
+            );
+        }
+
+        // The actor is the automation, not a person. Recorded anyway: this is a
+        // write to a salon's credentials and the log is where you look when her
+        // photos start going somewhere unexpected.
+        await audit('automation', 'tenant.cdn.provisioned', body.tenant_id, {
+            slug: body.slug,
+            stored: [
+                body.upload_token ? 'upload' : null,
+                body.reference_token ? 'reference' : null,
+            ].filter(Boolean),
+        });
+
+        res.json(await cdnSummary(body.tenant_id));
     })
 );
 
