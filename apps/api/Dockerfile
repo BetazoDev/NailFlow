@@ -42,7 +42,18 @@ EXPOSE 3000
 # Checked often and early: Swarm only marks the task healthy after the first
 # success, and Dokploy stops waiting before a 20s start period plus a 30s
 # interval elapses — which made successful deploys report as failed.
-HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=5 \
+# Comprobar la salud cuesta un proceso de Node entero, porque la imagen no
+# trae curl. Arrancar Node son 200ms con el servidor tranquilo y varios
+# segundos cuando no lo esta, asi que un intervalo corto con un margen corto
+# se convierte en una espiral: la comprobacion tarda de mas, Swarm da el
+# contenedor por muerto, arranca otro, y ese arranque consume justo lo que
+# faltaba. Paso de verdad: cada 5s, dos contenedores, 47% de la CPU en
+# comprobar si estaban vivos.
+#
+# El margen ahora es holgado a proposito. Una caida real se detecta 30
+# segundos mas tarde, que no le cuesta nada a nadie; la espiral costaba el
+# producto entero.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "apps/api/dist/index.js"]
