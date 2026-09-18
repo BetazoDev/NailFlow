@@ -265,11 +265,26 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
  * Used by the pages that render a "this salon is not available" state: a server
  * component that throws here would render a bare 500 instead.
  */
+/**
+ * Statuses that mean "there is nothing to show", rather than "something broke".
+ *
+ * 404 is the salon not existing and 0 is the API not answering at all. The
+ * gateway codes matter just as much and were missing: when the API's container
+ * is down, the request does not fail to connect — it reaches the reverse proxy,
+ * which answers 502. That was re-thrown, the server component crashed, and a
+ * salon's booking page showed a raw "Application error" instead of saying it
+ * was unavailable.
+ *
+ * A 500 is deliberately absent. That is the API answering and being broken,
+ * which is a different problem and should stay loud.
+ */
+const ABSENT = new Set([0, 404, 502, 503, 504]);
+
 async function optional<T>(promise: Promise<T>): Promise<T | null> {
     try {
         return await promise;
     } catch (error) {
-        if (error instanceof ApiError && (error.status === 404 || error.status === 0)) return null;
+        if (error instanceof ApiError && ABSENT.has(error.status)) return null;
         throw error;
     }
 }
