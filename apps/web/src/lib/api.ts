@@ -622,11 +622,19 @@ export const api = {
      *
      * The folder is deliberately not filled in here. Each salon now has her
      * own, and a value baked into the web app at build time could only ever
-     * name one of them; the API knows which salon the request arrived for and
-     * resolves it there, which is also where it can refuse to serve another
-     * salon's.
+     * name one of them; the API resolves it per request, which is also where it
+     * can refuse to serve another salon's.
+     *
+     * Which salon that is travels in the URL. Everything else here goes through
+     * `request`, which sets `x-tenant-domain` — but this returns a string for an
+     * `<img src>`, and the browser fetches that by itself, with no way to attach
+     * a header. Until the domain went in the query the API saw only its own
+     * host, matched no salon, and answered 404 for every photo.
+     *
+     * `domain` is for callers rendering on the server, where there is no
+     * `window` to read it from.
      */
-    getImageUrl: (reference: string | null | undefined): string => {
+    getImageUrl: (reference: string | null | undefined, domain?: string): string => {
         if (!reference) return '';
         if (reference.startsWith('data:') || reference.startsWith('blob:')) return reference;
 
@@ -638,7 +646,10 @@ export const api = {
 
         if (!path) return '';
 
-        return `${API_BASE}/api/img/${path}`;
+        const host = tenantDomain(domain);
+        const query = host ? `?d=${encodeURIComponent(host)}` : '';
+
+        return `${API_BASE}/api/img/${path}${query}`;
     },
 };
 
