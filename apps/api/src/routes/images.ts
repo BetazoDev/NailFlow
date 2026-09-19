@@ -21,11 +21,16 @@ export const imagesRouter: Router = Router();
 /**
  * Reading and writing a salon's images.
  *
- * Both directions are scoped to the salon the request arrived for, resolved
- * from the Host header — never from anything the browser asks for. Before that
- * was true, the read proxy served whatever path it was given with a key that
- * could read everything, so one salon's page could serve another salon's
- * client photos to anyone who knew a filename.
+ * Both directions are scoped to a salon. Before that was true, the read proxy
+ * served whatever path it was given with a key that could read everything, so
+ * one salon's page could serve another salon's client photos to anyone who knew
+ * a filename.
+ *
+ * Which salon is named by the Host, by `x-tenant-domain`, or — for reads only —
+ * by the `d` query parameter. None of the three grants anything: naming a salon
+ * only picks whose folder is looked in, and `mayServe` still has to agree that
+ * this salon shows this file. What closes the leak is that pairing, not the
+ * secrecy of the name.
  *
  * The CDN key never leaves the server in either direction.
  */
@@ -53,8 +58,35 @@ function safePath(raw: string): string | null {
 
 // ── Reading ──────────────────────────────────────────────────────────────────
 
+/**
+ * Lets a read name its salon in the query string.
+ *
+ * An `<img>` tag cannot send headers. The web app forwards `x-tenant-domain` on
+ * every `fetch`, but a photo is fetched by the browser itself from a plain
+ * `src`, so the only name the API saw was its own Host — which belongs to no
+ * salon, and answered 404 for every image on every page.
+ *
+ * Reads only. Uploads keep to the header, because there the domain travels
+ * beside a signed-in owner and a body worth storing; a query parameter invites
+ * being pasted into a link and sent to someone else.
+ *
+ * An explicit header wins, so nothing changes for callers that already send one.
+ *
+ * Typed through `express.RequestHandler` rather than the `Request`/`Response`
+ * pair the other middleware imports: this file also calls `fetch`, and pulling
+ * Express's `Response` into scope shadows the global one the reply below is.
+ */
+const tenantFromQuery: express.RequestHandler = (req, _res, next) => {
+    if (!req.headers['x-tenant-domain']) {
+        const domain = req.query.d;
+        if (typeof domain === 'string' && domain) req.headers['x-tenant-domain'] = domain;
+    }
+    next();
+};
+
 imagesRouter.get(
     '/img/*',
+    tenantFromQuery,
     resolveTenant,
     asyncHandler(async (req, res) => {
         const { id: tenantId } = tenantOf(req);
