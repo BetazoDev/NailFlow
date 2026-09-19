@@ -247,10 +247,16 @@ export class CdnError extends Error {
 /**
  * Sends one image to the CDN under the salon's own key.
  *
- * The stored path comes back from the CDN rather than being assembled here: its
- * first segment is the folder the *key* belongs to, not anything the caller
+ * The stored path comes back from the CDN rather than being assembled here: it
+ * begins with the client the *key* belongs to, not with anything the caller
  * asked for. That is precisely why a key per salon separates them, so the
  * answer is read rather than assumed.
+ *
+ * It was assumed once, and the shape guessed at — "<salon>/<folder>/<file>" —
+ * was not the shape the CDN serves. Every upload succeeded and every photo
+ * 404'd afterwards, which is the worst way for this to fail: nothing to see
+ * until someone opens the page. The fallback below is the real shape now, but
+ * it is still only a fallback.
  */
 export async function uploadImage(
     account: CdnAccount,
@@ -307,7 +313,9 @@ export async function uploadImage(
     }
 
     const raw = item.url ?? item.cdnUrl ?? '';
-    if (!raw) return [account.slug, folder, item.filename].filter(Boolean).join('/');
+    if (!raw) {
+        return [account.slug, folder, 'original', item.filename].filter(Boolean).join('/');
+    }
 
     try {
         return new URL(raw).pathname.replace(/^\/+/, '');

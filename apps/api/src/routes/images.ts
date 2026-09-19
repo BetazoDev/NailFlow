@@ -116,10 +116,12 @@ imagesRouter.get(
          * Which key reads this file is decided by which folder it is in, not by
          * what the path looks like.
          *
-         * The CDN stores everything flat — "<project>/<file>" — so the segment
-         * after the folder is a filename, never a folder name. Reading it as one
-         * picked the wrong key for every image whose file happened to start with
-         * a word like "services".
+         * A path is "<salon>/<folder>/original/<file>", and the salon at the
+         * front is the CDN's *client* — both of her projects sit under it, and
+         * the CDN accepts either of her keys for anything beneath it. So this
+         * almost always lands on the upload key, and that is correct rather
+         * than lucky: it is her own client, and the reference key buys nothing
+         * extra on a read.
          *
          * In the shared folder there is nothing to go on, so both are tried:
          * that is the folder from before salons had their own, and its two keys
