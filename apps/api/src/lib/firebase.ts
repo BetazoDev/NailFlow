@@ -1,4 +1,11 @@
-import { applicationDefault, cert, getApps, initializeApp, type App } from 'firebase-admin/app';
+import {
+    applicationDefault,
+    cert,
+    getApps,
+    initializeApp,
+    type App,
+    type ServiceAccount,
+} from 'firebase-admin/app';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 import { createLogger, errorContext } from './logger';
@@ -39,7 +46,7 @@ function initialise(): App | null {
 
     if (inline) {
         try {
-            const account = JSON.parse(inline) as { project_id?: string };
+            const account = JSON.parse(inline) as ServiceAccount & { project_id?: string };
             project = account.project_id ?? null;
             return initializeApp({ credential: cert(account) });
         } catch (error) {
