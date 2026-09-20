@@ -24,17 +24,34 @@ export const hexColorSchema = z
     .regex(/^#[0-9a-fA-F]{6}$/, 'Expected a hex colour like #E8B4B8');
 
 /**
- * Only accept image URLs we host. Storing an arbitrary URL would let a booking
- * embed a tracker — or an attacker's endpoint — into the salon's dashboard.
+ * Only accept image references we host. Storing an arbitrary URL would let a
+ * booking embed a tracker — or an attacker's endpoint — into the salon's
+ * dashboard.
+ *
+ * Three shapes are ours, and all three arrive: a bare CDN path, which is what
+ * an upload answers with now that each salon has her own folder
+ * ("bella/services/original/x.jpg"); the same path with a leading slash; and a
+ * full URL, which is what the oldest rows carry.
+ *
+ * The bare one used to be refused, so a salon could upload a photo and then be
+ * unable to save the service pointing at it — the file was already stored and
+ * the form said "Expected an absolute or root-relative URL", which names a
+ * shape she has no way to produce.
+ *
+ * "//host/path" is refused on purpose. It begins with a slash, so the old rule
+ * waved it through, and a browser reads it as a URL on somebody else's host —
+ * an external image inside the salon's panel, which is the one thing this is
+ * here to prevent. Same for "..", which has no business in a stored path.
  */
 export const imageUrlSchema = z
     .string()
     .trim()
     .max(2048)
-    .refine(
-        value => /^https?:\/\//i.test(value) || value.startsWith('/'),
-        'Expected an absolute or root-relative URL'
-    );
+    .refine(value => {
+        if (/^https?:\/\//i.test(value)) return true;
+        if (value.startsWith('//') || value.includes('..')) return false;
+        return /^\/?[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(value);
+    }, 'Expected an image we host, or an absolute URL');
 
 // ── Services ─────────────────────────────────────────────────────────────────
 
