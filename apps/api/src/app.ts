@@ -9,6 +9,7 @@ import { imagesRouter } from './routes/images';
 import { webhooksRouter } from './routes/webhooks';
 import { gatewayRouter } from './routes/gateway';
 import { platformRouter } from './routes/platform';
+import { handoffRouter } from './routes/handoff';
 import { devicesRouter } from './routes/devices';
 import { tenantRouter } from './routes/tenant';
 import { sessionRouter } from './routes/session';
@@ -101,6 +102,11 @@ export function createApp(): Express {
     // platform admin acts across every salon, so the Host header says nothing
     // about which one is meant.
     app.use('/api/platform', platformRouter);
+
+    // Carrying a Google sign-in from the account domain to a salon's own.
+    // Outside `resolveTenant` for the same reason as the platform router: the
+    // minting half is called from the account domain, which is no salon.
+    app.use('/api/auth', handoffRouter);
 
     // ── Tier 3: tenant-scoped API ────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { authErrorMessage } from '@/lib/auth-errors';
+import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -50,19 +51,101 @@ export default function LoginPage() {
         setGoogleAvailable(!account || window.location.host === account);
     }, []);
 
+    /**
+     * A salon she owns, once Google has said who she is.
+     *
+     * Only ever more than one when the same woman runs two locations, which
+     * the platform allows on purpose — so the choice is offered rather than
+     * guessed at.
+     */
+    const [salons, setSalons] = useState<{ domain: string; name: string | null; code: string }[]>([]);
+
+    /**
+     * Sends her to her own panel, signed in.
+     *
+     * The code rides in the fragment, never the query. A fragment is the one
+     * part of a URL browsers keep to themselves: it is not sent with the
+     * request, not put in the Referer, and so never lands in an access log on
+     * either side. For sixty seconds this code is worth her password.
+     */
+    const enter = (salon: { domain: string; code: string }) => {
+        window.location.replace(`https://${salon.domain}/entrar#t=${encodeURIComponent(salon.code)}`);
+    };
+
     const handleGoogleLogin = async () => {
         setLoading(true);
         setError('');
 
         try {
             await signInWithPopup(auth, new GoogleAuthProvider());
-            router.replace('/admin');
         } catch (caught) {
             const message = authErrorMessage(caught);
             if (message) setError(message);
             setLoading(false);
+            return;
+        }
+
+        /*
+         * Signed in here, but here is not her panel.
+         *
+         * This page only offers Google on the account domain — the one Firebase
+         * authorises — and a Firebase session belongs to the origin that made
+         * it. Going to /admin now would land her on a domain that is no salon,
+         * and the panel would ask the API for one by that name and be told it
+         * does not exist. So the session has to be carried across.
+         */
+        try {
+            const { salons: owned } = await api.auth.handoff();
+            if (owned.length === 1) {
+                enter(owned[0]);
+                return;
+            }
+            setSalons(owned);
+            setLoading(false);
+        } catch (caught) {
+            setError(
+                caught instanceof ApiError
+                    ? caught.message
+                    : 'Entraste con Google, pero no pudimos abrir tu panel. Intenta de nuevo.'
+            );
+            setLoading(false);
         }
     };
+
+    /*
+     * Two salons, one owner. Rare, and deliberately supported: the platform
+     * reuses an existing account when the same woman opens a second location,
+     * so guessing which one she meant would be wrong half the time.
+     */
+    if (salons.length > 1) {
+        return (
+            <main className="flex min-h-dvh flex-col justify-center bg-surface px-6 py-12">
+                <div className="mx-auto w-full max-w-md rounded-3xl border border-line bg-surface-raised p-8 shadow-soft">
+                    <h1 className="mb-2 font-display text-2xl font-semibold text-text-strong">
+                        ¿A cuál entras?
+                    </h1>
+                    <p className="mb-6 text-sm text-text-muted">
+                        Administras más de un salón con este correo.
+                    </p>
+                    <ul className="space-y-3">
+                        {salons.map(salon => (
+                            <li key={salon.domain}>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="lg"
+                                    className="w-full"
+                                    onClick={() => enter(salon)}
+                                >
+                                    {salon.name ?? salon.domain}
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main className="flex min-h-dvh flex-col justify-center bg-surface px-6 py-12">

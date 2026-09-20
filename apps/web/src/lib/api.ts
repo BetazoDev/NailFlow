@@ -463,6 +463,35 @@ export const api = {
         audit: () => request<AuditEntry[]>('/platform/audit'),
     },
 
+    /**
+     * Carrying a Google sign-in from the account domain to a salon's own.
+     *
+     * Google only runs on the one domain Firebase knows, and a Firebase
+     * session belongs to the origin that made it — so the two halves here are
+     * called from two different hosts, and that is the whole point of them.
+     */
+    auth: {
+        /** On the account domain: her salons, each with a code to enter it. */
+        handoff: () =>
+            request<{ salons: { domain: string; name: string | null; code: string }[]; expiresIn: number }>(
+                '/auth/handoff',
+                { method: 'POST' }
+            ),
+
+        /**
+         * On her own domain: the code for a token that signs her in here.
+         *
+         * Anonymous because she has no session on this origin yet; the code is
+         * what stands in for one, which is why it dies after this call.
+         */
+        redeem: (code: string) =>
+            request<{ token: string }>('/auth/handoff/redeem', {
+                method: 'POST',
+                body: { code },
+                anonymous: true,
+            }),
+    },
+
     /** First sign-up on a fresh deployment takes ownership of the salon. */
 
     // ── Services ─────────────────────────────────────────────────────────────

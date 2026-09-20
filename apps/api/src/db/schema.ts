@@ -188,19 +188,44 @@ const TABLES = `
         slug             TEXT NOT NULL UNIQUE,
         upload_token     TEXT,
 
-        -- And a second folder for the photos her clients upload while booking.
+        -- And a second CDN project for the photos her clients upload while
+        -- booking, with a key of its own.
         --
-        -- A separate folder rather than a subfolder because the CDN has no
-        -- subfolders: every stored path is "<project>/<file>", flat, and the
-        -- "folder" sent with an upload is metadata that never reaches the URL.
-        -- A project is the only unit of separation there is — and these two
-        -- have to be separated, because the key that writes reference photos is
-        -- used by people who are not signed in and must not be able to
-        -- overwrite the salon's own pictures.
+        -- Two projects and not one, because that key is handed to people who
+        -- are not signed in and must not reach the salon's own pictures with
+        -- it. On disk the two live side by side under her client folder —
+        -- "<client>/<folder>/original/<file>" — and what keeps this salon apart
+        -- from every other is that the CDN refuses a key whose client is not
+        -- the one named in the path.
         reference_slug   TEXT UNIQUE,
         reference_token  TEXT,
 
         updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    /*
+     * Carrying a sign-in from the account domain to a salon's own.
+     *
+     * Google only returns someone to a domain Firebase has been told about,
+     * and that list takes no wildcards — so she signs in on the one account
+     * domain. But a Firebase session belongs to the origin that created it:
+     * signing in at cuenta.example.com does not sign her in at
+     * bella.example.com. Different origin, different storage.
+     *
+     * So the account domain mints a code here, sends her to her own domain
+     * carrying it, and that page trades it for a token that signs her in
+     * there. This table is what makes the trade safe.
+     *
+     * The code itself is never stored, only its SHA-256. Reading this table
+     * then yields nothing usable, which matters because for sixty seconds a
+     * row here is equivalent to her password.
+     */
+    CREATE TABLE IF NOT EXISTS auth_handoffs (
+        code_hash   TEXT PRIMARY KEY,
+        uid         TEXT NOT NULL,
+        tenant_id   TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        expires_at  TIMESTAMPTZ NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 `;
 
@@ -219,6 +244,8 @@ const INDEXES = [
     'CREATE INDEX IF NOT EXISTS idx_appointments_tenant_phone ON appointments (tenant_id, client_phone)',
     'CREATE INDEX IF NOT EXISTS idx_appointments_created_at ON appointments (created_at)',
     'CREATE INDEX IF NOT EXISTS idx_slot_locks_expiry ON slot_locks (expires_at)',
+    // Every redeem sweeps the expired rows on its way past.
+    'CREATE INDEX IF NOT EXISTS idx_auth_handoffs_expiry ON auth_handoffs (expires_at)',
     // Stripe Connect delivers every account's events to one endpoint, so the
     // webhook looks the salon up by connected account id on every call.
     "CREATE INDEX IF NOT EXISTS idx_payment_accounts_stripe ON payment_accounts (stripe_account_id) WHERE stripe_account_id IS NOT NULL",
