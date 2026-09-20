@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import {
+    GoogleAuthProvider,
+    signInWithCustomToken,
+    signInWithEmailAndPassword,
+    signInWithPopup,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { authErrorMessage } from '@/lib/auth-errors';
 import { api, ApiError } from '@/lib/api';
@@ -39,24 +44,19 @@ export default function LoginPage() {
     };
 
     /**
-     * Google sign-in only works on a domain Firebase has been told about, and
-     * that list takes no wildcards — so on a salon's own subdomain the popup
-     * fails with `auth/unauthorized-domain` no matter what we do. Offering a
-     * button that cannot work is worse than not offering it: she would blame
-     * her password. Email and password work everywhere.
+     * The one host Firebase has been told about, or nothing on a deployment
+     * that runs on a single domain.
      */
-    const [googleAvailable, setGoogleAvailable] = useState(false);
+    const account = process.env.NEXT_PUBLIC_ACCOUNT_DOMAIN;
+    const [here, setHere] = useState(true);
     useEffect(() => {
-        const account = process.env.NEXT_PUBLIC_ACCOUNT_DOMAIN;
-        setGoogleAvailable(!account || window.location.host === account);
-    }, []);
+        setHere(!account || window.location.host === account);
+    }, [account]);
 
     /**
-     * A salon she owns, once Google has said who she is.
-     *
-     * Only ever more than one when the same woman runs two locations, which
-     * the platform allows on purpose — so the choice is offered rather than
-     * guessed at.
+     * A salon she owns, once Google has said who she is. Only ever more than
+     * one when the same woman runs two locations, which the platform supports
+     * on purpose — so the choice is offered rather than guessed at.
      */
     const [salons, setSalons] = useState<{ domain: string; name: string | null; code: string }[]>([]);
 
@@ -64,17 +64,87 @@ export default function LoginPage() {
      * Sends her to her own panel, signed in.
      *
      * The code rides in the fragment, never the query. A fragment is the one
-     * part of a URL browsers keep to themselves: it is not sent with the
-     * request, not put in the Referer, and so never lands in an access log on
-     * either side. For sixty seconds this code is worth her password.
+     * part of a URL browsers keep to themselves: not sent with the request,
+     * not put in the Referer, so never written into an access log on either
+     * side. For sixty seconds this code is worth her password.
      */
     const enter = (salon: { domain: string; code: string }) => {
         window.location.replace(`https://${salon.domain}/entrar#t=${encodeURIComponent(salon.code)}`);
     };
 
+    /** Signs her in here, with a code a window on the account domain fetched. */
+    const signInWithHandoff = async (code: string) => {
+        try {
+            const { token } = await api.auth.redeem(code);
+            await signInWithCustomToken(auth, token);
+            router.replace('/admin');
+        } catch (caught) {
+            setError(
+                caught instanceof ApiError
+                    ? caught.message
+                    : 'No pudimos completar el acceso. Intenta de nuevo.'
+            );
+            setLoading(false);
+        }
+    };
+
+    /**
+     * Google, from a salon's own domain.
+     *
+     * It cannot run here — Firebase only allows it on a domain in its list,
+     * and hers will never be in it — so it runs in a small window on the one
+     * domain that is, and sends a code back. Her tab does not move: she stays
+     * on her own site the whole time, which is the entire point.
+     */
+    const viaBridge = () => {
+        const origin = window.location.origin;
+        const bridge = window.open(
+            `https://${account}/puente?o=${encodeURIComponent(origin)}`,
+            'nailflow-google',
+            'width=480,height=640,menubar=no,toolbar=no'
+        );
+
+        if (!bridge) {
+            // Popups blocked entirely. The slower path still works, and saying
+            // so is better than a button that does nothing.
+            window.location.assign(`https://${account}/login`);
+            return;
+        }
+
+        const onMessage = (event: MessageEvent) => {
+            // Only the account domain may speak, and only in the one shape.
+            // Without this check any page that got a handle on this window
+            // could push a code of its own choosing.
+            if (event.origin !== `https://${account}`) return;
+            const data = event.data as { type?: string; code?: string } | null;
+            if (data?.type !== 'nailflow:handoff' || typeof data.code !== 'string') return;
+
+            window.removeEventListener('message', onMessage);
+            clearInterval(watch);
+            void signInWithHandoff(data.code);
+        };
+
+        // She may simply close the window. Nothing arrives, and without this
+        // the button would stay spinning for ever.
+        const watch = setInterval(() => {
+            if (bridge.closed) {
+                clearInterval(watch);
+                window.removeEventListener('message', onMessage);
+                setLoading(false);
+            }
+        }, 500);
+
+        window.addEventListener('message', onMessage);
+    };
+
     const handleGoogleLogin = async () => {
         setLoading(true);
         setError('');
+
+        if (!here) {
+            viaBridge();
+            return;
+        }
 
         try {
             await signInWithPopup(auth, new GoogleAuthProvider());
@@ -86,13 +156,9 @@ export default function LoginPage() {
         }
 
         /*
-         * Signed in here, but here is not her panel.
-         *
-         * This page only offers Google on the account domain — the one Firebase
-         * authorises — and a Firebase session belongs to the origin that made
-         * it. Going to /admin now would land her on a domain that is no salon,
-         * and the panel would ask the API for one by that name and be told it
-         * does not exist. So the session has to be carried across.
+         * Signed in, but this is the account domain and her panel is not here.
+         * A Firebase session belongs to the origin that made it, so going to
+         * /admin now would land her on a host that is no salon.
          */
         try {
             const { salons: owned } = await api.auth.handoff();
@@ -205,7 +271,7 @@ export default function LoginPage() {
                         </Link>
                     </p>
 
-                    {googleAvailable && (
+                    {(
                     <div className="relative my-8">
                         <span className="absolute inset-0 flex items-center" aria-hidden="true">
                             <span className="w-full border-t border-line" />
@@ -216,7 +282,7 @@ export default function LoginPage() {
                     </div>
                     )}
 
-                    {googleAvailable && (
+                    {(
                     <Button
                         type="button"
                         variant="secondary"
