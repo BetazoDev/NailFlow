@@ -18,7 +18,7 @@ import {
     registerDomain,
     unregisterDomain,
 } from '../services/hosting';
-import { authorizeDomains } from '../services/auth-domains';
+import { authorizeDomains, revokeDomains } from '../services/auth-domains';
 import { checkMail, mailEnabled, sendInvite, type MailOutcome } from '../services/mail';
 import {
     SLUG_PATTERN,
@@ -647,6 +647,27 @@ platformRouter.delete(
         }
 
         const hosting = await unregisterDomain(tenant.domain);
+
+        /*
+         * And out of the list of domains Firebase will sign people in on.
+         *
+         * Adding was the part that made her Google button work; this is the
+         * part that keeps the list honest. A subdomain left authorised after
+         * its salon is gone would arrive pre-trusted if the name were ever
+         * handed to somebody else.
+         *
+         * Best effort, like unregistering the subdomain above: the salon is
+         * being deleted either way, and a stale entry in a list is a smaller
+         * problem than a delete that half happened.
+         */
+        const signIn = await revokeDomains([tenant.domain]);
+        if (!signIn.ok) {
+            log.warn('Could not remove the salon domain from the sign-in list', {
+                domain: tenant.domain,
+                reason: signIn.reason,
+                detail: signIn.detail,
+            });
+        }
 
         // Everything that hangs off the salon, removed explicitly and in one
         // transaction.

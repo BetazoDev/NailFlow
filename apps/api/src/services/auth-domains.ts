@@ -122,6 +122,63 @@ export async function authorizeDomains(hosts: readonly string[]): Promise<Domain
 }
 
 /**
+ * Takes these hosts back out, and nothing else.
+ *
+ * The list only ever grew, which is harmless at six salons and is not at six
+ * hundred: a deleted salon's subdomain would stay authorised for sign-in for
+ * ever, and if that name were ever handed to somebody else it would arrive
+ * pre-trusted.
+ *
+ * Removal is by exact name and only for the hosts named here, so `localhost`,
+ * Firebase's own domains and every other salon survive untouched. Read, subtract,
+ * write — the same shape as adding, for the same reason: the update replaces
+ * the whole array.
+ */
+export async function revokeDomains(hosts: readonly string[]): Promise<DomainOutcome> {
+    const unwanted = new Set(hosts.map(host => host.trim().toLowerCase()).filter(Boolean));
+    if (unwanted.size === 0) return { ok: true, added: [] };
+
+    const project = firebaseProjectId();
+    const token = await firebaseAccessToken();
+    if (!project || !token) {
+        return {
+            ok: false,
+            reason: 'unconfigured',
+            detail: 'No hay credenciales de Firebase en este servidor.',
+        };
+    }
+
+    let current: string[];
+    try {
+        const response = await call(token, project, { method: 'GET' });
+        if (!response.ok) return explain(response.status, await response.text().catch(() => ''));
+        const config = (await response.json()) as { authorizedDomains?: string[] };
+        current = config.authorizedDomains ?? [];
+    } catch (error) {
+        log.error('Could not read the authorized domains', errorContext(error));
+        return { ok: false, reason: 'failed', detail: 'No pudimos leer la lista de dominios.' };
+    }
+
+    const kept = current.filter(domain => !unwanted.has(domain.toLowerCase()));
+    if (kept.length === current.length) return { ok: true, added: [] };
+
+    try {
+        const response = await call(token, project, {
+            method: 'PATCH',
+            search: '?updateMask=authorizedDomains',
+            body: JSON.stringify({ authorizedDomains: kept }),
+        });
+        if (!response.ok) return explain(response.status, await response.text().catch(() => ''));
+    } catch (error) {
+        log.error('Could not update the authorized domains', errorContext(error));
+        return { ok: false, reason: 'failed', detail: 'No pudimos actualizar la lista.' };
+    }
+
+    log.info('Authorized domains removed', { removed: current.length - kept.length });
+    return { ok: true, added: [] };
+}
+
+/**
  * Brings every existing salon into the list, once, at startup.
  *
  * Salons created before this existed have domains Firebase has never been told
