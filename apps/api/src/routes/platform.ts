@@ -18,6 +18,7 @@ import {
     registerDomain,
     unregisterDomain,
 } from '../services/hosting';
+import { authorizeDomains } from '../services/auth-domains';
 import { checkMail, mailEnabled, sendInvite, type MailOutcome } from '../services/mail';
 import {
     SLUG_PATTERN,
@@ -256,6 +257,26 @@ platformRouter.post(
             [newId(), tenantId, body.owner_name || body.name, body.owner_email]
         );
 
+        /*
+         * Her subdomain has to be one Firebase will sign people in on, and that
+         * list takes no wildcards — so it goes in by name, here, before she is
+         * ever sent a link.
+         *
+         * Doing it now rather than the first time she signs in is what lets
+         * "Continue with Google" live on her own page instead of a detour
+         * through a shared domain. Best effort like the two steps below it: a
+         * salon whose domain did not register is still a salon, and her
+         * password works regardless.
+         */
+        const authDomain = await authorizeDomains([body.domain]);
+        if (!authDomain.ok) {
+            log.warn('Could not authorize the salon domain for sign-in', {
+                domain: body.domain,
+                reason: authDomain.reason,
+                detail: authDomain.detail,
+            });
+        }
+
         const invite = await inviteLink(body.owner_email, body.domain);
 
         // Registering the subdomain is best effort on purpose. The salon and her
@@ -320,10 +341,16 @@ platformRouter.post(
             domain: body.domain,
             owner_email: body.owner_email,
             subdomain_registered: hosting.ok,
+            sign_in_domain_authorized: authDomain.ok,
             invite_emailed: mail.ok,
         });
 
-        log.info('Salon created', { tenantId, domain: body.domain, hosting: hosting.ok });
+        log.info('Salon created', {
+            tenantId,
+            domain: body.domain,
+            hosting: hosting.ok,
+            signInDomain: authDomain.ok,
+        });
         res.status(201).json({ id: tenantId, domain: body.domain, invite, hosting, mail });
     })
 );

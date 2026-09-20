@@ -2,6 +2,7 @@ import type { Server } from 'node:http';
 import { env, describeConfig } from './config/env';
 import { createApp } from './app';
 import { initDb } from './db/schema';
+import { syncSalonDomains } from './services/auth-domains';
 import { closePool } from './db/pool';
 import { scheduleCleanupJobs } from './jobs/cleanup';
 import { scheduleReminderJob } from './jobs/reminders';
@@ -30,6 +31,13 @@ async function main(): Promise<void> {
     }
 
     await initDb();
+
+    /*
+     * Not awaited. It reaches Google, and a slow or unreachable Identity
+     * Platform would hold the whole API from listening over a list that only
+     * affects one button.
+     */
+    void syncSalonDomains();
 
     const app = createApp();
     const cleanupTask = scheduleCleanupJobs();

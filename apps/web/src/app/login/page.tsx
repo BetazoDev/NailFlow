@@ -141,17 +141,39 @@ export default function LoginPage() {
         setLoading(true);
         setError('');
 
-        if (!here) {
-            viaBridge();
-            return;
-        }
-
+        /*
+         * Google runs right here, on her own domain.
+         *
+         * It can because her subdomain is registered with Firebase the moment
+         * her salon is created, and the ones created before that were brought
+         * in when the API last started. A salon that slipped through both
+         * falls through to the detour rather than being shown a button that
+         * does nothing — which is what she would otherwise blame on her
+         * password.
+         */
         try {
             await signInWithPopup(auth, new GoogleAuthProvider());
         } catch (caught) {
+            const code =
+                typeof caught === 'object' && caught !== null && 'code' in caught
+                    ? String((caught as { code: unknown }).code)
+                    : '';
+
+            if (code === 'auth/unauthorized-domain' && account && !here) {
+                viaBridge();
+                return;
+            }
+
             const message = authErrorMessage(caught);
             if (message) setError(message);
             setLoading(false);
+            return;
+        }
+
+        // On her own domain there is nothing to carry: the session was made
+        // here, and here is where her panel is.
+        if (!here) {
+            router.replace('/admin');
             return;
         }
 

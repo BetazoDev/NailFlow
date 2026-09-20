@@ -78,3 +78,42 @@ export function firebaseMessaging(): Messaging | null {
     const instance = app();
     return instance ? getMessaging(instance) : null;
 }
+
+/**
+ * The project this credential belongs to, and a token that can act for it.
+ *
+ * Both exist for one job: telling Firebase which domains may host a sign-in.
+ * That list is not part of the Admin SDK's surface — it belongs to Identity
+ * Platform's own admin API — so the call is made by hand, with a token
+ * borrowed from the credential the SDK already holds.
+ *
+ * Nothing else in this file reaches outside the SDK, and it would be better if
+ * this did not either. The alternative is a person opening a console and
+ * adding a domain every time a salon is created, which is precisely the manual
+ * step this deployment is shaped to avoid.
+ */
+export function firebaseProjectId(): string | null {
+    const instance = app();
+    if (!instance) return null;
+
+    return (
+        instance.options.projectId ??
+        process.env.FIREBASE_PROJECT_ID ??
+        process.env.GOOGLE_CLOUD_PROJECT ??
+        null
+    );
+}
+
+export async function firebaseAccessToken(): Promise<string | null> {
+    const instance = app();
+    const credential = instance?.options.credential;
+    if (!credential) return null;
+
+    try {
+        const token = await credential.getAccessToken();
+        return token.access_token;
+    } catch (error) {
+        log.error('Could not mint a Google access token', errorContext(error));
+        return null;
+    }
+}
