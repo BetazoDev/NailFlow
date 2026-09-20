@@ -65,11 +65,24 @@ export async function authorizeDomains(hosts: readonly string[]): Promise<Domain
     const project = firebaseProjectId();
     const token = await firebaseAccessToken();
 
-    if (!project || !token) {
+    // Told apart on purpose. These two fail for different reasons and are
+    // fixed in different places, and saying "no credentials" when the
+    // credential was fine sent the last reader to the wrong one.
+    if (!token) {
         return {
             ok: false,
             reason: 'unconfigured',
             detail: 'No hay credenciales de Firebase en este servidor.',
+        };
+    }
+
+    if (!project) {
+        return {
+            ok: false,
+            reason: 'unconfigured',
+            detail:
+                'Hay credenciales, pero no sabemos de qué proyecto son. Define ' +
+                'FIREBASE_PROJECT_ID, o usa una cuenta de servicio que incluya project_id.',
         };
     }
 

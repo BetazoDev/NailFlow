@@ -20,6 +20,17 @@ const log = createLogger('firebase');
  */
 let resolved: App | null | undefined;
 
+/**
+ * The project id, kept from the service account as it goes past.
+ *
+ * `initializeApp({ credential })` records only what it was handed, so
+ * `options.projectId` stays undefined on this path — while the id itself sits
+ * in the JSON being parsed one line below. Dropping it meant the only caller
+ * that needs it concluded there were no credentials at all, which is both
+ * wrong and the most misleading thing it could have said.
+ */
+let project: string | null = null;
+
 function initialise(): App | null {
     const existing = getApps()[0];
     if (existing) return existing;
@@ -28,7 +39,9 @@ function initialise(): App | null {
 
     if (inline) {
         try {
-            return initializeApp({ credential: cert(JSON.parse(inline)) });
+            const account = JSON.parse(inline) as { project_id?: string };
+            project = account.project_id ?? null;
+            return initializeApp({ credential: cert(account) });
         } catch (error) {
             log.error(
                 'FIREBASE_SERVICE_ACCOUNT is set but could not be used. It must be the ' +
@@ -98,6 +111,7 @@ export function firebaseProjectId(): string | null {
 
     return (
         instance.options.projectId ??
+        project ??
         process.env.FIREBASE_PROJECT_ID ??
         process.env.GOOGLE_CLOUD_PROJECT ??
         null
